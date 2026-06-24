@@ -1,0 +1,89 @@
+﻿# =============================================================
+#  Unreal Engine 5.5 / Visual Studio 2022 / JetBrains Rider
+#  ProjectD (MeowTractive)
+#  ※ Content/, Config/ 는 추적 대상이므로 제외하지 않음 (Content는 Git LFS)
+# =============================================================
+
+# ----- 개인 작업공간 (로컬 전용, 커밋 안 함) -----
+# 실험·테스트용 스크래치. 정식 에셋이 이 폴더를 참조하면 안됩니다.
+Content/Developers/LCW/Test/
+Skills/
+
+
+
+# ----- Unreal Engine 생성물 -----
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+Platforms/*/Binaries/
+Platforms/*/Intermediate/
+
+# 플러그인 빌드 산출물 (플러그인 소스 자체는 추적)
+Plugins/**/Binaries/
+Plugins/**/Intermediate/
+
+# 자동 생성 IDE 프로젝트 파일 (Generate Project Files로 재생성됨)
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+*.xcodeproj
+*.xcworkspace
+
+# 언리얼 임시/캐시
+*.VC.db
+*.VC.opendb
+*.opensdf
+*.opendb
+*.sdf
+*.suo
+*.tmp
+*.pdb
+
+# ----- Visual Studio 2022 -----
+.vs/
+*.user
+*.userprefs
+*.userosscache
+*.sln.docstates
+
+# ----- JetBrains Rider / ReSharper -----
+.idea/
+_ReSharper*/
+*.DotSettings.user
+*.resharper.user
+
+# ----- OS 생성 파일 -----
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+# macOS
+.DS_Store
+.AppleDouble
+# Linux
+*~
+
+# ----- AI 어시스턴트 / 에이전트 도구 -----
+# Claude Code
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+# OpenAI Codex
+.codex/
+AGENTS.md
+# Cursor
+.cursor/
+.cursorrules
+# 기타 에이전트 (Gemini / Windsurf / Aider 등)
+.gemini/
+GEMINI.md
+.windsurfrules
+.aider*
+
+# ----- 기타 -----
+*.log
+*.bak

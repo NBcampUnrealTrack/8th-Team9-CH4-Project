@@ -1,0 +1,30 @@
+# 최상위 설정: 상위 디렉터리 탐색 중단
+root = true
+
+# 공통 기본값 (Rider / Visual Studio 2022 모두 적용)
+[*]
+charset = utf-8-bom
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# C++ 소스: 언리얼 컨벤션(탭 들여쓰기) + UTF-8 BOM
+[*.{h,hpp,inl,cpp,c,cc,cxx}]
+indent_style = tab
+indent_size = 4
+
+# UnrealBuildTool 스크립트(.cs)
+[*.cs]
+indent_style = tab
+indent_size = 4
+
+# 설정/데이터 파일은 BOM 없이 둠 (외부 도구 호환)
+[*.{json,xml,uproject,uplugin,ini,yml,yaml}]
+charset = utf-8
+indent_style = space
+indent_size = 2
+
+# 마크다운: 줄 끝 공백 보존(강제 줄바꿈)
+[*.md]
+charset = utf-8
+trim_trailing_whitespace = false
