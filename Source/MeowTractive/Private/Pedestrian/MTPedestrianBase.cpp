@@ -28,10 +28,12 @@ AMTPedestrianBase::AMTPedestrianBase()
 	}
 
 	AttractivenessBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("AttractivenessBar"));
-	AttractivenessBarWidget->SetupAttachment(GetMesh(), TEXT("head")); // 머리 소켓
-	AttractivenessBarWidget->SetWidgetSpace(EWidgetSpace::World);
+	AttractivenessBarWidget->SetupAttachment(GetMesh());
+	AttractivenessBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 200.f));
+	AttractivenessBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
 	AttractivenessBarWidget->SetDrawSize(FVector2D(200.f, 20.f));
-	AttractivenessBarWidget->SetVisibility(false); // 기본 숨김
+	AttractivenessBarWidget->SetVisibility(true); // 기본 숨김
+
 }
 
 void AMTPedestrianBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -146,17 +148,58 @@ void AMTPedestrianBase::BeginPlay()
 
 void AMTPedestrianBase::Tick(float DeltaTime)
 {
-	Super::Tick(DeltaTime);
+    Super::Tick(DeltaTime);
 
-	if (!HasAuthority())
+	UIUpdateTimer += DeltaTime;
+	if (UIUpdateTimer < UIUpdateInterval) return;
+	UIUpdateTimer = 0.f;
+
+	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
 	{
-		return;
+		FVector CameraLocation;
+		FRotator CameraRotation;
+		PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
+
+		float Distance = FVector::Dist(GetActorLocation(), CameraLocation);
+    
+		// 일정 거리 이상이면 숨김
+		if (Distance > AttractivenessBarVisibleDistance)
+		{
+			AttractivenessBarWidget->SetVisibility(false);
+			return;
+		}
+
+		FVector ToWidget = (GetActorLocation() - CameraLocation).GetSafeNormal();
+		float Dot = FVector::DotProduct(CameraRotation.Vector(), ToWidget);
+		if (Dot < 0.f)
+		{
+			AttractivenessBarWidget->SetVisibility(false);
+			return;
+		}
+
+		FHitResult HitResult;
+		FCollisionQueryParams Params;
+		Params.AddIgnoredActor(this);
+		Params.AddIgnoredActor(PC->GetPawn());
+		bool bBlocked = GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, GetActorLocation(), ECC_Visibility, Params);
+    
+		if (bBlocked)
+		{
+			AttractivenessBarWidget->SetVisibility(false);
+			return;
+		}
+
+		AttractivenessBarWidget->SetVisibility(true);
+		// DrawSize는 고정
+		AttractivenessBarWidget->SetDrawSize(FVector2D(200.f, 20.f));
 	}
 
-	if (!bIsWaiting && bHasDestination && HasReachedDestination())
-	{
-		WaitBeforeNextMove();
-	}
+    if (!HasAuthority()) return;
+
+    if (!bIsWaiting && bHasDestination && HasReachedDestination())
+    {
+        WaitBeforeNextMove();
+    }
 }
 
 //무작위 지점 선택 후 이동 시작

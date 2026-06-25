@@ -55,6 +55,14 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "UI")
 	UWidgetComponent* AttractivenessBarWidget;
 
+	UPROPERTY(EditAnywhere, Category = "Pedestrian|UI")
+	float AttractivenessBarVisibleDistance = 1500.f;
+
+	float UIUpdateTimer = 0.f;
+
+	UPROPERTY(EditAnywhere, Category = "Pedestrian|UI")
+	float UIUpdateInterval = 0.1f; // 0.1초마다 체크
+
 private:
 	//걷기 속도
 	UPROPERTY(EditAnywhere, Category = "Pedestrian|Movement")
