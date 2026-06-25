@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
@@ -20,6 +20,9 @@ public:
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "MT|Lobby")
 	void Server_RequestStartMatch();
+
+	UFUNCTION(Client, Reliable)
+	void ClientShowResult();
 
 private:
 	float LastReadyToggleTime = -100.f;     // 서버 쿨다운 기준 시각

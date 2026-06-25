@@ -16,6 +16,9 @@ public:
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void HandleSeamlessTravelPlayer(AController*& C) override;
 
+	virtual void HandleMatchHasEnded() override;
+	void ReturnToLobby();
+
 protected:
 	// 전원 로딩 완료 + 이동 중 플레이어 없음 → true 시 StartMatch
 	virtual bool ReadyToStartMatch_Implementation() override;

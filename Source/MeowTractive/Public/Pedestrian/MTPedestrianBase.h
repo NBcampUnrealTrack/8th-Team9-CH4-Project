@@ -39,6 +39,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Pedestrian|Attractiveness")
 	void AddAttractiveness(APlayerState* TargetPlayerState, float Delta);
 
+	// 매료도 감소 속도
+	UPROPERTY(EditAnywhere, Category = "Pedestrian|Attractiveness")
+	float AttractivenessDecayRate = 5.f; // 초당 감소량
+
+	void UpdateAttractivenessBarVisibility();
+
 	UFUNCTION(Server, Reliable)
 	void ServerAddAttractiveness(APlayerState* TargetPlayerState, float Delta);
 

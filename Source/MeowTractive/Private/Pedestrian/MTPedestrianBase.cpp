@@ -9,6 +9,7 @@
 #include "UI/InGame/MTAttractivenessBarWidget.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/MTPlayerState.h"
+#include "Game/MTGameState.h"
 #include "TimerManager.h"
 
 AMTPedestrianBase::AMTPedestrianBase()
@@ -80,19 +81,32 @@ void AMTPedestrianBase::AddAttractiveness(APlayerState* TargetPlayerState, float
 		}
 	);
 
+	AMTGameState* GS = GetWorld()->GetGameState<AMTGameState>();
+
 	if (Entry)
 	{
-		Entry->Value = FMath::Max(0.0f, Entry->Value + Delta);
+		float PrevValue = Entry->Value; // 업데이트 전 값
+		Entry->Value = FMath::Clamp(Entry->Value + Delta, 0.f, MaxAttraction);
+    
+		bool bWasMax = PrevValue >= MaxAttraction;
+		bool bIsMax = Entry->Value >= MaxAttraction;
+
+		if (!bWasMax && bIsMax && GS)
+			GS->AddAttractedCount(TargetPlayerState);
+		else if (bWasMax && !bIsMax && GS)
+			GS->RemoveAttractedCount(TargetPlayerState);
 	}
 	else
 	{
 		FPedestrianAttractiveness NewEntry;
 		NewEntry.PlayerState = TargetPlayerState;
-		NewEntry.Value = FMath::Max(0.0f, Delta);
+		NewEntry.Value = FMath::Clamp(Delta, 0.f, MaxAttraction);
 		Attractivenesses.Add(NewEntry);
+
+		if (NewEntry.Value >= MaxAttraction && GS)
+			GS->AddAttractedCount(TargetPlayerState);
 	}
 
-	// 필요하면 여기서 팬 전환/최고 매료도 플레이어 판정
 }
 
 void AMTPedestrianBase::ServerAddAttractiveness_Implementation(APlayerState* TargetPlayerState, float Delta)
@@ -150,56 +164,73 @@ void AMTPedestrianBase::Tick(float DeltaTime)
 {
     Super::Tick(DeltaTime);
 
-	UIUpdateTimer += DeltaTime;
-	if (UIUpdateTimer < UIUpdateInterval) return;
-	UIUpdateTimer = 0.f;
+    // UI 업데이트 (타이머 기반)
+    UIUpdateTimer += DeltaTime;
+    if (UIUpdateTimer >= UIUpdateInterval)
+    {
+        UIUpdateTimer = 0.f;
+        UpdateAttractivenessBarVisibility();
+    }
 
-	if (APlayerController* PC = GetWorld()->GetFirstPlayerController())
-	{
-		FVector CameraLocation;
-		FRotator CameraRotation;
-		PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
-
-		float Distance = FVector::Dist(GetActorLocation(), CameraLocation);
-    
-		// 일정 거리 이상이면 숨김
-		if (Distance > AttractivenessBarVisibleDistance)
-		{
-			AttractivenessBarWidget->SetVisibility(false);
-			return;
-		}
-
-		FVector ToWidget = (GetActorLocation() - CameraLocation).GetSafeNormal();
-		float Dot = FVector::DotProduct(CameraRotation.Vector(), ToWidget);
-		if (Dot < 0.f)
-		{
-			AttractivenessBarWidget->SetVisibility(false);
-			return;
-		}
-
-		FHitResult HitResult;
-		FCollisionQueryParams Params;
-		Params.AddIgnoredActor(this);
-		Params.AddIgnoredActor(PC->GetPawn());
-		bool bBlocked = GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, GetActorLocation(), ECC_Visibility, Params);
-    
-		if (bBlocked)
-		{
-			AttractivenessBarWidget->SetVisibility(false);
-			return;
-		}
-
-		AttractivenessBarWidget->SetVisibility(true);
-		// DrawSize는 고정
-		AttractivenessBarWidget->SetDrawSize(FVector2D(200.f, 20.f));
-	}
-
+    // 서버 전용
     if (!HasAuthority()) return;
+
+    // 매료도 감소
+    for (FPedestrianAttractiveness& Entry : Attractivenesses)
+    {
+        if (Entry.Value > 0.f)
+        {
+            AddAttractiveness(Entry.PlayerState, -AttractivenessDecayRate * DeltaTime);
+        }
+    }
 
     if (!bIsWaiting && bHasDestination && HasReachedDestination())
     {
         WaitBeforeNextMove();
     }
+}
+
+void AMTPedestrianBase::UpdateAttractivenessBarVisibility()
+{
+     APlayerController* PC = GetWorld()->GetFirstPlayerController();
+    if (!PC) return;
+
+    FVector CameraLocation;
+    FRotator CameraRotation;
+    PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
+
+    // 거리 체크
+    float Distance = FVector::Dist(GetActorLocation(), CameraLocation);
+    if (Distance > AttractivenessBarVisibleDistance)
+    {
+        AttractivenessBarWidget->SetVisibility(false);
+        return;
+    }
+
+    // 시야 체크
+    FVector ToWidget = (GetActorLocation() - CameraLocation).GetSafeNormal();
+    float Dot = FVector::DotProduct(CameraRotation.Vector(), ToWidget);
+    if (Dot < 0.f)
+    {
+        AttractivenessBarWidget->SetVisibility(false);
+        return;
+    }
+
+    // 벽 가림 체크
+    FHitResult HitResult;
+    FCollisionQueryParams Params;
+    Params.AddIgnoredActor(this);
+    Params.AddIgnoredActor(PC->GetPawn());
+    bool bBlocked = GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, GetActorLocation(), ECC_Visibility, Params);
+    if (bBlocked)
+    {
+        AttractivenessBarWidget->SetVisibility(false);
+        return;
+    }
+
+    AttractivenessBarWidget->SetVisibility(true);
+    AttractivenessBarWidget->SetDrawSize(FVector2D(200.f, 20.f));
+
 }
 
 //무작위 지점 선택 후 이동 시작

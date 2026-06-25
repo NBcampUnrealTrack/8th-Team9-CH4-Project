@@ -35,3 +35,20 @@ void AMTPlayerController::Server_RequestStartMatch_Implementation()
 		Lobby->TryStartMatch();
 	}
 }
+
+void AMTPlayerController::ClientShowResult_Implementation()
+{
+	// 입력 비활성화
+	DisableInput(this);
+	if (APawn* MyPawn = GetPawn())
+    {
+        MyPawn->DisableInput(this);
+    }
+    SetInputMode(FInputModeUIOnly());
+    bShowMouseCursor = true;
+
+    // 게임 끝 메시지
+    GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Yellow, TEXT("게임 종료!"));
+
+	// TODO: 결과 화면 위젯 생성 및 표시
+}

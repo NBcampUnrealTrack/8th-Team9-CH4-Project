@@ -55,23 +55,45 @@ void AMTMatchGameMode::HandleSeamlessTravelPlayer(AController*& C)
 	MarkLoaded(C);                  // seamless travel 완료 = 새 맵 로딩 완료
 }
 
+void AMTMatchGameMode::HandleMatchHasEnded()
+{
+    Super::HandleMatchHasEnded();
+
+    AMTGameState* GS = GetGameState<AMTGameState>();
+    if (!GS) return;
+
+    for (APlayerState* PS : GS->PlayerArray)
+    {
+        if (AMTPlayerController* PC = Cast<AMTPlayerController>(PS->GetPlayerController()))
+        {
+            PC->ClientShowResult();
+        }
+    }
+
+    FTimerHandle LobbyTimer;
+    GetWorldTimerManager().SetTimer(LobbyTimer, this, &AMTMatchGameMode::ReturnToLobby, 5.f, false);
+}
+
+void AMTMatchGameMode::ReturnToLobby()
+{
+	// 로비 복귀
+	// GetWorld()->ServerTravel(TEXT("/Game/Maps/LobbyMap?listen"));
+}
+
 void AMTMatchGameMode::UpdateMatchTimer()
 {
-	RemainingTime--;
+    RemainingTime--;
 
-		if (AMTGameState* GS = GetGameState<AMTGameState>())
-		{
-			// GS->SetRemainingTime(RemainingTime);
-		}
+    GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::White, 
+        FString::Printf(TEXT("남은 시간: %d"), RemainingTime));
 
-		if (RemainingTime <= 0)
-		{
-			GetWorldTimerManager().ClearTimer(MatchTimerHandle);
-        
-			// 매치 종료 및 승자 판정 로직으로 이동
-			// EndMatch(); 
-		}
-	}
+    if (RemainingTime <= 0)
+    {
+        GetWorldTimerManager().ClearTimer(MatchTimerHandle);
+        EndMatch();
+    }
+
+}
 
 void AMTMatchGameMode::SpawnInitialPedestrians()
 {
