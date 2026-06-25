@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerState.h"
@@ -35,6 +35,12 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "MT|Lobby")
 	int32 GetTeamId() const { return TeamId; }
+
+	// 팀 색
+	UFUNCTION(BlueprintPure, Category = "MT|Player")
+	FLinearColor GetTeamColor() const { return TeamColor; }
+
+	void SetTeamColor(FLinearColor NewColor);
 
 	// 방장 여부 (호스트 슬롯에 "게임시작" 표시용)
 	UFUNCTION(BlueprintPure, Category = "MT|Lobby")
@@ -73,4 +79,8 @@ protected:
 
 	// 서버에서 값 바꾼 직후 호스트(리슨 서버) UI도 갱신되게 직접 방송
 	void BroadcastChanged();
+
+	// 플레이어 팀 색
+	UPROPERTY(Replicated)
+	FLinearColor TeamColor = FLinearColor::White;
 };

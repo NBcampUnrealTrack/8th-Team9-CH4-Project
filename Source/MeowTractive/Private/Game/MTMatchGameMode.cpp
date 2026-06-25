@@ -27,8 +27,26 @@ AMTMatchGameMode::AMTMatchGameMode()
 
 void AMTMatchGameMode::PostLogin(APlayerController* NewPlayer)
 {
-	Super::PostLogin(NewPlayer);
-	MarkLoaded(NewPlayer);          // 비-seamless 진입 안전망
+    Super::PostLogin(NewPlayer);
+    MarkLoaded(NewPlayer);
+
+    AMTPlayerState* MTPS = NewPlayer->GetPlayerState<AMTPlayerState>();
+    if (!MTPS) return;
+
+    const int32 Slot = GameState->PlayerArray.Num() - 1;
+    MTPS->SetPlayerSlot(Slot);
+
+    const TArray<FLinearColor> SlotColors = {
+        FLinearColor(1.f, 0.2f, 0.2f),
+        FLinearColor(0.2f, 0.4f, 1.f),
+        FLinearColor(0.2f, 0.8f, 0.2f),
+        FLinearColor(1.f, 0.8f, 0.f),
+    };
+
+    if (SlotColors.IsValidIndex(Slot))
+    {
+        MTPS->SetTeamColor(SlotColors[Slot]);
+    }
 }
 
 void AMTMatchGameMode::HandleSeamlessTravelPlayer(AController*& C)

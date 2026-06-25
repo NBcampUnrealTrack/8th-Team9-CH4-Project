@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "Components/WidgetComponent.h"
 #include "MTPedestrianBase.generated.h"
 
 class APlayerState;
@@ -19,6 +20,7 @@ struct FPedestrianAttractiveness
 
 	UPROPERTY(BlueprintReadOnly, Category = "Pedestrian|Attractiveness")
 	float Value = 0.0f;
+
 };
 
 UCLASS()
@@ -50,6 +52,9 @@ protected:
 	UFUNCTION()
 	void OnRep_Attractivenesses();
 
+	UPROPERTY(VisibleAnywhere, Category = "UI")
+	UWidgetComponent* AttractivenessBarWidget;
+
 private:
 	//걷기 속도
 	UPROPERTY(EditAnywhere, Category = "Pedestrian|Movement")
@@ -74,6 +79,9 @@ private:
 	// 이동 체크 간격
 	UPROPERTY(EditAnywhere, Category = "Pedestrian|Movement")
 	float MoveCheckDistance = 120.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Pedestrian|Attractiveness")
+	float MaxAttraction = 100.f;
 
 	FTimerHandle WaitTimerHandle;
 

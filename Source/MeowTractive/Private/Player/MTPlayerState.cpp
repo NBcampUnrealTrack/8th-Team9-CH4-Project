@@ -1,4 +1,4 @@
-#include "Player/MTPlayerState.h"
+﻿#include "Player/MTPlayerState.h"
 #include "Net/UnrealNetwork.h"
 
 AMTPlayerState::AMTPlayerState()
@@ -75,6 +75,12 @@ void AMTPlayerState::OnRep_LobbyState()
 void AMTPlayerState::BroadcastChanged()
 {
 	OnLobbyStateChanged.Broadcast();
+}
+
+void AMTPlayerState::SetTeamColor(FLinearColor NewColor)
+{
+	if (!HasAuthority()) return;
+    TeamColor = NewColor;
 }
 
 // seamless travel 시 선택 정보 유지. bIsReady/bIsLoaded는 새 레벨에서 다시 받음.
