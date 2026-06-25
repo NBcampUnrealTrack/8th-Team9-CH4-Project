@@ -44,14 +44,22 @@ void AMTLobbyGameMode::Logout(AController* Exiting)
 bool AMTLobbyGameMode::CanStartMatch() const
 {
 	const AGameStateBase* GS = GameState;
-	if (!GS || GS->PlayerArray.Num() == 0)
+	if (!GS || GS->PlayerArray.Num() < 2)   // 호스트 혼자 시작 불가 (최소 2명)
 	{
 		return false;
 	}
 	for (const APlayerState* PS : GS->PlayerArray)
 	{
 		const AMTPlayerState* MTPS = Cast<AMTPlayerState>(PS);
-		if (!MTPS || !MTPS->IsReady())
+		if (!MTPS)
+		{
+			return false;
+		}
+		if (MTPS->IsHost())
+		{
+			continue;   // 호스트는 준비 불필요 (시작 권한 보유)
+		}
+		if (!MTPS->IsReady())
 		{
 			return false;
 		}

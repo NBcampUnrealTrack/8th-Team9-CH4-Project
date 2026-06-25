@@ -1,16 +1,32 @@
-﻿// MTPedestrianBase.cpp
+// MTPedestrianBase.cpp
 
 #include "Pedestrian/MTPedestrianBase.h"
 
-#include "AIController.h"
-#include "NavigationSystem.h"
+#include "Pedestrian/MTPedestrianAttributeSet.h"
+#include "AbilitySystemComponent.h"
+#include "GameplayEffect.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/WidgetComponent.h"
 #include "GameFramework/PlayerState.h"
-#include "UI/InGame/MTAttractivenessBarWidget.h"
-#include "Net/UnrealNetwork.h"
-#include "Player/MTPlayerState.h"
+#include "GameFramework/Pawn.h"
 #include "Game/MTGameState.h"
-#include "TimerManager.h"
+#include "Net/UnrealNetwork.h"
+
+// 자기 자신에게 GE 적용 (회복/태그/무적 — 전부 데이터 주도형)
+static void ApplySelfGE(UAbilitySystemComponent* ASC, TSubclassOf<UGameplayEffect> GE, AActor* Source)
+{
+	if (!ASC || !GE)
+	{
+		return;
+	}
+	FGameplayEffectContextHandle Ctx = ASC->MakeEffectContext();
+	Ctx.AddSourceObject(Source);
+	const FGameplayEffectSpecHandle Spec = ASC->MakeOutgoingSpec(GE, 1.f, Ctx);
+	if (Spec.IsValid())
+	{
+		ASC->ApplyGameplayEffectSpecToSelf(*Spec.Data.Get());
+	}
+}
 
 AMTPedestrianBase::AMTPedestrianBase()
 {
@@ -18,7 +34,6 @@ AMTPedestrianBase::AMTPedestrianBase()
 
 	bReplicates = true;
 	SetReplicateMovement(true);
-
 	bUseControllerRotationYaw = false;
 
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
@@ -28,127 +43,44 @@ AMTPedestrianBase::AMTPedestrianBase()
 		Movement->RotationRate = FRotator(0.0f, 360.0f, 0.0f);
 	}
 
-	AttractivenessBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("AttractivenessBar"));
-	AttractivenessBarWidget->SetupAttachment(GetMesh());
-	AttractivenessBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 200.f));
-	AttractivenessBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
-	AttractivenessBarWidget->SetDrawSize(FVector2D(200.f, 20.f));
-	AttractivenessBarWidget->SetVisibility(true); // 기본 숨김
+	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	AbilitySystemComponent->SetIsReplicated(true);
+	// AI(소유 클라 없음) → Minimal: GE는 복제 안 하고 속성/태그/큐만 복제
+	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
+	AttributeSet = CreateDefaultSubobject<UMTPedestrianAttributeSet>(TEXT("AttractiveAttributeSet"));
+
+	AttractiveBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("AttractiveBar"));
+	AttractiveBarWidget->SetupAttachment(GetMesh());
+	AttractiveBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 200.f));
+	AttractiveBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
+	AttractiveBarWidget->SetDrawSize(FVector2D(200.f, 20.f));
 }
 
 void AMTPedestrianBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-
-	DOREPLIFETIME(AMTPedestrianBase, Attractivenesses);
+	// 기여도 테이블 전체가 아닌 '결과(소유자)'만 복제
+	DOREPLIFETIME(AMTPedestrianBase, AttractedBy);
 }
 
-float AMTPedestrianBase::GetAttractiveness(APlayerState* TargetPlayerState) const
+UAbilitySystemComponent* AMTPedestrianBase::GetAbilitySystemComponent() const
 {
-	if (!TargetPlayerState)
-	{
-		return 0.0f;
-	}
-
-	const FPedestrianAttractiveness* Entry = Attractivenesses.FindByPredicate(
-		[TargetPlayerState](const FPedestrianAttractiveness& Item)
-		{
-			return Item.PlayerState == TargetPlayerState;
-		}
-	);
-
-	return Entry ? Entry->Value : 0.0f;
+	return AbilitySystemComponent;
 }
 
-void AMTPedestrianBase::AddAttractiveness(APlayerState* TargetPlayerState, float Delta)
-{
-	if (!TargetPlayerState || FMath::IsNearlyZero(Delta))
-	{
-		return;
-	}
-
-	if (!HasAuthority())
-	{
-		ServerAddAttractiveness(TargetPlayerState, Delta);
-		return;
-	}
-
-	FPedestrianAttractiveness* Entry = Attractivenesses.FindByPredicate(
-		[TargetPlayerState](const FPedestrianAttractiveness& Item)
-		{
-			return Item.PlayerState == TargetPlayerState;
-		}
-	);
-
-	AMTGameState* GS = GetWorld()->GetGameState<AMTGameState>();
-
-	if (Entry)
-	{
-		float PrevValue = Entry->Value; // 업데이트 전 값
-		Entry->Value = FMath::Clamp(Entry->Value + Delta, 0.f, MaxAttraction);
-    
-		bool bWasMax = PrevValue >= MaxAttraction;
-		bool bIsMax = Entry->Value >= MaxAttraction;
-
-		if (!bWasMax && bIsMax && GS)
-			GS->AddAttractedCount(TargetPlayerState);
-		else if (bWasMax && !bIsMax && GS)
-			GS->RemoveAttractedCount(TargetPlayerState);
-	}
-	else
-	{
-		FPedestrianAttractiveness NewEntry;
-		NewEntry.PlayerState = TargetPlayerState;
-		NewEntry.Value = FMath::Clamp(Delta, 0.f, MaxAttraction);
-		Attractivenesses.Add(NewEntry);
-
-		if (NewEntry.Value >= MaxAttraction && GS)
-			GS->AddAttractedCount(TargetPlayerState);
-	}
-
-}
-
-void AMTPedestrianBase::ServerAddAttractiveness_Implementation(APlayerState* TargetPlayerState, float Delta)
-{
-	AddAttractiveness(TargetPlayerState, Delta);
-}
-
-void AMTPedestrianBase::OnRep_Attractivenesses()
-{
-	// 클라이언트 UI/VFX 갱신이 필요하면 여기서 처리
-
-	// 가장 높은 매료도 플레이어 찾기
-    const FPedestrianAttractiveness* Top = nullptr;
-    for (const FPedestrianAttractiveness& Entry : Attractivenesses)
-    {
-        if (!Top || Entry.Value > Top->Value)
-            Top = &Entry;
-    }
-
-    if (!Top || Top->Value <= 0.f)
-    {
-        AttractivenessBarWidget->SetVisibility(false);
-        return;
-    }
-
-    // 팀 색 가져오기 (PlayerState에서)
-	AMTPlayerState* MTPS = Cast<AMTPlayerState>(Top->PlayerState);
-	if (!MTPS) return;
-
-	if (auto* Bar = Cast<UMTAttractivenessBarWidget>(AttractivenessBarWidget->GetUserWidgetObject()))
-	{
-		Bar->UpdateBar(Top->Value, MaxAttraction, MTPS->GetTeamColor());
-		AttractivenessBarWidget->SetVisibility(true);
-	}
-}
-
-//시작과 함께 돌아다니기 시작
 void AMTPedestrianBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	//이동속도 설정
+	InvulnerableTag = FGameplayTag::RequestGameplayTag(FName("State.Invulnerable"));
+	AttractiveInProgressTag = FGameplayTag::RequestGameplayTag(FName("State.AttractiveInProgress"));
+
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->InitAbilityActorInfo(this, this);
+	}
+
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
 		Movement->MaxWalkSpeed = WalkSpeed;
@@ -156,161 +88,216 @@ void AMTPedestrianBase::BeginPlay()
 
 	if (HasAuthority())
 	{
-		ResumeWander();
+		// 회복 GE 1회 부여: 무한+주기. AttractiveInProgress/Invulnerable 태그가 있으면 Ongoing Req로 정지.
+		// 배회/이동은 StateTree(ST_Pedestrian)가 시작·관리한다.
+		ApplySelfGE(AbilitySystemComponent, RegenGE, this);
+	}
+
+	BroadcastAttractiveChanged(); // 초기값 바 반영
+}
+
+void AMTPedestrianBase::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->InitAbilityActorInfo(this, this);
 	}
 }
 
 void AMTPedestrianBase::Tick(float DeltaTime)
 {
-    Super::Tick(DeltaTime);
+	Super::Tick(DeltaTime);
 
-    // UI 업데이트 (타이머 기반)
-    UIUpdateTimer += DeltaTime;
-    if (UIUpdateTimer >= UIUpdateInterval)
-    {
-        UIUpdateTimer = 0.f;
-        UpdateAttractivenessBarVisibility();
-    }
+	// 바 가시성만 주기적으로 토글 (값 갱신은 델리게이트 — Tick 렌더링 아님)
+	BarVisibilityTimer += DeltaTime;
+	if (BarVisibilityTimer >= 0.1f)
+	{
+		BarVisibilityTimer = 0.f;
+		UpdateAttractiveBarVisibility();
+	}
 
-    // 서버 전용
-    if (!HasAuthority()) return;
-
-    // 매료도 감소
-    for (FPedestrianAttractiveness& Entry : Attractivenesses)
-    {
-        if (Entry.Value > 0.f)
-        {
-            AddAttractiveness(Entry.PlayerState, -AttractivenessDecayRate * DeltaTime);
-        }
-    }
-
-    if (!bIsWaiting && bHasDestination && HasReachedDestination())
-    {
-        WaitBeforeNextMove();
-    }
-}
-
-void AMTPedestrianBase::UpdateAttractivenessBarVisibility()
-{
-     APlayerController* PC = GetWorld()->GetFirstPlayerController();
-    if (!PC) return;
-
-    FVector CameraLocation;
-    FRotator CameraRotation;
-    PC->GetPlayerViewPoint(CameraLocation, CameraRotation);
-
-    // 거리 체크
-    float Distance = FVector::Dist(GetActorLocation(), CameraLocation);
-    if (Distance > AttractivenessBarVisibleDistance)
-    {
-        AttractivenessBarWidget->SetVisibility(false);
-        return;
-    }
-
-    // 시야 체크
-    FVector ToWidget = (GetActorLocation() - CameraLocation).GetSafeNormal();
-    float Dot = FVector::DotProduct(CameraRotation.Vector(), ToWidget);
-    if (Dot < 0.f)
-    {
-        AttractivenessBarWidget->SetVisibility(false);
-        return;
-    }
-
-    // 벽 가림 체크
-    FHitResult HitResult;
-    FCollisionQueryParams Params;
-    Params.AddIgnoredActor(this);
-    Params.AddIgnoredActor(PC->GetPawn());
-    bool bBlocked = GetWorld()->LineTraceSingleByChannel(HitResult, CameraLocation, GetActorLocation(), ECC_Visibility, Params);
-    if (bBlocked)
-    {
-        AttractivenessBarWidget->SetVisibility(false);
-        return;
-    }
-
-    AttractivenessBarWidget->SetVisibility(true);
-    AttractivenessBarWidget->SetDrawSize(FVector2D(200.f, 20.f));
-
-}
-
-//무작위 지점 선택 후 이동 시작
-void AMTPedestrianBase::MoveToRandomLocation()
-{
-	if (bIsWaiting)
+	if (!HasAuthority())
 	{
 		return;
 	}
 
-	AAIController* AIController = Cast<AAIController>(GetController());
-	if (!AIController)
+	// 매료됨: 소유 플레이어를 향해 회전 (서버 회전 → 이동 복제로 클라 반영). #4 C++ 유지.
+	// 이동 정지 자체는 StateTree의 Attracted 상태가 담당.
+	if (bIsAttracted && AttractedBy)
+	{
+		if (const APawn* TargetPawn = AttractedBy->GetPawn())
+		{
+			FVector Dir = TargetPawn->GetActorLocation() - GetActorLocation();
+			Dir.Z = 0.f;
+			if (!Dir.IsNearlyZero())
+			{
+				const FRotator Target(0.f, Dir.Rotation().Yaw, 0.f);
+				SetActorRotation(FMath::RInterpTo(GetActorRotation(), Target, DeltaTime, AttractiveTurnSpeed));
+			}
+		}
+	}
+}
+
+// --- 매료 처리 (AttributeSet에서 서버 호출) ---
+
+void AMTPedestrianBase::HandleAttractiveHit(APlayerState* Source, float Amount, float NewAttractiveHealth)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	// 매료 직후 무적이면 무시
+	if (AbilitySystemComponent && AbilitySystemComponent->HasMatchingGameplayTag(InvulnerableTag))
 	{
 		return;
 	}
 
-	UNavigationSystemV1* NavSystem = UNavigationSystemV1::GetCurrent(GetWorld());
-	if (!NavSystem)
+	if (Source)
+	{
+		AttractiveContributions.FindOrAdd(Source) += Amount;
+		LastAttacker = Source;
+	}
+
+	// 7초 전투중 태그 갱신 → 회복 GE 정지 (AttractiveInProgressGE는 적용 시 Duration Refresh)
+	ApplySelfGE(AbilitySystemComponent, AttractiveInProgressGE, this);
+
+	BroadcastAttractiveChanged();
+
+	if (NewAttractiveHealth <= 0.f && !bIsAttracted)
+	{
+		BecomeAttracted(DetermineAttractiveWinner());
+	}
+}
+
+void AMTPedestrianBase::HandleAttractiveRegen(float NewAttractiveHealth)
+{
+	if (!HasAuthority())
 	{
 		return;
 	}
+	BroadcastAttractiveChanged();
 
-	FNavLocation RandomLocation;
-	const bool bFoundLocation = NavSystem->GetRandomReachablePointInRadius(
-		GetActorLocation(),
-		WanderRadius,
-		RandomLocation
-	);
-
-	if (!bFoundLocation)
+	// 만탱 회복 = 경합 리셋 (+ 매료였다면 중립 복귀)
+	if (NewAttractiveHealth >= GetMaxAttractiveHealthValue())
 	{
-		WaitBeforeNextMove();
+		ResetContributions();
+		if (bIsAttracted)
+		{
+			if (AMTGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMTGameState>() : nullptr)
+			{
+				GS->RemoveAttractedCount(AttractedBy);
+			}
+			bIsAttracted = false;
+			AttractedBy = nullptr;
+		}
+	}
+}
+
+APlayerState* AMTPedestrianBase::DetermineAttractiveWinner() const
+{
+	float MaxVal = -1.f;
+	for (const TPair<TWeakObjectPtr<APlayerState>, float>& Pair : AttractiveContributions)
+	{
+		if (Pair.Key.IsValid() && Pair.Value > MaxVal)
+		{
+			MaxVal = Pair.Value;
+		}
+	}
+	if (MaxVal <= 0.f)
+	{
+		return LastAttacker.Get(); // 폴백
+	}
+
+	// 최다 기여자 수집
+	TArray<APlayerState*> Top;
+	for (const TPair<TWeakObjectPtr<APlayerState>, float>& Pair : AttractiveContributions)
+	{
+		if (Pair.Key.IsValid() && FMath::IsNearlyEqual(Pair.Value, MaxVal, 0.01f))
+		{
+			Top.Add(Pair.Key.Get());
+		}
+	}
+
+	if (Top.Num() == 1)
+	{
+		return Top[0];
+	}
+	// 동점 → 라스트힛 우선
+	if (LastAttacker.IsValid() && Top.Contains(LastAttacker.Get()))
+	{
+		return LastAttacker.Get();
+	}
+	return Top.Num() > 0 ? Top[0] : nullptr;
+}
+
+void AMTPedestrianBase::BecomeAttracted(APlayerState* Winner)
+{
+	if (!Winner)
+	{
 		return;
 	}
+	bIsAttracted = true;
+	AttractedBy = Winner;
 
-	CurrentDestination = RandomLocation.Location;
-	bHasDestination = true;
+	// 15초 무적 (State.Invulnerable)
+	ApplySelfGE(AbilitySystemComponent, InvulnerableGE, this);
 
-	AIController->MoveToLocation(
-		CurrentDestination,
-		AcceptanceRadius,
-		true,
-		true,
-		true,
-		false
-	);
-}
-
-//대기모드로 전환
-void AMTPedestrianBase::WaitBeforeNextMove()
-{
-	bIsWaiting = true;
-	bHasDestination = false;
-
-	if (AAIController* AIController = Cast<AAIController>(GetController()))
+	// 점수: 매료 소유자 +1
+	if (AMTGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMTGameState>() : nullptr)
 	{
-		AIController->StopMovement();
+		GS->AddAttractedCount(Winner);
 	}
 
-	const float WaitTime = FMath::RandRange(MinWaitTime, MaxWaitTime);
-
-	GetWorldTimerManager().SetTimer(
-		WaitTimerHandle,
-		this,
-		&AMTPedestrianBase::ResumeWander,
-		WaitTime,
-		false
-	);
+	BroadcastAttractiveChanged();
+	// StateTree/BP가 구독 → Attracted 상태로 전환(이동 정지). 회전은 C++ Tick이 처리.
+	OnAttracted.Broadcast(Winner);
 }
 
-//걷기 모드로 전환
-void AMTPedestrianBase::ResumeWander()
+void AMTPedestrianBase::ResetContributions()
 {
-	bIsWaiting = false;
-	MoveToRandomLocation();
+	AttractiveContributions.Empty();
+	LastAttacker = nullptr;
 }
 
-//목표지점 도착 검사
-bool AMTPedestrianBase::HasReachedDestination() const
+void AMTPedestrianBase::OnRep_Attracted()
 {
-	const float DistanceSquared = FVector::DistSquared2D(GetActorLocation(), CurrentDestination);
-	return DistanceSquared <= FMath::Square(MoveCheckDistance);
+	// 클라 측 매료 시각 효과가 필요하면 여기서 (회전은 서버 복제로 처리됨)
+}
+
+void AMTPedestrianBase::BroadcastAttractiveChanged()
+{
+	OnAttractiveHealthChanged.Broadcast(GetAttractiveHealthValue(), GetMaxAttractiveHealthValue());
+}
+
+float AMTPedestrianBase::GetAttractiveHealthValue() const
+{
+	return AttributeSet ? AttributeSet->GetAttractiveHealth() : 0.f;
+}
+
+float AMTPedestrianBase::GetMaxAttractiveHealthValue() const
+{
+	return AttributeSet ? AttributeSet->GetMaxAttractiveHealth() : 0.f;
+}
+
+float AMTPedestrianBase::GetAttractiveGauge() const
+{
+	return GetMaxAttractiveHealthValue() - GetAttractiveHealthValue();
+}
+
+void AMTPedestrianBase::UpdateAttractiveBarVisibility()
+{
+	if (!AttractiveBarWidget)
+	{
+		return;
+	}
+	const APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	if (!PC)
+	{
+		return;
+	}
+	FVector CamLoc;
+	FRotator CamRot;
+	PC->GetPlayerViewPoint(CamLoc, CamRot);
+	AttractiveBarWidget->SetVisibility(FVector::Dist(GetActorLocation(), CamLoc) <= AttractiveBarVisibleDistance);
 }

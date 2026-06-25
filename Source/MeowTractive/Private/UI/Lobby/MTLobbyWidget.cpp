@@ -113,13 +113,21 @@ bool UMTLobbyWidget::IsHost() const
 bool UMTLobbyWidget::CanStart() const
 {
 	const TArray<AMTPlayerState*> Players = GetPlayers();
-	if (Players.Num() == 0)
+	if (Players.Num() < 2)   // 호스트 혼자 시작 불가 (최소 2명)
 	{
 		return false;
 	}
 	for (const AMTPlayerState* MTPS : Players)
 	{
-		if (!MTPS || !MTPS->IsReady())
+		if (!MTPS)
+		{
+			return false;
+		}
+		if (MTPS->IsHost())
+		{
+			continue;   // 호스트는 준비 불필요
+		}
+		if (!MTPS->IsReady())
 		{
 			return false;
 		}
