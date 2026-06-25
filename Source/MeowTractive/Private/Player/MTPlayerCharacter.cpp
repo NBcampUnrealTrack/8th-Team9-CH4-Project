@@ -3,15 +3,13 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Camera/CameraComponent.h"
-#include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
+#include "Player/MTGameplayTags.h"
 
 AMTPlayerCharacter::AMTPlayerCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
-
-	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 
 	bUseControllerRotationPitch = false;
 	bUseControllerRotationYaw = false;
@@ -29,12 +27,13 @@ AMTPlayerCharacter::AMTPlayerCharacter()
 
 	CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
 	CameraBoom->SetupAttachment(RootComponent);
-	CameraBoom->TargetArmLength = 400.0f;
 	CameraBoom->bUsePawnControlRotation = true;
 
 	FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
 	FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	FollowCamera->bUsePawnControlRotation = false;
+
+	JumpMaxCount = 2;
 
 	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
 
@@ -59,6 +58,30 @@ void AMTPlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	// 점프 테스트
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC) return;
+
+	const bool bCIsDown = PC->IsInputKeyDown(EKeys::C);
+
+	// 막 눌린 순간 → 점프 시작
+	if (bCIsDown && !bWasCJumpHeld)
+	{
+		Jump();
+	}
+
+	// 막 떼진 순간 → 아직 올라가는 중이면 상승 끊기
+	if (!bCIsDown && bWasCJumpHeld)
+	{
+		FVector Vel = GetCharacterMovement()->Velocity;
+		if (Vel.Z > 0.f)
+		{
+			Vel.Z *= 0.4f; // 남은 상승 속도를 깎아서 정점 낮춤
+			GetCharacterMovement()->Velocity = Vel;
+		}
+	}
+
+	bWasCJumpHeld = bCIsDown;
 }
 
 void AMTPlayerCharacter::PossessedBy(AController* NewController)
@@ -66,6 +89,17 @@ void AMTPlayerCharacter::PossessedBy(AController* NewController)
 	Super::PossessedBy(NewController);
 
 	AbilitySystemComponent->InitAbilityActorInfo(this,this);
+
+	if (HasAuthority() && AbilitySystemComponent)
+	{
+		for (const TSubclassOf<UGameplayAbility>& Ability : DefaultAbilities)
+		{
+			if (Ability)
+			{
+				AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(Ability, 1, INDEX_NONE, this));
+			}
+		}
+	}
 }
 
 void AMTPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -78,6 +112,8 @@ void AMTPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AMTPlayerCharacter::StopJumping);
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AMTPlayerCharacter::Move);
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AMTPlayerCharacter::Look);
+		EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::Dash);
+		EnhancedInputComponent->BindAction(AttractiveBeamAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::AttractiveBeam);
 	}
 	else
 	{
@@ -124,6 +160,29 @@ void AMTPlayerCharacter::Look(const FInputActionValue& Value)
 		AddControllerPitchInput(LookAxisVector.Y);
 	}
 }
+
+void AMTPlayerCharacter::Dash()
+{
+	if (!AbilitySystemComponent)
+	{
+		return;
+	}
+
+	AbilitySystemComponent->TryActivateAbilitiesByTag(
+		FGameplayTagContainer(TAG_Skill_Move_Dash), true);
+}
+
+void AMTPlayerCharacter::AttractiveBeam()
+{
+	if (!AbilitySystemComponent)
+	{
+		return;
+	};
+
+	AbilitySystemComponent->TryActivateAbilitiesByTag(
+		FGameplayTagContainer(TAG_Skill_Attract_Beam), true);
+}
+
 
 void AMTPlayerCharacter::ApplyDamagePlayer(float DamageAmount)
 {
