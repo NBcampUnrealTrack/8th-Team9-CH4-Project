@@ -18,7 +18,6 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FMTOnAttractiveHealthChanged, float
 // 매료된 순간. StateTree/BP가 구독해 Attracted 상태(이동 정지)로 전환.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnAttracted, APlayerState*, AttractedBy);
 
-/** 행인: HP 없음. 매료 체력(0=매료) + GAS 기반. 기여도 최다 플레이어가 매료 소유. */
 UCLASS()
 class MEOWTRACTIVE_API AMTPedestrianBase : public ACharacter, public IAbilitySystemInterface
 {
@@ -45,6 +44,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "Attractive")
 	FMTOnAttracted OnAttracted;
 
+	// StateTree가 3초 후 호출 → 매료 반응 종료(매료도 풀 복구, 이동 재개)
+	UFUNCTION(BlueprintCallable, Category = "Attractive")
+	void EndAttracted();
+
 	UFUNCTION(BlueprintPure, Category = "Attractive")
 	float GetAttractiveHealthValue() const;
 
@@ -70,7 +73,7 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UMTPedestrianAttributeSet> AttributeSet;
 
-	// 데이터 주도형: 모든 타이밍은 GE+태그로. (C++ 타이머 사용 안 함)
+	// 행인 GE (서버/클라 공통). 매료도 초기화, 매료도 최대치 설정, 매료도 회복 주기 부여
 	UPROPERTY(EditDefaultsOnly, Category = "Attractive|GE")
 	TSubclassOf<UGameplayEffect> RegenGE;           // 무한+주기, Ongoing Req: Ignore State.AttractiveInProgress
 
@@ -86,6 +89,13 @@ protected:
 
 	UFUNCTION()
 	void OnRep_Attracted();
+
+	// 현재 선두 기여자 (바 색용). 기여도 테이블 전체 대신 이것만 복제.
+	UPROPERTY(ReplicatedUsing = OnRep_Leader)
+	TObjectPtr<APlayerState> LeadingPlayer;
+
+	UFUNCTION()
+	void OnRep_Leader();
 
 	UPROPERTY(VisibleAnywhere, Category = "Attractive|UI")
 	TObjectPtr<UWidgetComponent> AttractiveBarWidget;
@@ -110,6 +120,7 @@ private:
 	void ResetContributions();
 
 	void UpdateAttractiveBarVisibility();
+	FLinearColor GetLeaderColor() const;   // AttractedBy/LeadingPlayer의 팀 색
 
 	// 이동/배회는 StateTree(ST_Pedestrian)가 담당. 여기선 이동 속도만 설정.
 	UPROPERTY(EditAnywhere, Category = "Pedestrian|Movement")

@@ -1,4 +1,4 @@
-#include "Pedestrian/MTPedestrianAttributeSet.h"
+﻿#include "Pedestrian/MTPedestrianAttributeSet.h"
 
 #include "Pedestrian/MTPedestrianBase.h"
 #include "GameplayEffectExtension.h"
@@ -16,7 +16,7 @@ UMTPedestrianAttributeSet::UMTPedestrianAttributeSet()
 void UMTPedestrianAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
-	// 모든 클라가 동일한 매료 체력을 봐야 함(바 표시) → COND_None
+	// 모든 클라가 동일한 매료 체력을 봐야 함
 	DOREPLIFETIME_CONDITION_NOTIFY(UMTPedestrianAttributeSet, AttractiveHealth, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UMTPedestrianAttributeSet, MaxAttractiveHealth, COND_None, REPNOTIFY_Always);
 }
@@ -51,7 +51,7 @@ void UMTPedestrianAttributeSet::PostGameplayEffectExecute(const FGameplayEffectM
 			return;
 		}
 
-		// 가해 플레이어 추출 (예측 안 함 → 서버 컨텍스트)
+		// 매료한 고양이 추출 
 		APlayerState* SourcePS = nullptr;
 		if (AActor* Instigator = Data.EffectSpec.GetContext().GetOriginalInstigator())
 		{

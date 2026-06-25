@@ -5,7 +5,7 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
-#include "Player/MTGameplayTags.h"
+#include "Game/MTGameplayTags.h"
 
 AMTPlayerCharacter::AMTPlayerCharacter()
 {
@@ -169,7 +169,7 @@ void AMTPlayerCharacter::Dash()
 	}
 
 	AbilitySystemComponent->TryActivateAbilitiesByTag(
-		FGameplayTagContainer(TAG_Skill_Move_Dash), true);
+		FGameplayTagContainer(MTGameplayTags::Ability::TAG_Skill_Move_Dash), true);
 }
 
 void AMTPlayerCharacter::AttractiveBeam()
@@ -180,7 +180,7 @@ void AMTPlayerCharacter::AttractiveBeam()
 	};
 
 	AbilitySystemComponent->TryActivateAbilitiesByTag(
-		FGameplayTagContainer(TAG_Skill_Attract_Beam), true);
+		FGameplayTagContainer(MTGameplayTags::Ability::TAG_Skill_Attract_Beam), true);
 }
 
 

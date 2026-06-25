@@ -1,8 +1,12 @@
-// MTPedestrianBase.cpp
+﻿// MTPedestrianBase.cpp
 
 #include "Pedestrian/MTPedestrianBase.h"
 
 #include "Pedestrian/MTPedestrianAttributeSet.h"
+#include "Game/MTGameplayTags.h"
+#include "UI/InGame/MTAttractivenessBarWidget.h"
+#include "Player/MTPlayerState.h"
+#include "AIController.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayEffect.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -36,6 +40,9 @@ AMTPedestrianBase::AMTPedestrianBase()
 	SetReplicateMovement(true);
 	bUseControllerRotationYaw = false;
 
+	// 스폰된 행인도 AIController가 붙어야 StateTree/MoveTo가 동작 (이거 없으면 안 움직임)
+	AutoPossessAI = EAutoPossessAI::PlacedInWorldOrSpawned;
+
 	if (UCharacterMovementComponent* Movement = GetCharacterMovement())
 	{
 		Movement->MaxWalkSpeed = WalkSpeed;
@@ -62,6 +69,7 @@ void AMTPedestrianBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	// 기여도 테이블 전체가 아닌 '결과(소유자)'만 복제
 	DOREPLIFETIME(AMTPedestrianBase, AttractedBy);
+	DOREPLIFETIME(AMTPedestrianBase, LeadingPlayer);
 }
 
 UAbilitySystemComponent* AMTPedestrianBase::GetAbilitySystemComponent() const
@@ -73,8 +81,8 @@ void AMTPedestrianBase::BeginPlay()
 {
 	Super::BeginPlay();
 
-	InvulnerableTag = FGameplayTag::RequestGameplayTag(FName("State.Invulnerable"));
-	AttractiveInProgressTag = FGameplayTag::RequestGameplayTag(FName("State.AttractiveInProgress"));
+	InvulnerableTag = MTGameplayTags::Pedestrian::Invulnerable.GetTag();
+	AttractiveInProgressTag = MTGameplayTags::Pedestrian::AttractiveInProgress.GetTag();
 
 	if (AbilitySystemComponent)
 	{
@@ -147,7 +155,7 @@ void AMTPedestrianBase::HandleAttractiveHit(APlayerState* Source, float Amount, 
 	{
 		return;
 	}
-	// 매료 직후 무적이면 무시
+	// 매료 직후 15초 무적 중엔 무시 (3초 응시와 별개)
 	if (AbilitySystemComponent && AbilitySystemComponent->HasMatchingGameplayTag(InvulnerableTag))
 	{
 		return;
@@ -157,6 +165,7 @@ void AMTPedestrianBase::HandleAttractiveHit(APlayerState* Source, float Amount, 
 	{
 		AttractiveContributions.FindOrAdd(Source) += Amount;
 		LastAttacker = Source;
+		LeadingPlayer = Source;   // 바 색용 (복제)
 	}
 
 	// 7초 전투중 태그 갱신 → 회복 GE 정지 (AttractiveInProgressGE는 적용 시 Duration Refresh)
@@ -178,19 +187,19 @@ void AMTPedestrianBase::HandleAttractiveRegen(float NewAttractiveHealth)
 	}
 	BroadcastAttractiveChanged();
 
-	// 만탱 회복 = 경합 리셋 (+ 매료였다면 중립 복귀)
+	// 체력 100 완전 회복 = 중립 복귀: 소유자 점수 회수 + 기여도 초기화
 	if (NewAttractiveHealth >= GetMaxAttractiveHealthValue())
 	{
-		ResetContributions();
-		if (bIsAttracted)
+		if (AttractedBy)
 		{
 			if (AMTGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMTGameState>() : nullptr)
 			{
 				GS->RemoveAttractedCount(AttractedBy);
 			}
-			bIsAttracted = false;
-			AttractedBy = nullptr;
 		}
+		ResetContributions();   // 기여도 + LeadingPlayer 초기화
+		AttractedBy = nullptr;
+		bIsAttracted = false;
 	}
 }
 
@@ -240,7 +249,13 @@ void AMTPedestrianBase::BecomeAttracted(APlayerState* Winner)
 	bIsAttracted = true;
 	AttractedBy = Winner;
 
-	// 15초 무적 (State.Invulnerable)
+	// 즉시 이동 정지: 배회 MoveTo 중단 (StateTree가 Attracted로 전환되도록)
+	if (AAIController* AI = Cast<AAIController>(GetController()))
+	{
+		AI->StopMovement();
+	}
+
+	// 15초 무적 (State.Invulnerable) — 3초 응시와 별개. 회복도 이 동안 정지.
 	ApplySelfGE(AbilitySystemComponent, InvulnerableGE, this);
 
 	// 점수: 매료 소유자 +1
@@ -250,24 +265,61 @@ void AMTPedestrianBase::BecomeAttracted(APlayerState* Winner)
 	}
 
 	BroadcastAttractiveChanged();
-	// StateTree/BP가 구독 → Attracted 상태로 전환(이동 정지). 회전은 C++ Tick이 처리.
+	// StateTree/BP가 구독 → Attracted 상태로 전환(이동 정지, 3초).
 	OnAttracted.Broadcast(Winner);
+}
+
+void AMTPedestrianBase::EndAttracted()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	// 3초 응시만 종료(이동 재개). 무적(15초)·회복(GE)·소유자는 그대로 유지.
+	bIsAttracted = false;
 }
 
 void AMTPedestrianBase::ResetContributions()
 {
 	AttractiveContributions.Empty();
 	LastAttacker = nullptr;
+	LeadingPlayer = nullptr;
 }
 
 void AMTPedestrianBase::OnRep_Attracted()
 {
-	// 클라 측 매료 시각 효과가 필요하면 여기서 (회전은 서버 복제로 처리됨)
+	BroadcastAttractiveChanged(); // 바 색 갱신 (회전은 서버 복제로 처리됨)
+}
+
+void AMTPedestrianBase::OnRep_Leader()
+{
+	BroadcastAttractiveChanged();
+}
+
+FLinearColor AMTPedestrianBase::GetLeaderColor() const
+{
+	const APlayerState* PS = AttractedBy ? AttractedBy : LeadingPlayer;
+	if (const AMTPlayerState* MTPS = Cast<AMTPlayerState>(PS))
+	{
+		return MTPS->GetTeamColor();
+	}
+	return FLinearColor::White;
 }
 
 void AMTPedestrianBase::BroadcastAttractiveChanged()
 {
-	OnAttractiveHealthChanged.Broadcast(GetAttractiveHealthValue(), GetMaxAttractiveHealthValue());
+	const float Cur = GetAttractiveHealthValue();
+	const float Max = GetMaxAttractiveHealthValue();
+	OnAttractiveHealthChanged.Broadcast(Cur, Max);
+
+	// 매료도 바 직접 갱신 (이벤트 기반 — Tick 렌더링 아님). 표시값 = Max-Current(쌓인 매료도)
+	if (AttractiveBarWidget)
+	{
+		if (UMTAttractivenessBarWidget* Bar = Cast<UMTAttractivenessBarWidget>(AttractiveBarWidget->GetUserWidgetObject()))
+		{
+			Bar->UpdateBar(Max - Cur, Max, GetLeaderColor());
+		}
+	}
 }
 
 float AMTPedestrianBase::GetAttractiveHealthValue() const

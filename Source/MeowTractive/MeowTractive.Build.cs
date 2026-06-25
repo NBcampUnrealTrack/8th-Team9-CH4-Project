@@ -10,7 +10,9 @@ public class MeowTractive : ModuleRules
 
 		PublicDependencyModuleNames.AddRange(new string[] { "Core", "CoreUObject", "Engine", "InputCore", "EnhancedInput", "GameplayAbilities", "GameplayTags", "GameplayTasks", "OnlineSubsystem", "OnlineSubsystemUtils", "OnlineSubsystemSteam", "CommonUI", "CommonInput", "UMG", "Slate", "SlateCore",
 				//행인용 모듈
-				"NavigationSystem", "AIModule" });
+				"NavigationSystem", "AIModule",
+				//StateTree (C++ 태스크용)
+				"StateTreeModule", "GameplayStateTreeModule" });
 
 	}
 

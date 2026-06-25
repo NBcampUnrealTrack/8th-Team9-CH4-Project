@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "AbilitySystemComponent.h"
@@ -11,7 +11,6 @@
 	GAMEPLAYATTRIBUTE_VALUE_SETTER(PropertyName) \
 	GAMEPLAYATTRIBUTE_VALUE_INITTER(PropertyName)
 
-/** 행인 매료 체력 속성. HP 없음 — 매료 체력(0=매료)만 가진다. */
 UCLASS()
 class MEOWTRACTIVE_API UMTPedestrianAttributeSet : public UAttributeSet
 {

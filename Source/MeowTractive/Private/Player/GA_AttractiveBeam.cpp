@@ -1,7 +1,18 @@
 #include "Player/GA_AttractiveBeam.h"
 
+#include "Pedestrian/MTPedestrianBase.h"
+#include "AbilitySystemComponent.h"
+#include "AbilitySystemBlueprintLibrary.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
 #include "DrawDebugHelpers.h"
+
+UGA_AttractiveBeam::UGA_AttractiveBeam()
+{
+	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
+	// 클라 예측 + 서버 실행: 빔/디버그는 즉시, 실제 매료 적용은 서버에서.
+	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+}
 
 void UGA_AttractiveBeam::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
@@ -11,68 +22,81 @@ void UGA_AttractiveBeam::ActivateAbility(
 {
 	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
 
-	AActor* Avatar = GetAvatarActorFromActorInfo();
-	APawn* Pawn = Cast<APawn>(Avatar);
-	if (!Pawn)
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	APlayerController* PC = Cast<APlayerController>(Pawn->GetController());
+	AActor* Avatar = GetAvatarActorFromActorInfo();
+	const APawn* Pawn = Cast<APawn>(Avatar);
+	APlayerController* PC = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
 	if (!PC)
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
 
-	// 카메라 시점 가져오기
+	// 카메라 시점 기준 라인트레이스 (Pawn 오브젝트 타입)
 	FVector CamLocation;
 	FRotator CamRotation;
 	PC->GetPlayerViewPoint(CamLocation, CamRotation);
-
 	const FVector Start = CamLocation;
 	const FVector End = Start + (CamRotation.Vector() * TraceDistance);
 
-	// Pawn 채널 단일 라인 트레이스
 	FHitResult Hit;
 	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(Avatar); // 자기 자신 제외
-
+	Params.AddIgnoredActor(Avatar);
 	FCollisionObjectQueryParams ObjParams;
-	ObjParams.AddObjectTypesToQuery(ECC_Pawn); // Pawn 오브젝트 타입을 타겟
+	ObjParams.AddObjectTypesToQuery(ECC_Pawn);
 
-	bool bHit = GetWorld()->LineTraceSingleByObjectType(
-		Hit,
-		Start,
-		End,
-		ObjParams,
-		Params
-	);
+	const bool bHit = GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, ObjParams, Params);
 
-	if (bHit && Hit.GetActor())
+	if (bDrawDebug)
 	{
-		AActor* TargetActor = Hit.GetActor();
-
-		// 멈춘 지점까지만 빨간 선 + 타격 지점 표시
-		DrawDebugLine(GetWorld(), Start, Hit.ImpactPoint, FColor::Red, false, 2.f, 0, 1.f);
-		DrawDebugPoint(GetWorld(), Hit.ImpactPoint, 12.f, FColor::Yellow, false, 2.f);
-
-		// 화면에 NPC 이름 출력
-		if (GEngine)
+		if (bHit)
 		{
-			GEngine->AddOnScreenDebugMessage(
-				-1, 2.f, FColor::Green,
-				FString::Printf(TEXT("Hit NPC: %s"), *TargetActor->GetName()));
+			DrawDebugLine(GetWorld(), Start, Hit.ImpactPoint, FColor::Red, false, 2.f, 0, 1.f);
+			DrawDebugPoint(GetWorld(), Hit.ImpactPoint, 12.f, FColor::Yellow, false, 2.f);
 		}
-
-		UE_LOG(LogTemp, Warning, TEXT("AttractiveBeam Hit: %s"), *TargetActor->GetName());
+		else
+		{
+			DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 2.f, 0, 1.f);
+		}
 	}
-	else
+
+	// 실제 매료도 적용은 서버 권위 + 행인 대상만 (기여도 정확성)
+	if (bHit && HasAuthority(&ActivationInfo))
 	{
-		// 안 맞았으면 끝까지 초록 선
-		DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 2.f, 0, 1.f);
+		if (AMTPedestrianBase* Ped = Cast<AMTPedestrianBase>(Hit.GetActor()))
+		{
+			ApplyAttractiveDamage(Ped);
+		}
 	}
 
 	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+}
+
+void UGA_AttractiveBeam::ApplyAttractiveDamage(AMTPedestrianBase* Target)
+{
+	if (!Target || !AttractiveDamageGE)
+	{
+		return;
+	}
+
+	UAbilitySystemComponent* SourceASC = GetAbilitySystemComponentFromActorInfo();
+	UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target);
+	if (!SourceASC || !TargetASC)
+	{
+		return;
+	}
+
+	// 소스(고양이) ASC로 만들어야 instigator=고양이 → 행인 PostGEExecute가 가해자를 정확히 기록
+	FGameplayEffectContextHandle Ctx = SourceASC->MakeEffectContext();
+	Ctx.AddSourceObject(GetAvatarActorFromActorInfo());
+	const FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(AttractiveDamageGE, GetAbilityLevel(), Ctx);
+	if (Spec.IsValid())
+	{
+		SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
+	}
 }
