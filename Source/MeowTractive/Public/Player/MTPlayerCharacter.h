@@ -30,7 +30,12 @@ protected:
 
 	void Dash();
 
+	void StopJump();
+
 	void AttractiveBeam();
+	void AttractiveBeamReleased();
+
+#pragma region PlayerInput
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
 	USpringArmComponent* CameraBoom;
@@ -55,6 +60,8 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* AttractiveBeamAction;
+
+#pragma endregion
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AbilitySystem")
 	TArray<TSubclassOf< UGameplayAbility>> DefaultAbilities;

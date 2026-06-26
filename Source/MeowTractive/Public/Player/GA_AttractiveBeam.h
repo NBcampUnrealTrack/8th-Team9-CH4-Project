@@ -17,11 +17,21 @@ public:
 	UGA_AttractiveBeam();
 
 protected:
+	FTimerHandle BeamTimerHandle;
+
+	void FireBeam();
+
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
+
+	virtual void EndAbility(
+		const FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilityActorInfo* ActorInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
+		bool bReplicateEndAbility, bool bWasCancelled) override;
 
 	// 빔 사거리 (cm)
 	UPROPERTY(EditDefaultsOnly, Category = "AttractiveBeam")
@@ -34,6 +44,9 @@ protected:
 	// 디버그 라인 표시
 	UPROPERTY(EditDefaultsOnly, Category = "AttractiveBeam")
 	bool bDrawDebug = true;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Beam")
+	float FireInterval = 0.1f;
 
 private:
 	// 소스(고양이) ASC로 GE 적용 → 행인 기여도가 올바르게 기록됨

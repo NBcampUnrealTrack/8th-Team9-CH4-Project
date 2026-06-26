@@ -57,31 +57,6 @@ void AMTPlayerCharacter::BeginPlay()
 void AMTPlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-	// 점프 테스트
-	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (!PC) return;
-
-	const bool bCIsDown = PC->IsInputKeyDown(EKeys::C);
-
-	// 막 눌린 순간 → 점프 시작
-	if (bCIsDown && !bWasCJumpHeld)
-	{
-		Jump();
-	}
-
-	// 막 떼진 순간 → 아직 올라가는 중이면 상승 끊기
-	if (!bCIsDown && bWasCJumpHeld)
-	{
-		FVector Vel = GetCharacterMovement()->Velocity;
-		if (Vel.Z > 0.f)
-		{
-			Vel.Z *= 0.4f; // 남은 상승 속도를 깎아서 정점 낮춤
-			GetCharacterMovement()->Velocity = Vel;
-		}
-	}
-
-	bWasCJumpHeld = bCIsDown;
 }
 
 void AMTPlayerCharacter::PossessedBy(AController* NewController)
@@ -109,11 +84,12 @@ void AMTPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
 
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::Jump);
-		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AMTPlayerCharacter::StopJumping);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &AMTPlayerCharacter::StopJump);
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &AMTPlayerCharacter::Move);
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &AMTPlayerCharacter::Look);
 		EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::Dash);
 		EnhancedInputComponent->BindAction(AttractiveBeamAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::AttractiveBeam);
+		EnhancedInputComponent->BindAction(AttractiveBeamAction, ETriggerEvent::Completed, this, &AMTPlayerCharacter::AttractiveBeamReleased);
 	}
 	else
 	{
@@ -172,6 +148,19 @@ void AMTPlayerCharacter::Dash()
 		FGameplayTagContainer(MTGameplayTags::Ability::TAG_Skill_Move_Dash), true);
 }
 
+void AMTPlayerCharacter::StopJump()
+{
+	StopJumping();
+
+	// 가변 점프: 점프 키를 일찍 떼면 남은 상승 속도를 깎아 정점을 낮춤
+	FVector Vel = GetCharacterMovement()->Velocity;
+	if (Vel.Z > 0.f)
+	{
+		Vel.Z *= 0.4f;
+		GetCharacterMovement()->Velocity = Vel;
+	}
+}
+
 void AMTPlayerCharacter::AttractiveBeam()
 {
 	if (!AbilitySystemComponent)
@@ -181,6 +170,17 @@ void AMTPlayerCharacter::AttractiveBeam()
 
 	AbilitySystemComponent->TryActivateAbilitiesByTag(
 		FGameplayTagContainer(MTGameplayTags::Ability::TAG_Skill_Attract_Beam), true);
+}
+
+void AMTPlayerCharacter::AttractiveBeamReleased()
+{
+	if (!AbilitySystemComponent)
+	{
+		return;
+	}
+
+	FGameplayTagContainer BeamTags(MTGameplayTags::Ability::TAG_Skill_Attract_Beam);
+	AbilitySystemComponent->CancelAbilities(&BeamTags);
 }
 
 

@@ -14,30 +14,16 @@ UGA_AttractiveBeam::UGA_AttractiveBeam()
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
 }
 
-void UGA_AttractiveBeam::ActivateAbility(
-	const FGameplayAbilitySpecHandle Handle,
-	const FGameplayAbilityActorInfo* ActorInfo,
-	const FGameplayAbilityActivationInfo ActivationInfo,
-	const FGameplayEventData* TriggerEventData)
+void UGA_AttractiveBeam::FireBeam()
 {
-	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
-
-	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
-	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
-		return;
-	}
-
 	AActor* Avatar = GetAvatarActorFromActorInfo();
 	const APawn* Pawn = Cast<APawn>(Avatar);
 	APlayerController* PC = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
 	if (!PC)
 	{
-		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
-	}
+	};
 
-	// 카메라 시점 기준 라인트레이스 (Pawn 오브젝트 타입)
 	FVector CamLocation;
 	FRotator CamRotation;
 	PC->GetPlayerViewPoint(CamLocation, CamRotation);
@@ -56,25 +42,63 @@ void UGA_AttractiveBeam::ActivateAbility(
 	{
 		if (bHit)
 		{
-			DrawDebugLine(GetWorld(), Start, Hit.ImpactPoint, FColor::Red, false, 2.f, 0, 1.f);
-			DrawDebugPoint(GetWorld(), Hit.ImpactPoint, 12.f, FColor::Yellow, false, 2.f);
+			DrawDebugLine(GetWorld(), Start, Hit.ImpactPoint, FColor::Red, false, FireInterval, 0, 1.f);
+			DrawDebugPoint(GetWorld(), Hit.ImpactPoint, 12.f, FColor::Yellow, false, FireInterval);
 		}
 		else
 		{
-			DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, 2.f, 0, 1.f);
+			DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, FireInterval, 0, 1.f);
 		}
 	}
 
-	// 실제 매료도 적용은 서버 권위 + 행인 대상만 (기여도 정확성)
-	if (bHit && HasAuthority(&ActivationInfo))
+	if (bHit && HasAuthority(&CurrentActivationInfo))
 	{
 		if (AMTPedestrianBase* Ped = Cast<AMTPedestrianBase>(Hit.GetActor()))
 		{
 			ApplyAttractiveDamage(Ped);
 		}
 	}
+}
 
-	EndAbility(Handle, ActorInfo, ActivationInfo, true, false);
+void UGA_AttractiveBeam::ActivateAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	const FGameplayEventData* TriggerEventData)
+{
+	Super::ActivateAbility(Handle, ActorInfo, ActivationInfo, TriggerEventData);
+
+	if (!CommitAbility(Handle, ActorInfo, ActivationInfo))
+	{
+		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
+		return;
+	}
+
+	// 첫 발 즉시
+	FireBeam();
+
+	// 이후 FireInterval 간격으로 반복
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().SetTimer(
+			BeamTimerHandle, this, &UGA_AttractiveBeam::FireBeam, FireInterval, /*bLoop=*/true);
+	}
+	// EndAbility 호출 제거 — 입력이 떨어질 때까지 살아있음
+}
+
+void UGA_AttractiveBeam::EndAbility(
+	const FGameplayAbilitySpecHandle Handle,
+	const FGameplayAbilityActorInfo* ActorInfo,
+	const FGameplayAbilityActivationInfo ActivationInfo,
+	bool bReplicateEndAbility,
+	bool bWasCancelled)
+{
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(BeamTimerHandle);
+	}
+
+	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UGA_AttractiveBeam::ApplyAttractiveDamage(AMTPedestrianBase* Target)
