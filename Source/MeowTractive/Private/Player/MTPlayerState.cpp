@@ -16,6 +16,7 @@ void AMTPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AMTPlayerState, TeamId);
 	DOREPLIFETIME(AMTPlayerState, bIsLoaded);
 	DOREPLIFETIME(AMTPlayerState, bIsHost);
+	DOREPLIFETIME(AMTPlayerState, TeamColor);
 }
 
 void AMTPlayerState::SetSelectedCat(EMTCatType NewCat)

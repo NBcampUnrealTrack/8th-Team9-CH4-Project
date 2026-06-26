@@ -343,7 +343,7 @@ void AMTPedestrianBase::UpdateAttractiveBarVisibility()
 	{
 		return;
 	}
-	const APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr;
+	const APlayerController* PC = GetWorld() ? GEngine->GetFirstLocalPlayerController(GetWorld()) : nullptr;
 	if (!PC)
 	{
 		return;
