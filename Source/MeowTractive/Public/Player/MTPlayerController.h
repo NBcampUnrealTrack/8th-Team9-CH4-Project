@@ -24,6 +24,9 @@ public:
 	UFUNCTION(Client, Reliable)
 	void ClientShowResult();
 
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TSubclassOf<class UMTMatchGameResultWidget> ResultWidgetClass;
+
 private:
 	float LastReadyToggleTime = -100.f;     // 서버 쿨다운 기준 시각
 	static constexpr float ReadyCooldown = 0.5f;

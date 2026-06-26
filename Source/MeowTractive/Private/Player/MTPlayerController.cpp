@@ -1,5 +1,6 @@
 ﻿#include "Player/MTPlayerController.h"
 #include "Player/MTPlayerState.h"
+#include "UI/InGame/MTMatchGameResultWidget.h"
 #include "Game/MTLobbyGameMode.h"
 
 void AMTPlayerController::Server_SetSelectedCat_Implementation(EMTCatType NewCat)
@@ -51,4 +52,13 @@ void AMTPlayerController::ClientShowResult_Implementation()
     GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Yellow, TEXT("게임 종료!"));
 
 	// TODO: 결과 화면 위젯 생성 및 표시
+	if (ResultWidgetClass)
+    {
+        UMTMatchGameResultWidget* ResultWidget = CreateWidget<UMTMatchGameResultWidget>(this, ResultWidgetClass);
+        if (ResultWidget)
+        {
+            ResultWidget->AddToViewport();
+            ResultWidget->ShowResult();
+        }
+    }
 }
