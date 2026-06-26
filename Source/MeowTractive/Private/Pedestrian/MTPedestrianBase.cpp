@@ -130,7 +130,7 @@ void AMTPedestrianBase::Tick(float DeltaTime)
 		return;
 	}
 
-	// 매료됨: 소유 플레이어를 향해 회전 (서버 회전 → 이동 복제로 클라 반영). #4 C++ 유지.
+	// 매료됨: 소유 플레이어를 향해 회전 (서버 회전 → 이동 복제로 클라 반영).
 	// 이동 정지 자체는 StateTree의 Attracted 상태가 담당.
 	if (bIsAttracted && AttractedBy)
 	{
