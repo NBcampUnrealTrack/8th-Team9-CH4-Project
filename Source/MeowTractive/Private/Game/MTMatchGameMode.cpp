@@ -23,36 +23,28 @@ AMTMatchGameMode::AMTMatchGameMode()
 	{
 		DefaultPawnClass = PawnBP.Class;
 	}
+
+	// 슬롯별 팀색 (빨·파·초·노)
+	TeamColors = {
+		FLinearColor(1.f, 0.2f, 0.2f),
+		FLinearColor(0.2f, 0.4f, 1.f),
+		FLinearColor(0.2f, 0.8f, 0.2f),
+		FLinearColor(1.f, 0.8f, 0.f),
+	};
 }
 
 void AMTMatchGameMode::PostLogin(APlayerController* NewPlayer)
 {
     Super::PostLogin(NewPlayer);
     MarkLoaded(NewPlayer);
-
-    AMTPlayerState* MTPS = NewPlayer->GetPlayerState<AMTPlayerState>();
-    if (!MTPS) return;
-
-    const int32 Slot = GameState->PlayerArray.Num() - 1;
-    MTPS->SetPlayerSlot(Slot);
-
-    const TArray<FLinearColor> SlotColors = {
-        FLinearColor(1.f, 0.2f, 0.2f),
-        FLinearColor(0.2f, 0.4f, 1.f),
-        FLinearColor(0.2f, 0.8f, 0.2f),
-        FLinearColor(1.f, 0.8f, 0.f),
-    };
-
-    if (SlotColors.IsValidIndex(Slot))
-    {
-        MTPS->SetTeamColor(SlotColors[Slot]);
-    }
+    AssignTeamColor(NewPlayer);     // 슬롯 기준 팀색 (직접 진입 시 폴백 포함)
 }
 
 void AMTMatchGameMode::HandleSeamlessTravelPlayer(AController*& C)
 {
 	Super::HandleSeamlessTravelPlayer(C);
 	MarkLoaded(C);                  // seamless travel 완료 = 새 맵 로딩 완료
+	AssignTeamColor(C);             // 로비에서 운반된 슬롯으로 팀색 결정
 }
 
 void AMTMatchGameMode::HandleMatchHasEnded()
@@ -70,14 +62,19 @@ void AMTMatchGameMode::HandleMatchHasEnded()
         }
     }
 
-    FTimerHandle LobbyTimer;
-    GetWorldTimerManager().SetTimer(LobbyTimer, this, &AMTMatchGameMode::ReturnToLobby, 5.f, false);
+    // 결과 화면 표시 후 자동 복귀 (버튼 미입력 대비 타임아웃)
+    GetWorldTimerManager().SetTimer(LobbyTimer, this, &AMTMatchGameMode::ReturnToLobby, ResultScreenDuration, false);
 }
 
 void AMTMatchGameMode::ReturnToLobby()
 {
-	// 로비 복귀
-	// GetWorld()->ServerTravel(TEXT("/Game/Maps/LobbyMap?listen"));
+	// 세션 유지한 채 전원 로비로 복귀 (리슨 서버: 호스트 권위 ServerTravel)
+	if (!HasAuthority() || !GetWorld())
+	{
+		return;
+	}
+	GetWorldTimerManager().ClearTimer(LobbyTimer);   // 자동/버튼 중복 트래블 방지
+	GetWorld()->ServerTravel(LobbyMapPath + TEXT("?listen"));
 }
 
 void AMTMatchGameMode::UpdateMatchTimer()
@@ -145,6 +142,28 @@ void AMTMatchGameMode::MarkLoaded(AController* C)
 		{
 			MTPS->SetLoaded(true);
 		}
+	}
+}
+
+void AMTMatchGameMode::AssignTeamColor(AController* C)
+{
+	AMTPlayerState* MTPS = C ? C->GetPlayerState<AMTPlayerState>() : nullptr;
+	if (!MTPS)
+	{
+		return;
+	}
+
+	// 로비를 거치면 슬롯이 운반됨. 매치맵 직접 진입(PIE 등)이면 슬롯이 없으니 진입 순서로 폴백.
+	int32 Slot = MTPS->GetPlayerSlot();
+	if (!TeamColors.IsValidIndex(Slot))
+	{
+		Slot = NextColorSlot++;
+		MTPS->SetPlayerSlot(Slot);   // 폴백 슬롯도 기록 (결과/표시 일관성)
+	}
+
+	if (TeamColors.IsValidIndex(Slot))
+	{
+		MTPS->SetTeamColor(TeamColors[Slot]);
 	}
 }
 

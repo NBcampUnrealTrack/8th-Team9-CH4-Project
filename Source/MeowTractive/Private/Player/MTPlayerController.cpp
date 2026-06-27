@@ -2,6 +2,7 @@
 #include "Player/MTPlayerState.h"
 #include "UI/InGame/MTMatchGameResultWidget.h"
 #include "Game/MTLobbyGameMode.h"
+#include "Game/MTMatchGameMode.h"
 
 void AMTPlayerController::Server_SetSelectedCat_Implementation(EMTCatType NewCat)
 {
@@ -34,6 +35,15 @@ void AMTPlayerController::Server_RequestStartMatch_Implementation()
 	if (AMTLobbyGameMode* Lobby = GetWorld() ? GetWorld()->GetAuthGameMode<AMTLobbyGameMode>() : nullptr)
 	{
 		Lobby->TryStartMatch();
+	}
+}
+
+void AMTPlayerController::Server_ReturnToLobby_Implementation()
+{
+	// 권위·트래블은 GameMode가 담당 (리슨 서버: 전원 함께 복귀)
+	if (AMTMatchGameMode* Match = GetWorld() ? GetWorld()->GetAuthGameMode<AMTMatchGameMode>() : nullptr)
+	{
+		Match->ReturnToLobby();
 	}
 }
 

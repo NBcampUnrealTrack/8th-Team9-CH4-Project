@@ -21,6 +21,10 @@ public:
 	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "MT|Lobby")
 	void Server_RequestStartMatch();
 
+	// 결과 화면 "로비로" 버튼 → 세션 유지 + 전원 로비 복귀 (호스트가 ServerTravel)
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "MT|Match")
+	void Server_ReturnToLobby();
+
 	UFUNCTION(Client, Reliable)
 	void ClientShowResult();
 

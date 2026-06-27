@@ -94,5 +94,6 @@ void AMTPlayerState::CopyProperties(APlayerState* NewPlayerState)
 		NewMTPS->PlayerSlot = PlayerSlot;
 		NewMTPS->TeamId = TeamId;
 		NewMTPS->bIsHost = bIsHost;
+		NewMTPS->TeamColor = TeamColor;   // 슬롯 색도 트래블 간 유지
 	}
 }
