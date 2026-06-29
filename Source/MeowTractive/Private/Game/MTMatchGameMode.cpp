@@ -17,8 +17,8 @@ AMTMatchGameMode::AMTMatchGameMode()
 	PlayerStateClass = AMTPlayerState::StaticClass();
 	PlayerControllerClass = AMTPlayerController::StaticClass();
 
-	// 임시 테스트용 폰 (추후 고양이 캐릭터로 교체)
-	static ConstructorHelpers::FClassFinder<APawn> PawnBP(TEXT("/Game/ThirdPerson/Blueprints/BP_ThirdPersonCharacter"));
+	// 고양이 캐릭터로 교체
+	static ConstructorHelpers::FClassFinder<APawn> PawnBP(TEXT("/Game/Blueprints/Player/BP_Cat"));
 	if (PawnBP.Succeeded())
 	{
 		DefaultPawnClass = PawnBP.Class;
