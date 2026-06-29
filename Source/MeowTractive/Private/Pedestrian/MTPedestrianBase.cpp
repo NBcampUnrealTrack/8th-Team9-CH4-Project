@@ -7,6 +7,7 @@
 #include "UI/InGame/MTAttractivenessBarWidget.h"
 #include "Player/MTPlayerState.h"
 #include "AIController.h"
+#include "BrainComponent.h"
 #include "AbilitySystemComponent.h"
 #include "GameplayEffect.h"
 #include "GameFramework/CharacterMovementComponent.h"
@@ -75,6 +76,33 @@ void AMTPedestrianBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 UAbilitySystemComponent* AMTPedestrianBase::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
+}
+
+void AMTPedestrianBase::FreezeForMatchEnd()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	// StateTree(브레인) 로직 중단 + 진행 중 MoveTo 취소
+	if (AAIController* AI = Cast<AAIController>(GetController()))
+	{
+		AI->StopMovement();
+		if (UBrainComponent* Brain = AI->GetBrainComponent())
+		{
+			Brain->StopLogic(TEXT("MatchEnded"));
+		}
+	}
+
+	// 이동 완전 정지 (재요청돼도 안 움직이게 MOVE_None)
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->StopMovementImmediately();
+		Move->DisableMovement();
+	}
+
+	SetActorTickEnabled(false);
 }
 
 void AMTPedestrianBase::BeginPlay()

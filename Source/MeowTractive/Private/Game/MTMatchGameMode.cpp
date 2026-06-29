@@ -54,6 +54,17 @@ void AMTMatchGameMode::HandleMatchHasEnded()
     AMTGameState* GS = GetGameState<AMTGameState>();
     if (!GS) return;
 
+    // 결과 화면 동안 행인 AI 정지 (서버에서 멈추면 이동 복제로 전 클라 정지)
+    TArray<AActor*> Pedestrians;
+    UGameplayStatics::GetAllActorsOfClass(GetWorld(), AMTPedestrianBase::StaticClass(), Pedestrians);
+    for (AActor* A : Pedestrians)
+    {
+        if (AMTPedestrianBase* Ped = Cast<AMTPedestrianBase>(A))
+        {
+            Ped->FreezeForMatchEnd();
+        }
+    }
+
     for (APlayerState* PS : GS->PlayerArray)
     {
         if (AMTPlayerController* PC = Cast<AMTPlayerController>(PS->GetPlayerController()))

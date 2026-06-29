@@ -36,6 +36,9 @@ public:
 	// 서버/클라 공통 — 델리게이트 방송 (이벤트 기반 바 갱신)
 	void BroadcastAttractiveChanged();
 
+	// 매치 종료 시 AI 정지 (서버 전용). 서버에서 멈추면 이동 복제로 전 클라에 반영됨.
+	void FreezeForMatchEnd();
+
 	// --- 표시용 (BP 바인딩) ---
 	UPROPERTY(BlueprintAssignable, Category = "Attractive")
 	FMTOnAttractiveHealthChanged OnAttractiveHealthChanged;
