@@ -6,6 +6,7 @@
 #include "Game/MTLog.h"
 #include "GameFramework/GameStateBase.h"
 #include "Engine/Engine.h"
+#include "Engine/World.h"
 #include "TimerManager.h"
 
 void UMTLobbyWidget::LobbySetup()
@@ -21,6 +22,20 @@ void UMTLobbyWidget::LobbySetup()
 		World->GetTimerManager().SetTimer(RefreshTimer, this, &UMTLobbyWidget::HandleRefresh, 0.4f, true);
 	}
 	HandleRefresh();
+
+	// 로비 월드가 정리되면 위젯도 함께 제거 (호스트 하드 LoadMap 포함 → 좀비 위젯 방지)
+	if (!WorldCleanupHandle.IsValid())
+	{
+		WorldCleanupHandle = FWorldDelegates::OnWorldCleanup.AddUObject(this, &UMTLobbyWidget::HandleWorldCleanup);
+		if (MTLogEnabled())
+		{
+			const APlayerController* PC = GetOwningPlayer();
+			const FString Msg = FString::Printf(TEXT("[MTLobby] LobbySetup: Cleanup 바인딩 | Host(Auth)=%d"),
+				(PC && PC->HasAuthority()) ? 1 : 0);
+			UE_LOG(LogMT, Log, TEXT("%s"), *Msg);
+			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Cyan, Msg);
+		}
+	}
 }
 
 void UMTLobbyWidget::SelectCat(EMTCatType CatType)
@@ -92,6 +107,12 @@ AMTPlayerState* UMTLobbyWidget::GetPlayerInSlot(int32 SlotIndex) const
 	return nullptr;        // 빈 슬롯 → BP에서 "대기 중"
 }
 
+bool UMTLobbyWidget::IsLocalPlayerSlot(int32 SlotIndex) const
+{
+	const AMTPlayerState* Local = GetLocalMTPS();
+	return Local && Local->GetPlayerSlot() == SlotIndex;
+}
+
 bool UMTLobbyWidget::IsLocalReady() const
 {
 	const AMTPlayerState* MTPS = GetLocalMTPS();
@@ -149,7 +170,9 @@ void UMTLobbyWidget::HandleRefresh()
 		{
 			if (MTPS)
 			{
-				Info += FString::Printf(TEXT("[slot=%d host=%d] "), MTPS->GetPlayerSlot(), MTPS->IsHost() ? 1 : 0);
+				// 복제 진단: 다른 클라가 준비하면 ready 값이 모든 화면에서 바뀌어야 정상
+					Info += FString::Printf(TEXT("[slot=%d host=%d ready=%d] "),
+						MTPS->GetPlayerSlot(), MTPS->IsHost() ? 1 : 0, MTPS->IsReady() ? 1 : 0);
 			}
 		}
 		UE_LOG(LogMT, Log, TEXT("%s"), *Info);
@@ -162,12 +185,31 @@ void UMTLobbyWidget::HandleRefresh()
 	OnLobbyRefresh.Broadcast();
 }
 
+void UMTLobbyWidget::HandleWorldCleanup(UWorld* World, bool bSessionEnded, bool bCleanupResources)
+{
+	const bool bMine = (World == GetWorld());
+	if (MTLogEnabled())
+	{
+		const FString Msg = FString::Printf(TEXT("[MTLobby] WorldCleanup 수신 bMine=%d | World=%s MyWorld=%s"),
+			bMine ? 1 : 0, *GetNameSafe(World), *GetNameSafe(GetWorld()));
+		UE_LOG(LogMT, Log, TEXT("%s"), *Msg);
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Cyan, Msg);
+	}
+	if (bMine)
+	{
+		DeactivateWidget();      // CommonUI 활성 트리에서 빠져 Menu 입력모드 해제
+		RemoveFromParent();
+	}
+}
+
 void UMTLobbyWidget::NativeDestruct()
 {
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(RefreshTimer);
 	}
+	FWorldDelegates::OnWorldCleanup.Remove(WorldCleanupHandle);
+	WorldCleanupHandle.Reset();
 	Super::NativeDestruct();
 }
 

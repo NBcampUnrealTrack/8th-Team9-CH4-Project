@@ -4,10 +4,17 @@
 #include "UI/InGame/MTMatchGameResultWidget.h"
 #include "Game/MTGameState.h"
 #include "Player/MTPlayerState.h"
+#include "GameFramework/PlayerController.h"
 
 void UMTMatchGameResultWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+}
+
+bool UMTMatchGameResultWidget::IsHost() const
+{
+    const APlayerController* PC = GetOwningPlayer();
+    return PC && PC->HasAuthority();
 }
 
 void UMTMatchGameResultWidget::ShowResult()

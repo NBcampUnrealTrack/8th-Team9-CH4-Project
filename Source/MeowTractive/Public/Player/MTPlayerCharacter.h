@@ -21,6 +21,10 @@ class MEOWTRACTIVE_API AMTPlayerCharacter : public ACharacter, public IAbilitySy
 private:
 	bool bWasCJumpHeld = false; // 점프 테스트
 
+	// 로컬 컨트롤러 소유 시 게임 입력모드 적용. seamless travel 시 호스트는 BeginPlay가
+	// possession보다 먼저라, possession 직후(NotifyControllerChanged)에서도 호출해야 한다.
+	void ApplyLocalInputMode();
+
 protected:
 	AMTPlayerCharacter();
 

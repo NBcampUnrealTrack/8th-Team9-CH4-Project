@@ -51,6 +51,10 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MT|Lobby")
 	AMTPlayerState* GetPlayerInSlot(int32 SlotIndex) const;
 
+	// 이 슬롯이 로컬 플레이어 본인 슬롯인지 (준비 버튼은 본인 슬롯만 활성)
+	UFUNCTION(BlueprintPure, Category = "MT|Lobby")
+	bool IsLocalPlayerSlot(int32 SlotIndex) const;
+
 	UFUNCTION(BlueprintPure, Category = "MT|Lobby")
 	bool IsLocalReady() const;
 
@@ -78,7 +82,12 @@ private:
 	UFUNCTION()
 	void HandleRefresh();           // 타이머 → OnLobbyRefresh 방송
 
+	// 로비 월드 정리 시 위젯 자체 제거. OnWorldCleanup은 seamless·하드 LoadMap 양쪽에서
+	// 호출되어, 하드 LoadMap으로 전환하는 리슨 서버 호스트도 잡힌다(좀비 위젯→Menu 입력모드 고착 방지).
+	void HandleWorldCleanup(UWorld* World, bool bSessionEnded, bool bCleanupResources);
+
 	FTimerHandle RefreshTimer;
+	FDelegateHandle WorldCleanupHandle;
 
 	UPROPERTY(EditAnywhere, Category = "MT|Lobby")
 	int32 MaxSlots = 4;

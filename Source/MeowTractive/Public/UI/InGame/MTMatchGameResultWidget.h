@@ -15,6 +15,10 @@ public:
     UFUNCTION(BlueprintCallable)
     void ShowResult();
 
+    // 로컬 플레이어가 호스트(리슨 서버)인지 — "로비로 나가기" 버튼 활성 조건
+    UFUNCTION(BlueprintPure, Category = "MT|UI")
+    bool IsHost() const;
+
 protected:
     virtual void NativeConstruct() override;
 

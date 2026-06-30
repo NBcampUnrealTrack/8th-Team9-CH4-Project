@@ -6,6 +6,8 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Game/MTGameplayTags.h"
+#include "Game/MTLog.h"
+#include "Engine/Engine.h"
 
 AMTPlayerCharacter::AMTPlayerCharacter()
 {
@@ -44,13 +46,24 @@ void AMTPlayerCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (IsLocallyControlled())
+	const bool bLocally = IsLocallyControlled();
+	APlayerController* PC = Cast<APlayerController>(GetController());
+
+	// 클라는 보통 여기서 적용됨. 호스트(seamless)는 아직 미possess라 NotifyControllerChanged에서 적용.
+	ApplyLocalInputMode();
+
+	if (MTLogEnabled())
 	{
-		if (APlayerController* PC = Cast<APlayerController>(GetController()))
-		{
-			PC->SetInputMode(FInputModeGameOnly());
-			PC->SetShowMouseCursor(false);
-		}
+		// 호스트 입력잠김 진단: 이 분기를 탔는지 / 컨트롤러가 BeginPlay 시점에 붙었는지
+		const FString Msg = FString::Printf(TEXT("[MTPawn] BeginPlay LocallyCtrl=%d PC=%s Auth=%d NetMode=%d 입력모드적용=%d | Pawn=%s"),
+			bLocally ? 1 : 0,
+			PC ? *PC->GetName() : TEXT("null"),
+			HasAuthority() ? 1 : 0,
+			(int32)GetNetMode(),
+			(bLocally && PC) ? 1 : 0,
+			*GetName());
+		UE_LOG(LogMT, Log, TEXT("%s"), *Msg);
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Green, Msg);
 	}
 }
 
@@ -106,6 +119,27 @@ void AMTPlayerCharacter::NotifyControllerChanged()
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
 		{
 			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+		}
+	}
+
+	// possession 직후 — 호스트(seamless travel)는 여기서 게임 입력모드 확정
+	ApplyLocalInputMode();
+}
+
+void AMTPlayerCharacter::ApplyLocalInputMode()
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (PC && PC->IsLocalController())
+	{
+		PC->SetInputMode(FInputModeGameOnly());
+		PC->SetShowMouseCursor(false);
+
+		if (MTLogEnabled())
+		{
+			const FString Msg = FString::Printf(TEXT("[MTPawn] ApplyLocalInputMode → GameOnly | PC=%s NetMode=%d Pawn=%s"),
+				*PC->GetName(), (int32)GetNetMode(), *GetName());
+			UE_LOG(LogMT, Log, TEXT("%s"), *Msg);
+			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Magenta, Msg);
 		}
 	}
 }

@@ -1,5 +1,6 @@
 ﻿#include "Game/MTMatchGameMode.h"
 #include "Game/MTGameState.h"
+#include "Game/MTLog.h"
 #include "Player/MTPlayerState.h"
 #include "Player/MTPlayerController.h"
 #include "Pedestrian/MTPedestrianBase.h"
@@ -40,6 +41,14 @@ void AMTMatchGameMode::PostLogin(APlayerController* NewPlayer)
     Super::PostLogin(NewPlayer);
     MarkLoaded(NewPlayer);
     AssignTeamColor(NewPlayer);     // 슬롯 기준 팀색 (직접 진입 시 폴백 포함)
+
+    if (MTLogEnabled())
+    {
+        UE_LOG(LogMT, Log, TEXT("[MTMatch] PostLogin(신규접속) PC=%s Local=%d Auth=%d NetMode=%d"),
+            *GetNameSafe(NewPlayer),
+            (NewPlayer && NewPlayer->IsLocalController()) ? 1 : 0,
+            HasAuthority() ? 1 : 0, (int32)GetNetMode());
+    }
 }
 
 void AMTMatchGameMode::HandleSeamlessTravelPlayer(AController*& C)
@@ -47,6 +56,12 @@ void AMTMatchGameMode::HandleSeamlessTravelPlayer(AController*& C)
 	Super::HandleSeamlessTravelPlayer(C);
 	MarkLoaded(C);                  // seamless travel 완료 = 새 맵 로딩 완료
 	AssignTeamColor(C);             // 로비에서 운반된 슬롯으로 팀색 결정
+
+	if (MTLogEnabled())
+	{
+		UE_LOG(LogMT, Log, TEXT("[MTMatch] HandleSeamlessTravelPlayer C=%s Local=%d"),
+			*GetNameSafe(C), (C && C->IsLocalController()) ? 1 : 0);
+	}
 }
 
 void AMTMatchGameMode::HandleMatchHasEnded()
@@ -94,7 +109,8 @@ void AMTMatchGameMode::UpdateMatchTimer()
 {
     RemainingTime--;
 
-    GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::White, 
+    // 화면 가림 방지로 임시 주석 (남은 시간 디버그 표시)
+    GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::White,
         FString::Printf(TEXT("남은 시간: %d"), RemainingTime));
 
     if (RemainingTime <= 0)
@@ -287,6 +303,13 @@ void AMTMatchGameMode::HandleMatchHasStarted()
 {
 	Super::HandleMatchHasStarted();
 	UE_LOG(LogTemp, Log, TEXT("[MTMatch] 전원 로딩 완료 → StartMatch (InProgress)"));
+
+	if (MTLogEnabled())
+	{
+		const AGameStateBase* GS = GameState;
+		UE_LOG(LogMT, Log, TEXT("[MTMatch] HandleMatchHasStarted NetMode=%d Players=%d"),
+			(int32)GetNetMode(), GS ? GS->PlayerArray.Num() : -1);
+	}
 	// TODO: 입력 권한 부여. 클라는 GameState->IsMatchInProgress()로 게이트.
 
 	// 1. 매치 타이머 초기화 및 시작
