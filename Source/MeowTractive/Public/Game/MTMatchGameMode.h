@@ -33,6 +33,13 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
 	TArray<FLinearColor> TeamColors;
 
+	// 플레이어 스타트 지점
+	
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+
+	// 리스폰 요청
+	void RequestRespawn(AController* Controller);
+
 protected:
 	// 전원 로딩 완료 + 이동 중 플레이어 없음 → true 시 StartMatch
 	virtual bool ReadyToStartMatch_Implementation() override;
@@ -49,6 +56,13 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
     int32 MaxNormalPedestrians = 20;
+		
+	TArray<APlayerStart*> UsedStarts; // 플레이어 스타트 지점
+
+	UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
+    float RespawnDelay = 5.f; // 리스폰 쿨타임
+
+	TSet<AController*> RespawningControllers; // 리스폰하는 컨트롤러
 
 private:
     FTimerHandle MatchTimerHandle;
