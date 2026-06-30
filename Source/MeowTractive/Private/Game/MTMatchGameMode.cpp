@@ -5,6 +5,8 @@
 #include "Pedestrian/MTPedestrianBase.h"
 #include "GameFramework/GameStateBase.h"
 #include "Kismet/GameplayStatics.h"
+#include "EngineUtils.h"
+#include "GameFramework/PlayerStart.h"
 #include "NavigationSystem.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -165,6 +167,84 @@ void AMTMatchGameMode::AssignTeamColor(AController* C)
 	{
 		MTPS->SetTeamColor(TeamColors[Slot]);
 	}
+}
+
+AActor* AMTMatchGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+	// 플레이어 스타트
+    AMTPlayerState* MTPS = Player->GetPlayerState<AMTPlayerState>();
+    if (!MTPS) return Super::ChoosePlayerStart_Implementation(Player);
+
+    int32 Slot = MTPS->GetPlayerSlot();
+    FString TagName = FString::Printf(TEXT("Slot%d"), Slot);
+
+    TArray<APlayerStart*> ValidStarts;
+    for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+    {
+        if (It->PlayerStartTag == FName(*TagName))
+        {
+            ValidStarts.Add(*It);
+        }
+    }
+
+    if (ValidStarts.Num() == 0)
+        return Super::ChoosePlayerStart_Implementation(Player);
+
+    APlayerStart* Chosen = nullptr;
+
+    if (RespawningControllers.Contains(Player))
+    {
+        // 리스폰: 전체 중 랜덤
+        Chosen = ValidStarts[FMath::RandRange(0, ValidStarts.Num() - 1)];
+    }
+    else
+    {
+        // 최초 스폰: 미사용 포인트 우선
+        TArray<APlayerStart*> UnusedStarts = ValidStarts.FilterByPredicate([this](APlayerStart* S)
+        {
+            return !UsedStarts.Contains(S);
+        });
+
+        if (UnusedStarts.Num() > 0)
+        {
+            Chosen = UnusedStarts[FMath::RandRange(0, UnusedStarts.Num() - 1)];
+            UsedStarts.Add(Chosen);
+        }
+        else
+        {
+            Chosen = ValidStarts[FMath::RandRange(0, ValidStarts.Num() - 1)];
+        }
+    }
+
+    UE_LOG(LogTemp, Log, TEXT("[MT] 슬롯 %d → 스폰 포인트: %s"), Slot, *Chosen->GetName());
+
+    return Chosen;
+}
+
+void AMTMatchGameMode::RequestRespawn(AController* Controller)
+{
+	// 리스폰
+    if (!Controller) return;
+
+    UE_LOG(LogTemp, Log, TEXT("[MT] 리스폰 대기 중: %s"), *Controller->GetName());
+
+    TWeakObjectPtr<AController> WeakController = Controller;
+
+    FTimerHandle RespawnTimer;
+    GetWorldTimerManager().SetTimer(RespawnTimer, [this, WeakController]()
+    {
+        if (!WeakController.IsValid()) return;
+
+        AController* C = WeakController.Get();
+        RespawningControllers.Add(C);
+
+        AActor* StartSpot = ChoosePlayerStart(C);
+        RestartPlayerAtPlayerStart(C, StartSpot);
+
+        RespawningControllers.Remove(C);
+
+        UE_LOG(LogTemp, Log, TEXT("[MT] 리스폰 완료: %s"), *C->GetName());
+    }, RespawnDelay, false);
 }
 
 bool AMTMatchGameMode::ReadyToStartMatch_Implementation()
