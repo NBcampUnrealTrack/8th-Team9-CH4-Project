@@ -62,32 +62,61 @@ void UMTAttractivenessBarWidget::UpdateBars(float Current, float Enemy, float Ma
         AttractivenessBar->SetFillColorAndOpacity(CurrentColor);
     }
 
-	//마커 위치 업데이트
-    UpdateMarker(EnemyAttractivenessHandle, EnemyPercent, EnemyColor);
-    UpdateMarker(CurrentAttractivenessHandle, CurrentPercent, CurrentColor);
+	//핸들 위치 업데이트
+    UpdateEnemyMarker(EnemyPercent, EnemyColor);
+    UpdateCurrentMarker(CurrentPercent);
 }
 
 //마커(핸들) 위치/색상 업데이트
-void UMTAttractivenessBarWidget::UpdateMarker(UImage* Marker, float Percent, FLinearColor Color)
+void UMTAttractivenessBarWidget::UpdateCurrentMarker(float Percent)
 {
-    if (!Marker)
+    if (!CurrentAttractivenessHandle)
     {
         return;
     }
 
+	// 0 이상일때만 활성화
     const float ClampedPercent = FMath::Clamp(Percent, 0.f, 1.f);
-    Marker->SetVisibility(ClampedPercent > 0.f
+	CurrentAttractivenessHandle->SetVisibility(ClampedPercent > 0.f
         ? ESlateVisibility::HitTestInvisible
         : ESlateVisibility::Collapsed);
     if (bUseTeamColors)
     {
-        Marker->SetColorAndOpacity(Color);
+		CurrentAttractivenessHandle->SetColorAndOpacity(CachedCurrentColor);
     }
 
-    if (UCanvasPanelSlot* MarkerSlot = Cast<UCanvasPanelSlot>(Marker->Slot))
+	//앵커 위치를 옮겨서 마커 이동(비율에 따른 이동 구현)
+    if (UCanvasPanelSlot* MarkerSlot = Cast<UCanvasPanelSlot>(CurrentAttractivenessHandle->Slot))
     {
         MarkerSlot->SetAnchors(FAnchors(ClampedPercent, 0.5f));
         MarkerSlot->SetAlignment(FVector2D(0.5f, 0.5f));
         MarkerSlot->SetPosition(FVector2D::ZeroVector);
     }
+}
+
+void UMTAttractivenessBarWidget::UpdateEnemyMarker(float Percent, FLinearColor Color)
+{
+	if (!EnemyAttractivenessHandle)
+	{
+		return;
+	}
+
+	// 0 이상일때만 활성화
+	const float ClampedPercent = FMath::Clamp(Percent, 0.f, 1.f);
+	EnemyAttractivenessHandle->SetVisibility(ClampedPercent > 0.f
+		? ESlateVisibility::HitTestInvisible
+		: ESlateVisibility::Collapsed);
+	if (bUseTeamColors)
+	{
+		EnemyAttractivenessHandle->SetColorAndOpacity(Color);
+	}
+
+	//앵커 위치를 옮겨서 마커 이동(비율에 따른 이동 구현)
+	if (UCanvasPanelSlot* MarkerSlot = Cast<UCanvasPanelSlot>(EnemyAttractivenessHandle->Slot))
+	{
+		//
+		MarkerSlot->SetAnchors(FAnchors(ClampedPercent, 0.5f));
+		MarkerSlot->SetAlignment(FVector2D(0.5f, 1.0f));	//적 핸들만 바 위쪽으로 조금 튀어나오게 설정.
+		MarkerSlot->SetPosition(FVector2D::ZeroVector);
+	}
 }

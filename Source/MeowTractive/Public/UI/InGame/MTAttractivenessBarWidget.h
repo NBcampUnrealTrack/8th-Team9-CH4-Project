@@ -58,5 +58,6 @@ private:
     FLinearColor CachedCurrentColor = FLinearColor::White;
     FLinearColor CachedEnemyColor = FLinearColor::White;
 
-    void UpdateMarker(UImage* Marker, float Percent, FLinearColor Color);
+    void UpdateCurrentMarker(float Percent);
+	void UpdateEnemyMarker(float Percent, FLinearColor Color);
 };
