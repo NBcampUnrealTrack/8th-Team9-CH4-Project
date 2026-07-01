@@ -170,6 +170,32 @@ void UMTAttractiveComponent::ResetAllAttractiveAmounts()
 	NotifyAmountsChanged();
 }
 
+// 매료 완료 플레이어는 유지하고 나머지 플레이어 수치를 0으로 초기화
+void UMTAttractiveComponent::ResetOtherAttractiveAmounts(APlayerState* KeptPlayerState)
+{
+	AActor* Owner = GetOwner();
+	if (!Owner || !Owner->HasAuthority() || !IsValid(KeptPlayerState))
+	{
+		return;
+	}
+
+	bool bChanged = false;
+	for (FMTAttractiveAmountEntry& Entry : AttractiveAmounts)
+	{
+		if (Entry.PlayerState != KeptPlayerState && Entry.AttractiveAmount > 0.f)
+		{
+			Entry.AttractiveAmount = 0.f;
+			bChanged = true;
+		}
+	}
+
+	LastAttacker = KeptPlayerState;
+	if (bChanged)
+	{
+		NotifyAmountsChanged();
+	}
+}
+
 //현재 매료도 확인
 float UMTAttractiveComponent::GetAttractiveAmount(APlayerState* PlayerState) const
 {
@@ -227,6 +253,37 @@ APlayerState* UMTAttractiveComponent::GetLeadingPlayer() const
 	for (const FMTAttractiveAmountEntry& Entry : AttractiveAmounts)
 	{
 		if (IsValid(Entry.PlayerState)
+			&& FMath::IsNearlyEqual(Entry.AttractiveAmount, HighestAmount, 0.01f))
+		{
+			return Entry.PlayerState;
+		}
+	}
+	return nullptr;
+}
+
+// 특정 플레이어를 제외한 최고 매료도 플레이어 확인 (로컬 UI의 경쟁자 표시용)
+APlayerState* UMTAttractiveComponent::GetLeadingPlayerExcluding(APlayerState* ExcludedPlayerState) const
+{
+	const float HighestAmount = GetHighestAttractiveAmountExcluding(ExcludedPlayerState);
+	if (HighestAmount <= 0.f)
+	{
+		return nullptr;
+	}
+
+	if (LastAttacker.IsValid() && LastAttacker.Get() != ExcludedPlayerState)
+	{
+		const FMTAttractiveAmountEntry* LastAttackerEntry = FindEntry(LastAttacker.Get());
+		if (LastAttackerEntry
+			&& FMath::IsNearlyEqual(LastAttackerEntry->AttractiveAmount, HighestAmount, 0.01f))
+		{
+			return LastAttacker.Get();
+		}
+	}
+
+	for (const FMTAttractiveAmountEntry& Entry : AttractiveAmounts)
+	{
+		if (IsValid(Entry.PlayerState)
+			&& Entry.PlayerState != ExcludedPlayerState
 			&& FMath::IsNearlyEqual(Entry.AttractiveAmount, HighestAmount, 0.01f))
 		{
 			return Entry.PlayerState;

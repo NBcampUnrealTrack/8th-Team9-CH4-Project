@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
@@ -40,6 +40,7 @@ public:
 	float AddAttractiveAmount(APlayerState* PlayerState, float Amount);
 	void DecreaseAllAttractiveAmounts(float Amount);
 	void ResetAllAttractiveAmounts();
+	void ResetOtherAttractiveAmounts(APlayerState* KeptPlayerState);
 
 	UFUNCTION(BlueprintPure, Category = "Attractive")
 	float GetAttractiveAmount(APlayerState* PlayerState) const;
@@ -52,6 +53,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "Attractive")
 	APlayerState* GetLeadingPlayer() const;
+
+	UFUNCTION(BlueprintPure, Category = "Attractive")
+	APlayerState* GetLeadingPlayerExcluding(APlayerState* ExcludedPlayerState) const;
 
 	UFUNCTION(BlueprintPure, Category = "Attractive")
 	float GetMaxAttractiveAmount() const { return MaxAttractiveAmount; }
