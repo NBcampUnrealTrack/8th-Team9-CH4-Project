@@ -1,6 +1,45 @@
 ﻿// MTGameState.cpp
 #include "Game/MTGameState.h"
+#include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
+#include "Pedestrian/MTAttractiveComponent.h"
+#include "Pedestrian/MTPedestrianBase.h"
+
+void AMTGameState::AddPlayerState(APlayerState* PlayerState)
+{
+    Super::AddPlayerState(PlayerState);
+
+    if (!HasAuthority() || !PlayerState)
+    {
+        return;
+    }
+
+    for (TActorIterator<AMTPedestrianBase> It(GetWorld()); It; ++It)
+    {
+        if (UMTAttractiveComponent* AttractiveComponent = It->GetAttractiveComponent())
+        {
+            AttractiveComponent->AddPlayerState(PlayerState);
+        }
+    }
+}
+
+void AMTGameState::RemovePlayerState(APlayerState* PlayerState)
+{
+    Super::RemovePlayerState(PlayerState);
+
+    if (!HasAuthority() || !PlayerState)
+    {
+        return;
+    }
+
+    for (TActorIterator<AMTPedestrianBase> It(GetWorld()); It; ++It)
+    {
+        if (UMTAttractiveComponent* AttractiveComponent = It->GetAttractiveComponent())
+        {
+            AttractiveComponent->RemovePlayerState(PlayerState);
+        }
+    }
+}
 
 void AMTGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {

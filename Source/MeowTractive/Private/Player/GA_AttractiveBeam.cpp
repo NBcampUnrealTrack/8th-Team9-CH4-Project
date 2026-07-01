@@ -1,10 +1,11 @@
-#include "Player/GA_AttractiveBeam.h"
+﻿#include "Player/GA_AttractiveBeam.h"
 
 #include "Pedestrian/MTPedestrianBase.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
+#include "GameplayTagContainer.h"
 #include "DrawDebugHelpers.h"
 
 UGA_AttractiveBeam::UGA_AttractiveBeam()
@@ -103,6 +104,7 @@ void UGA_AttractiveBeam::EndAbility(
 
 void UGA_AttractiveBeam::ApplyAttractiveDamage(AMTPedestrianBase* Target)
 {
+	// --- GE 호출전 정보 준비 ---
 	if (!Target || !AttractiveDamageGE)
 	{
 		return;
@@ -118,9 +120,12 @@ void UGA_AttractiveBeam::ApplyAttractiveDamage(AMTPedestrianBase* Target)
 	// 소스(고양이) ASC로 만들어야 instigator=고양이 → 행인 PostGEExecute가 가해자를 정확히 기록
 	FGameplayEffectContextHandle Ctx = SourceASC->MakeEffectContext();
 	Ctx.AddSourceObject(GetAvatarActorFromActorInfo());
-	const FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(AttractiveDamageGE, GetAbilityLevel(), Ctx);
+	FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(AttractiveDamageGE, GetAbilityLevel(), Ctx);
+
 	if (Spec.IsValid())
 	{
+		const FGameplayTag DamageTag = FGameplayTag::RequestGameplayTag(FName("Data.Damage"));
+		Spec.Data->SetSetByCallerMagnitude(DamageTag, BaseDamage);
 		SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
 	}
 }

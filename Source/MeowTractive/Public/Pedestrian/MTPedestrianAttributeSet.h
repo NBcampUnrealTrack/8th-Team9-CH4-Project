@@ -19,28 +19,10 @@ class MEOWTRACTIVE_API UMTPedestrianAttributeSet : public UAttributeSet
 public:
 	UMTPedestrianAttributeSet();
 
-	// 현재 매료 체력. 플레이어 바엔 (Max-Current)로 표시.
-	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_AttractiveHealth, Category = "Attractive")
-	FGameplayAttributeData AttractiveHealth;
-	ATTRIBUTE_ACCESSORS(UMTPedestrianAttributeSet, AttractiveHealth);
-
-	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MaxAttractiveHealth, Category = "Attractive")
-	FGameplayAttributeData MaxAttractiveHealth;
-	ATTRIBUTE_ACCESSORS(UMTPedestrianAttributeSet, MaxAttractiveHealth);
-
-	// 메타: 매료 공격 GE가 더하는 값 → PostGEExecute에서 AttractiveHealth 차감 (복제 안 함)
+	// GE 실행값 전달용 메타 속성. 실제 플레이어별 수치는 MTAttractiveComponent가 보관한다.
 	UPROPERTY(BlueprintReadOnly, Category = "Attractive")
-	FGameplayAttributeData IncomingAttractive;
-	ATTRIBUTE_ACCESSORS(UMTPedestrianAttributeSet, IncomingAttractive);
+	FGameplayAttributeData AttractiveAmount;
+	ATTRIBUTE_ACCESSORS(UMTPedestrianAttributeSet, AttractiveAmount);
 
-	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
-	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
-protected:
-	UFUNCTION()
-	void OnRep_AttractiveHealth(const FGameplayAttributeData& OldValue);
-
-	UFUNCTION()
-	void OnRep_MaxAttractiveHealth(const FGameplayAttributeData& OldValue);
 };
