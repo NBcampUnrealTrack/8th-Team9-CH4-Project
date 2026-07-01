@@ -1,7 +1,9 @@
 #include "Player/MTPlayerAttributeSet.h"
 
+#include "Game/MTLog.h"
 #include "GameplayEffectExtension.h"
 #include "Net/UnrealNetwork.h"
+#include "Engine/Engine.h"
 
 UMTPlayerAttributeSet::UMTPlayerAttributeSet()
 {
@@ -46,7 +48,28 @@ void UMTPlayerAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCa
 		SetIncomingDamage(0.f);
 		if (LocalDamage > 0.f)
 		{
-			SetHp(FMath::Clamp(GetHp() - LocalDamage, 0.f, GetMaxHp()));
+			const float OldHp = GetHp();
+			SetHp(FMath::Clamp(OldHp - LocalDamage, 0.f, GetMaxHp()));
+			const float NewHp = GetHp();
+
+			if (MTLogEnabled())
+			{
+				const AActor* Attacker = Data.EffectSpec.GetContext().GetOriginalInstigator();
+				const FString Msg = FString::Printf(
+					TEXT("[MTDamage] %s ← %.0f 데미지 (가해:%s) | Hp %.0f → %.0f"),
+					*GetNameSafe(GetOwningActor()), LocalDamage, *GetNameSafe(Attacker), OldHp, NewHp);
+				UE_LOG(LogMT, Log, TEXT("%s"), *Msg);
+				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, Msg);
+
+				if (NewHp <= 0.f)
+				{
+					const FString Dead = FString::Printf(
+						TEXT("[MTDamage] %s Hp 0 도달 → 사망/기절/리스폰 미구현"), *GetNameSafe(GetOwningActor()));
+					UE_LOG(LogMT, Warning, TEXT("%s"), *Dead);
+					if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Dead);
+				}
+			}
+
 			// TODO: Hp <= 0 시 기절/리스폰 처리 (미구현)
 		}
 	}
