@@ -1,5 +1,8 @@
 #include "Player/MTPlayerAttributeSet.h"
 
+#include "GameplayEffectExtension.h"
+#include "Net/UnrealNetwork.h"
+
 UMTPlayerAttributeSet::UMTPlayerAttributeSet()
 {
 	InitHp(100.f);
@@ -8,33 +11,63 @@ UMTPlayerAttributeSet::UMTPlayerAttributeSet()
 	InitMaxStamina(100.f);
 }
 
-bool UMTPlayerAttributeSet::PreGameplayEffectExecute(struct FGameplayEffectModCallbackData& Data)
+void UMTPlayerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
-	Super::PreGameplayEffectExecute(Data);
-
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("PreGameplayEffectExecute"));
-
-	return true;
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	// Hp는 적 머리 위 체력바 등으로 모두가 볼 수 있게. 스태미나는 본인만.
+	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, Hp, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, MaxHp, COND_None, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, Stamina, COND_OwnerOnly, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, MaxStamina, COND_OwnerOnly, REPNOTIFY_Always);
 }
 
-void UMTPlayerAttributeSet::PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const
+void UMTPlayerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
 {
-	Super::PreAttributeBaseChange(Attribute, NewValue);
+	Super::PreAttributeChange(Attribute, NewValue);
 
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("PreAttributeChange"));
+	if (Attribute == GetHpAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxHp());
+	}
+	else if (Attribute == GetStaminaAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxStamina());
+	}
 }
 
-void UMTPlayerAttributeSet::PostAttributeBaseChange(const FGameplayAttribute& Attribute, float OldValue,
-	float NewValue) const
-{
-	Super::PostAttributeBaseChange(Attribute, OldValue, NewValue);
-
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("PostAttributeChange"));
-}
-
-void UMTPlayerAttributeSet::PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData& Data)
+void UMTPlayerAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data)
 {
 	Super::PostGameplayEffectExecute(Data);
 
-	GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Green, TEXT("PostGameplayEffectExecute"));
+	// 데미지 GE: 메타 IncomingDamage 만큼 Hp 차감
+	if (Data.EvaluatedData.Attribute == GetIncomingDamageAttribute())
+	{
+		const float LocalDamage = GetIncomingDamage();
+		SetIncomingDamage(0.f);
+		if (LocalDamage > 0.f)
+		{
+			SetHp(FMath::Clamp(GetHp() - LocalDamage, 0.f, GetMaxHp()));
+			// TODO: Hp <= 0 시 기절/리스폰 처리 (미구현)
+		}
+	}
+}
+
+void UMTPlayerAttributeSet::OnRep_Hp(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UMTPlayerAttributeSet, Hp, OldValue);
+}
+
+void UMTPlayerAttributeSet::OnRep_MaxHp(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UMTPlayerAttributeSet, MaxHp, OldValue);
+}
+
+void UMTPlayerAttributeSet::OnRep_Stamina(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UMTPlayerAttributeSet, Stamina, OldValue);
+}
+
+void UMTPlayerAttributeSet::OnRep_MaxStamina(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UMTPlayerAttributeSet, MaxStamina, OldValue);
 }

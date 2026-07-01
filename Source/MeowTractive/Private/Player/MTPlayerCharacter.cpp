@@ -7,6 +7,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Game/MTGameplayTags.h"
 #include "Game/MTLog.h"
+#include "Player/MTPlayerState.h"
 #include "Engine/Engine.h"
 
 AMTPlayerCharacter::AMTPlayerCharacter()
@@ -38,6 +39,9 @@ AMTPlayerCharacter::AMTPlayerCharacter()
 	JumpMaxCount = 2;
 
 	AbilitySystemComponent = CreateDefaultSubobject<UAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	AbilitySystemComponent->SetIsReplicated(true);
+	// ASC가 Pawn에 있으므로 MP에선 Full (Mixed는 PlayerState 소유 전제)
+	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Full);
 
 	AttributeSet = CreateDefaultSubobject<UMTPlayerAttributeSet>(TEXT("AttributeSetBase"));
 }
@@ -48,6 +52,16 @@ void AMTPlayerCharacter::BeginPlay()
 
 	const bool bLocally = IsLocallyControlled();
 	APlayerController* PC = Cast<APlayerController>(GetController());
+
+	// 소유 클라 포함 모든 머신에서 ActorInfo 세팅 (LocalPredicted 어빌리티/속성·태그 복제 동작).
+	// 서버는 PossessedBy에서도 호출하지만 반복 호출 안전.
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->InitAbilityActorInfo(this, this);
+		AbilitySystemComponent->RegisterGameplayTagEvent(
+			MTGameplayTags::State::TAG_State_Stun, EGameplayTagEventType::NewOrRemoved)
+			.AddUObject(this, &AMTPlayerCharacter::OnStunTagChanged);
+	}
 
 	// 클라는 보통 여기서 적용됨. 호스트(seamless)는 아직 미possess라 NotifyControllerChanged에서 적용.
 	ApplyLocalInputMode();
@@ -103,6 +117,7 @@ void AMTPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 		EnhancedInputComponent->BindAction(DashAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::Dash);
 		EnhancedInputComponent->BindAction(AttractiveBeamAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::AttractiveBeam);
 		EnhancedInputComponent->BindAction(AttractiveBeamAction, ETriggerEvent::Completed, this, &AMTPlayerCharacter::AttractiveBeamReleased);
+		EnhancedInputComponent->BindAction(MeowPunchAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::MeowPunch);
 	}
 	else
 	{
@@ -146,6 +161,11 @@ void AMTPlayerCharacter::ApplyLocalInputMode()
 
 void AMTPlayerCharacter::Move(const FInputActionValue& Value)
 {
+	if (IsStunned())
+	{
+		return;
+	}
+
 	FVector2D MovementVector = Value.Get<FVector2D>();
 
 	if (Controller != nullptr)
@@ -173,13 +193,24 @@ void AMTPlayerCharacter::Look(const FInputActionValue& Value)
 
 void AMTPlayerCharacter::Dash()
 {
-	if (!AbilitySystemComponent)
+	if (!AbilitySystemComponent || IsStunned())
 	{
 		return;
 	}
 
 	AbilitySystemComponent->TryActivateAbilitiesByTag(
 		FGameplayTagContainer(MTGameplayTags::Ability::TAG_Skill_Move_Dash), true);
+}
+
+void AMTPlayerCharacter::MeowPunch()
+{
+	if (!AbilitySystemComponent || IsStunned())
+	{
+		return;
+	}
+
+	AbilitySystemComponent->TryActivateAbilitiesByTag(
+		FGameplayTagContainer(MTGameplayTags::Ability::TAG_Skill_Attack_MeowPunch), true);
 }
 
 void AMTPlayerCharacter::StopJump()
@@ -197,7 +228,7 @@ void AMTPlayerCharacter::StopJump()
 
 void AMTPlayerCharacter::AttractiveBeam()
 {
-	if (!AbilitySystemComponent)
+	if (!AbilitySystemComponent || IsStunned())
 	{
 		return;
 	};
@@ -227,4 +258,65 @@ void AMTPlayerCharacter::ApplyDamagePlayer(float DamageAmount)
 UAbilitySystemComponent* AMTPlayerCharacter::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
+}
+
+bool AMTPlayerCharacter::IsStunned() const
+{
+	return bStunned;
+}
+
+bool AMTPlayerCharacter::IsEnemyCat(const AActor* SourceActor, const AActor* TargetActor)
+{
+	const AMTPlayerCharacter* Src = Cast<AMTPlayerCharacter>(SourceActor);
+	const AMTPlayerCharacter* Tgt = Cast<AMTPlayerCharacter>(TargetActor);
+	if (!Src || !Tgt || Src == Tgt)
+	{
+		return false;
+	}
+
+	const AMTPlayerState* SrcPS = Src->GetPlayerState<AMTPlayerState>();
+	const AMTPlayerState* TgtPS = Tgt->GetPlayerState<AMTPlayerState>();
+	if (!SrcPS || !TgtPS)
+	{
+		return false;
+	}
+
+	const int32 SrcTeam = SrcPS->GetTeamId();
+	const int32 TgtTeam = TgtPS->GetTeamId();
+	// 개인전(TeamId<0): 자기 외 전원 적. 팀전: 다른 팀만 적.
+	if (SrcTeam < 0 || TgtTeam < 0)
+	{
+		return true;
+	}
+	return SrcTeam != TgtTeam;
+}
+
+void AMTPlayerCharacter::OnStunTagChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	// 이동/입력 잠금은 조작하는(소유) 클라 기준으로만 — 이동 권위가 클라에 있음
+	if (!IsLocallyControlled())
+	{
+		return;
+	}
+
+	bStunned = NewCount > 0;
+
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		if (bStunned)
+		{
+			Move->StopMovementImmediately();
+			Move->DisableMovement();
+			StopJumping();
+			// 시전 중이던 스킬(빔 등) 중단
+			if (AbilitySystemComponent)
+			{
+				AbilitySystemComponent->CancelAllAbilities();
+			}
+		}
+		else
+		{
+			Move->SetMovementMode(MOVE_Walking);
+		}
+	}
 }

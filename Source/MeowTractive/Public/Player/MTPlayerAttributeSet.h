@@ -23,25 +23,38 @@ public:
 	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, MaxHp);
 	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, Stamina);
 	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, MaxStamina);
+	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, IncomingDamage);
 
-	virtual bool PreGameplayEffectExecute(struct FGameplayEffectModCallbackData& Data) override;
-
-	virtual void PreAttributeBaseChange(const FGameplayAttribute& Attribute, float& NewValue) const override;
-
-	virtual void PostAttributeBaseChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue) const override;
-
-	virtual void PostGameplayEffectExecute(const struct FGameplayEffectModCallbackData& Data) override;
+	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
+	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
-	UPROPERTY()
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Hp, Category = "MT|Stat", meta = (AllowPrivateAccess = "true"))
 	FGameplayAttributeData Hp;
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MaxHp, Category = "MT|Stat", meta = (AllowPrivateAccess = "true"))
 	FGameplayAttributeData MaxHp;
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_Stamina, Category = "MT|Stat", meta = (AllowPrivateAccess = "true"))
 	FGameplayAttributeData Stamina;
 
-	UPROPERTY()
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MaxStamina, Category = "MT|Stat", meta = (AllowPrivateAccess = "true"))
 	FGameplayAttributeData MaxStamina;
+
+	// 메타: 데미지 GE가 더하는 값 → PostGEExecute에서 Hp 차감 (복제 안 함)
+	UPROPERTY(BlueprintReadOnly, Category = "MT|Stat", meta = (AllowPrivateAccess = "true"))
+	FGameplayAttributeData IncomingDamage;
+
+	UFUNCTION()
+	void OnRep_Hp(const FGameplayAttributeData& OldValue);
+
+	UFUNCTION()
+	void OnRep_MaxHp(const FGameplayAttributeData& OldValue);
+
+	UFUNCTION()
+	void OnRep_Stamina(const FGameplayAttributeData& OldValue);
+
+	UFUNCTION()
+	void OnRep_MaxStamina(const FGameplayAttributeData& OldValue);
 };

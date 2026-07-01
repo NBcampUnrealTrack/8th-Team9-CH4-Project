@@ -1,4 +1,4 @@
-﻿#include "Player/GA_AttractiveBeam.h"
+#include "Player/GA_AttractiveBeam.h"
 
 #include "Pedestrian/MTPedestrianBase.h"
 #include "AbilitySystemComponent.h"
@@ -6,6 +6,8 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayTagContainer.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 #include "DrawDebugHelpers.h"
 
 UGA_AttractiveBeam::UGA_AttractiveBeam()
@@ -23,42 +25,54 @@ void UGA_AttractiveBeam::FireBeam()
 	if (!PC)
 	{
 		return;
-	};
+	}
 
 	FVector CamLocation;
 	FRotator CamRotation;
 	PC->GetPlayerViewPoint(CamLocation, CamRotation);
 	const FVector Start = CamLocation;
-	const FVector End = Start + (CamRotation.Vector() * TraceDistance);
+	const FVector TraceEnd = Start + (CamRotation.Vector() * TraceDistance);
 
-	FHitResult Hit;
 	FCollisionQueryParams Params;
 	Params.AddIgnoredActor(Avatar);
+
+	// 빔 시각 끝점: 벽(가시성)에 막히면 거기까지
+	FVector BeamEnd = TraceEnd;
+	FHitResult WallHit;
+	if (GetWorld()->LineTraceSingleByChannel(WallHit, Start, TraceEnd, ECC_Visibility, Params))
+	{
+		BeamEnd = WallHit.ImpactPoint;
+	}
+
+	// 굵은 빔: 구체 스윕 단일 판정 — 경로상 '첫 폰'만 (관통 없음)
+	FHitResult PawnHit;
 	FCollisionObjectQueryParams ObjParams;
 	ObjParams.AddObjectTypesToQuery(ECC_Pawn);
+	const bool bPawnHit = GetWorld()->SweepSingleByObjectType(
+		PawnHit, Start, BeamEnd, FQuat::Identity, ObjParams, FCollisionShape::MakeSphere(BeamRadius), Params);
 
-	const bool bHit = GetWorld()->LineTraceSingleByObjectType(Hit, Start, End, ObjParams, Params);
+	AMTPedestrianBase* Ped = nullptr;
+	if (bPawnHit)
+	{
+		// 폰에 맞으면 빔은 거기서 끝 (관통 X)
+		BeamEnd = PawnHit.ImpactPoint;
+		Ped = Cast<AMTPedestrianBase>(PawnHit.GetActor());
+	}
+
+	const bool bHitPed = (Ped != nullptr);
+	if (bHitPed && HasAuthority(&CurrentActivationInfo))
+	{
+		ApplyAttractiveDamage(Ped);
+	}
 
 	if (bDrawDebug)
 	{
-		if (bHit)
-		{
-			DrawDebugLine(GetWorld(), Start, Hit.ImpactPoint, FColor::Red, false, FireInterval, 0, 1.f);
-			DrawDebugPoint(GetWorld(), Hit.ImpactPoint, 12.f, FColor::Yellow, false, FireInterval);
-		}
-		else
-		{
-			DrawDebugLine(GetWorld(), Start, End, FColor::Green, false, FireInterval, 0, 1.f);
-		}
+		DrawDebugLine(GetWorld(), Start, BeamEnd, bHitPed ? FColor::Red : FColor::Green, false, FireInterval, 0, 2.f);
+		DrawDebugSphere(GetWorld(), BeamEnd, BeamRadius, 8, FColor::Yellow, false, FireInterval);
 	}
 
-	if (bHit && HasAuthority(&CurrentActivationInfo))
-	{
-		if (AMTPedestrianBase* Ped = Cast<AMTPedestrianBase>(Hit.GetActor()))
-		{
-			ApplyAttractiveDamage(Ped);
-		}
-	}
+	// VFX 훅 — BP가 Niagara 빔 끝점을 여기에 맞춤
+	OnBeamUpdate(Start, BeamEnd, bHitPed);
 }
 
 void UGA_AttractiveBeam::ActivateAbility(
@@ -75,10 +89,12 @@ void UGA_AttractiveBeam::ActivateAbility(
 		return;
 	}
 
+	OnBeamStart(); // VFX 시작 훅
+
 	// 첫 발 즉시
 	FireBeam();
 
-	// 이후 FireInterval 간격으로 반복
+	// 이후 FireInterval 간격으로 반복 (지속 빔)
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
@@ -99,12 +115,13 @@ void UGA_AttractiveBeam::EndAbility(
 		World->GetTimerManager().ClearTimer(BeamTimerHandle);
 	}
 
+	OnBeamEnd(); // VFX 종료 훅
+
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
 
 void UGA_AttractiveBeam::ApplyAttractiveDamage(AMTPedestrianBase* Target)
 {
-	// --- GE 호출전 정보 준비 ---
 	if (!Target || !AttractiveDamageGE)
 	{
 		return;

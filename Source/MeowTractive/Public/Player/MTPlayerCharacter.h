@@ -39,6 +39,11 @@ protected:
 	void AttractiveBeam();
 	void AttractiveBeamReleased();
 
+	void MeowPunch();
+
+	// 스턴 중이면 스킬/이동 입력 무시
+	bool IsStunned() const;
+
 #pragma region PlayerInput
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -64,6 +69,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* AttractiveBeamAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* MeowPunchAction;
 
 #pragma endregion
 
@@ -91,4 +99,13 @@ public:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="AbilitySystem")
 	TObjectPtr<UMTPlayerAttributeSet> AttributeSet;
+
+	// 근접/대시 데미지 대상 판정: 서로 다른 고양이 + 적팀(개인전은 자기 외 전원 적)
+	static bool IsEnemyCat(const AActor* SourceActor, const AActor* TargetActor);
+
+private:
+	// State.Stun 태그 변화 → 이동/입력 잠금 토글 (소유 클라 기준)
+	void OnStunTagChanged(const FGameplayTag Tag, int32 NewCount);
+
+	bool bStunned = false;
 };
