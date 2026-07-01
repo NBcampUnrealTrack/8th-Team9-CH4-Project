@@ -2,6 +2,7 @@
 
 #include "Pedestrian/MTPedestrianBase.h"
 
+#include "Pedestrian/MTAttractiveComponent.h"
 #include "Pedestrian/MTPedestrianAttributeSet.h"
 #include "Game/MTGameplayTags.h"
 #include "UI/InGame/MTAttractivenessBarWidget.h"
@@ -11,6 +12,7 @@
 #include "AbilitySystemComponent.h"
 #include "GameplayEffect.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "GameFramework/PlayerController.h"
 #include "Components/WidgetComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/Pawn.h"
@@ -56,13 +58,15 @@ AMTPedestrianBase::AMTPedestrianBase()
 	// AI(소유 클라 없음) → Minimal: GE는 복제 안 하고 속성/태그/큐만 복제
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Minimal);
 
+	//매료도 수치 관련 컴포넌트
 	AttributeSet = CreateDefaultSubobject<UMTPedestrianAttributeSet>(TEXT("AttractiveAttributeSet"));
+	AttractiveComponent = CreateDefaultSubobject<UMTAttractiveComponent>(TEXT("AttractiveComponent"));
 
 	AttractiveBarWidget = CreateDefaultSubobject<UWidgetComponent>(TEXT("AttractiveBar"));
 	AttractiveBarWidget->SetupAttachment(GetMesh());
 	AttractiveBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 200.f));
 	AttractiveBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
-	AttractiveBarWidget->SetDrawSize(FVector2D(200.f, 20.f));
+	AttractiveBarWidget->SetDrawSize(FVector2D(240.f, 32.f));
 }
 
 void AMTPedestrianBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -177,9 +181,9 @@ void AMTPedestrianBase::Tick(float DeltaTime)
 
 // --- 매료 처리 (AttributeSet에서 서버 호출) ---
 
-void AMTPedestrianBase::HandleAttractiveHit(APlayerState* Source, float Amount, float NewAttractiveHealth)
+void AMTPedestrianBase::HandleAttractiveHit(APlayerState* Source, float Amount)
 {
-	if (!HasAuthority())
+	if (!HasAuthority() || !AttractiveComponent || !Source || Amount <= 0.f)
 	{
 		return;
 	}
@@ -189,34 +193,45 @@ void AMTPedestrianBase::HandleAttractiveHit(APlayerState* Source, float Amount, 
 		return;
 	}
 
-	if (Source)
-	{
-		AttractiveContributions.FindOrAdd(Source) += Amount;
-		LastAttacker = Source;
-		LeadingPlayer = Source;   // 바 색용 (복제)
-	}
+	const float NewAttractiveAmount = AttractiveComponent->AddAttractiveAmount(Source, Amount);
+	UpdateLeadingPlayer();
 
 	// 7초 전투중 태그 갱신 → 회복 GE 정지 (AttractiveInProgressGE는 적용 시 Duration Refresh)
 	ApplySelfGE(AbilitySystemComponent, AttractiveInProgressGE, this);
 
 	BroadcastAttractiveChanged();
 
-	if (NewAttractiveHealth <= 0.f && !bIsAttracted)
+	if (NewAttractiveAmount >= AttractiveComponent->GetMaxAttractiveAmount() && !bIsAttracted)
 	{
-		BecomeAttracted(DetermineAttractiveWinner());
+		// 한 플레이어가 100에 도달하면 경쟁 플레이어 수치는 즉시 0으로 초기화한다.
+		AttractiveComponent->ResetOtherAttractiveAmounts(Source);
+		UpdateLeadingPlayer();
+		BecomeAttracted(Source);
 	}
 }
 
-void AMTPedestrianBase::HandleAttractiveRegen(float NewAttractiveHealth)
+void AMTPedestrianBase::HandleAttractiveRegen(float Amount)
 {
-	if (!HasAuthority())
+	if (!HasAuthority() || !AttractiveComponent || Amount <= 0.f)
 	{
 		return;
 	}
+
+	// 피격 진행/매료 직후 무적 동안에는 RegenGE가 실행돼도 수치를 감소시키지 않는다.
+	if (AbilitySystemComponent
+		&& (AbilitySystemComponent->HasMatchingGameplayTag(AttractiveInProgressTag)
+			|| AbilitySystemComponent->HasMatchingGameplayTag(InvulnerableTag)))
+	{
+		return;
+	}
+
+	AttractiveComponent->DecreaseAllAttractiveAmounts(Amount);
+	UpdateLeadingPlayer();
 	BroadcastAttractiveChanged();
 
-	// 체력 100 완전 회복 = 중립 복귀: 소유자 점수 회수 + 기여도 초기화
-	if (NewAttractiveHealth >= GetMaxAttractiveHealthValue())
+	// 모든 플레이어 매료 수치가 0이면 중립 복귀한다.
+	if (AttractiveComponent->GetHighestAttractiveAmount() <= 0.f
+		&& (AttractedBy || LeadingPlayer || bIsAttracted))
 	{
 		if (AttractedBy)
 		{
@@ -225,47 +240,15 @@ void AMTPedestrianBase::HandleAttractiveRegen(float NewAttractiveHealth)
 				GS->RemoveAttractedCount(AttractedBy);
 			}
 		}
-		ResetContributions();   // 기여도 + LeadingPlayer 초기화
+		ResetAttractiveAmounts();
 		AttractedBy = nullptr;
 		bIsAttracted = false;
 	}
 }
 
-APlayerState* AMTPedestrianBase::DetermineAttractiveWinner() const
+void AMTPedestrianBase::UpdateLeadingPlayer()
 {
-	float MaxVal = -1.f;
-	for (const TPair<TWeakObjectPtr<APlayerState>, float>& Pair : AttractiveContributions)
-	{
-		if (Pair.Key.IsValid() && Pair.Value > MaxVal)
-		{
-			MaxVal = Pair.Value;
-		}
-	}
-	if (MaxVal <= 0.f)
-	{
-		return LastAttacker.Get(); // 폴백
-	}
-
-	// 최다 기여자 수집
-	TArray<APlayerState*> Top;
-	for (const TPair<TWeakObjectPtr<APlayerState>, float>& Pair : AttractiveContributions)
-	{
-		if (Pair.Key.IsValid() && FMath::IsNearlyEqual(Pair.Value, MaxVal, 0.01f))
-		{
-			Top.Add(Pair.Key.Get());
-		}
-	}
-
-	if (Top.Num() == 1)
-	{
-		return Top[0];
-	}
-	// 동점 → 라스트힛 우선
-	if (LastAttacker.IsValid() && Top.Contains(LastAttacker.Get()))
-	{
-		return LastAttacker.Get();
-	}
-	return Top.Num() > 0 ? Top[0] : nullptr;
+	LeadingPlayer = AttractiveComponent ? AttractiveComponent->GetLeadingPlayer() : nullptr;
 }
 
 void AMTPedestrianBase::BecomeAttracted(APlayerState* Winner)
@@ -307,10 +290,12 @@ void AMTPedestrianBase::EndAttracted()
 	bIsAttracted = false;
 }
 
-void AMTPedestrianBase::ResetContributions()
+void AMTPedestrianBase::ResetAttractiveAmounts()
 {
-	AttractiveContributions.Empty();
-	LastAttacker = nullptr;
+	if (AttractiveComponent)
+	{
+		AttractiveComponent->ResetAllAttractiveAmounts();
+	}
 	LeadingPlayer = nullptr;
 }
 
@@ -336,33 +321,68 @@ FLinearColor AMTPedestrianBase::GetLeaderColor() const
 
 void AMTPedestrianBase::BroadcastAttractiveChanged()
 {
-	const float Cur = GetAttractiveHealthValue();
-	const float Max = GetMaxAttractiveHealthValue();
-	OnAttractiveHealthChanged.Broadcast(Cur, Max);
+	const float Amount = GetHighestAttractiveAmountValue();
+	const float Max = GetMaxAttractiveAmountValue();
+	OnAttractiveAmountChanged.Broadcast(Amount, Max);
 
-	// 매료도 바 직접 갱신 (이벤트 기반 — Tick 렌더링 아님). 표시값 = Max-Current(쌓인 매료도)
+	// 로컬 플레이어 수치는 전경, 다른 플레이어 최고 수치는 배경에 겹쳐 표시한다.
 	if (AttractiveBarWidget)
 	{
 		if (UMTAttractivenessBarWidget* Bar = Cast<UMTAttractivenessBarWidget>(AttractiveBarWidget->GetUserWidgetObject()))
 		{
-			Bar->UpdateBar(Max - Cur, Max, GetLeaderColor());
+			const APlayerController* LocalPC =
+				GetWorld() ? GEngine->GetFirstLocalPlayerController(GetWorld()) : nullptr;
+			APlayerState* LocalPlayerState = LocalPC ? LocalPC->PlayerState : nullptr;
+
+			const float CurrentAmount = AttractiveComponent
+				? AttractiveComponent->GetAttractiveAmount(LocalPlayerState)
+				: 0.f;
+			const float EnemyAmount = AttractiveComponent
+				? AttractiveComponent->GetHighestAttractiveAmountExcluding(LocalPlayerState)
+				: 0.f;
+			const APlayerState* EnemyPlayerState = AttractiveComponent
+				? AttractiveComponent->GetLeadingPlayerExcluding(LocalPlayerState)
+				: nullptr;
+
+			FLinearColor CurrentColor = FLinearColor(1.f, 0.15f, 0.4f, 1.f);
+			if (const AMTPlayerState* CurrentMTPS = Cast<AMTPlayerState>(LocalPlayerState))
+			{
+				CurrentColor = CurrentMTPS->GetTeamColor();
+			}
+
+			FLinearColor EnemyColor = FLinearColor(0.45f, 0.2f, 1.f, 1.f);
+			if (const AMTPlayerState* EnemyMTPS = Cast<AMTPlayerState>(EnemyPlayerState))
+			{
+				EnemyColor = EnemyMTPS->GetTeamColor();
+			}
+
+			Bar->UpdateBars(CurrentAmount, EnemyAmount, Max, CurrentColor, EnemyColor);
 		}
 	}
 }
 
-float AMTPedestrianBase::GetAttractiveHealthValue() const
+void AMTPedestrianBase::HandleAttractiveAmountsChanged()
 {
-	return AttributeSet ? AttributeSet->GetAttractiveHealth() : 0.f;
+	if (HasAuthority())
+	{
+		UpdateLeadingPlayer();
+	}
+	BroadcastAttractiveChanged();
 }
 
-float AMTPedestrianBase::GetMaxAttractiveHealthValue() const
+float AMTPedestrianBase::GetAttractiveAmountValue(APlayerState* TargetPlayerState) const
 {
-	return AttributeSet ? AttributeSet->GetMaxAttractiveHealth() : 0.f;
+	return AttractiveComponent ? AttractiveComponent->GetAttractiveAmount(TargetPlayerState) : 0.f;
 }
 
-float AMTPedestrianBase::GetAttractiveGauge() const
+float AMTPedestrianBase::GetHighestAttractiveAmountValue() const
 {
-	return GetMaxAttractiveHealthValue() - GetAttractiveHealthValue();
+	return AttractiveComponent ? AttractiveComponent->GetHighestAttractiveAmount() : 0.f;
+}
+
+float AMTPedestrianBase::GetMaxAttractiveAmountValue() const
+{
+	return AttractiveComponent ? AttractiveComponent->GetMaxAttractiveAmount() : 100.f;
 }
 
 void AMTPedestrianBase::UpdateAttractiveBarVisibility()

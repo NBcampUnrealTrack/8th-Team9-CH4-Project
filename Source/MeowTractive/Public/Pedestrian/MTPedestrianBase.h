@@ -8,12 +8,13 @@
 
 class UAbilitySystemComponent;
 class UMTPedestrianAttributeSet;
+class UMTAttractiveComponent;
 class UWidgetComponent;
 class UGameplayEffect;
 class APlayerState;
 
-// 매료 체력 변경 알림 (Current, Max). 클라 프로그레스바가 이벤트로 구독 → Tick 렌더링 금지.
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FMTOnAttractiveHealthChanged, float, AttractiveHealth, float, MaxAttractiveHealth);
+// 최고 매료 수치 변경 알림 (Current, Max). 클라 프로그레스바가 이벤트로 구독.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FMTOnAttractiveAmountChanged, float, AttractiveAmount, float, MaxAttractiveAmount);
 
 // 매료된 순간. StateTree/BP가 구독해 Attracted 상태(이동 정지)로 전환.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnAttracted, APlayerState*, AttractedBy);
@@ -30,18 +31,19 @@ public:
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
 	// --- AttributeSet에서 호출 (서버) ---
-	void HandleAttractiveHit(APlayerState* Source, float Amount, float NewAttractiveHealth);
-	void HandleAttractiveRegen(float NewAttractiveHealth);
+	void HandleAttractiveHit(APlayerState* Source, float Amount);
+	void HandleAttractiveRegen(float Amount);
 
 	// 서버/클라 공통 — 델리게이트 방송 (이벤트 기반 바 갱신)
 	void BroadcastAttractiveChanged();
+	void HandleAttractiveAmountsChanged();
 
 	// 매치 종료 시 AI 정지 (서버 전용). 서버에서 멈추면 이동 복제로 전 클라에 반영됨.
 	void FreezeForMatchEnd();
 
 	// --- 표시용 (BP 바인딩) ---
 	UPROPERTY(BlueprintAssignable, Category = "Attractive")
-	FMTOnAttractiveHealthChanged OnAttractiveHealthChanged;
+	FMTOnAttractiveAmountChanged OnAttractiveAmountChanged;
 
 	// 매료된 순간 1회 — StateTree/BP가 Attracted 상태 전환에 사용
 	UPROPERTY(BlueprintAssignable, Category = "Attractive")
@@ -52,14 +54,16 @@ public:
 	void EndAttracted();
 
 	UFUNCTION(BlueprintPure, Category = "Attractive")
-	float GetAttractiveHealthValue() const;
+	float GetAttractiveAmountValue(APlayerState* TargetPlayerState) const;
 
 	UFUNCTION(BlueprintPure, Category = "Attractive")
-	float GetMaxAttractiveHealthValue() const;
+	float GetHighestAttractiveAmountValue() const;
 
-	// 플레이어에게 보이는 "쌓인 매료도" = Max - Current
 	UFUNCTION(BlueprintPure, Category = "Attractive")
-	float GetAttractiveGauge() const;
+	float GetMaxAttractiveAmountValue() const;
+
+	UFUNCTION(BlueprintPure, Category = "Attractive")
+	UMTAttractiveComponent* GetAttractiveComponent() const { return AttractiveComponent; }
 
 	UFUNCTION(BlueprintPure, Category = "Attractive")
 	bool IsAttracted() const { return bIsAttracted; }
@@ -73,8 +77,13 @@ protected:
 	UPROPERTY(VisibleAnywhere, Category = "Attractive|GAS")
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
 
+	//AT는 GAS공격에서의 데미지를 중계해주는 용도로만 사용
 	UPROPERTY()
 	TObjectPtr<UMTPedestrianAttributeSet> AttributeSet;
+
+	//실제 매료도 저장/관리 컴포넌트
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Attractive", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMTAttractiveComponent> AttractiveComponent;
 
 	// 행인 GE (서버/클라 공통). 매료도 초기화, 매료도 최대치 설정, 매료도 회복 주기 부여
 	UPROPERTY(EditDefaultsOnly, Category = "Attractive|GE")
@@ -107,20 +116,15 @@ protected:
 	float AttractiveBarVisibleDistance = 1500.f;
 
 private:
-	// 기여도 테이블 — 약참조 키(튕김/접속종료 대비). 서버 전용, 복제 안 함.
-	TMap<TWeakObjectPtr<APlayerState>, float> AttractiveContributions;
-	TWeakObjectPtr<APlayerState> LastAttacker;
-
 	bool bIsAttracted = false;
 
 	// 캐시 태그
 	FGameplayTag InvulnerableTag;
 	FGameplayTag AttractiveInProgressTag;
 
-	// 기여도 최다(동점=라스트힛) 산출
-	APlayerState* DetermineAttractiveWinner() const;
 	void BecomeAttracted(APlayerState* Winner);
-	void ResetContributions();
+	void ResetAttractiveAmounts();
+	void UpdateLeadingPlayer();
 
 	void UpdateAttractiveBarVisibility();
 	FLinearColor GetLeaderColor() const;   // AttractedBy/LeadingPlayer의 팀 색

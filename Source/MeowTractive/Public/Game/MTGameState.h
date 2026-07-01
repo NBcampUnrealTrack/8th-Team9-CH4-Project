@@ -23,6 +23,8 @@ class MEOWTRACTIVE_API AMTGameState : public AGameState
 
 public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+    virtual void AddPlayerState(APlayerState* PlayerState) override;
+    virtual void RemovePlayerState(APlayerState* PlayerState) override;
 
     // 서버에서 호출
     void AddAttractedCount(APlayerState* TargetPlayerState);
