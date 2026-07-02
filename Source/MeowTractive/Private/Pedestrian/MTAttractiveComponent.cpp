@@ -5,52 +5,82 @@
 #include "Net/UnrealNetwork.h"
 #include "Pedestrian/MTPedestrianBase.h"
 
+// FastArray가 변경 알림을 전달할 Component를 설정한다.
+void FMTAttractiveAmountContainer::SetOwner(UMTAttractiveComponent* InOwner)
+{
+	Owner = InOwner;
+}
+
+// 클라이언트가 FastArray의 추가·수정·삭제를 모두 반영한 뒤 UI 갱신을 요청한다.
+void FMTAttractiveAmountContainer::PostReplicatedReceive(
+	const FFastArraySerializer::FPostReplicatedReceiveParameters& Parameters)
+{
+	if (Owner.IsValid())
+	{
+		Owner->HandleReplicatedAmountsChanged();
+	}
+}
+
+// Component의 Tick과 FastArray 복제를 초기화한다.
 UMTAttractiveComponent::UMTAttractiveComponent()
 {
 	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
+	AttractiveAmounts.SetOwner(this);
 }
 
+// 서버에서 현재 참가 플레이어 목록을 최초 동기화한다.
 void UMTAttractiveComponent::BeginPlay()
 {
 	Super::BeginPlay();
 
-	if (GetOwner() && GetOwner()->HasAuthority())
+	AttractiveAmounts.SetOwner(this);
+	if (HasServerAuthority())
 	{
 		SynchronizePlayers();
 	}
 }
 
-//네트워크 복제 설정
-void UMTAttractiveComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+// FastArray Container를 Component의 복제 속성으로 등록한다.
+void UMTAttractiveComponent::GetLifetimeReplicatedProps(
+	TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(UMTAttractiveComponent, AttractiveAmounts);
 }
 
-//매료도 목록 최신화, 없는 플레이어 제거
+// 현재 GameState의 PlayerArray와 매료도 항목 목록을 일치시킨다.
 void UMTAttractiveComponent::SynchronizePlayers()
 {
-	AActor* Owner = GetOwner();
 	AGameStateBase* GameState = GetWorld() ? GetWorld()->GetGameState() : nullptr;
-	if (!Owner || !Owner->HasAuthority() || !GameState)
+	if (!HasServerAuthority() || !GameState)
 	{
 		return;
 	}
 
-	bool bChanged = AttractiveAmounts.RemoveAll(
+	bool bChanged = false;
+	const int32 RemovedCount = AttractiveAmounts.Entries.RemoveAll(
 		[GameState](const FMTAttractiveAmountEntry& Entry)
 		{
-			return !IsValid(Entry.PlayerState) || !GameState->PlayerArray.Contains(Entry.PlayerState);
-		}) > 0;
+			return !IsValid(Entry.PlayerState)
+				|| !GameState->PlayerArray.Contains(Entry.PlayerState);
+		});
+
+	if (RemovedCount > 0)
+	{
+		AttractiveAmounts.MarkArrayDirty();
+		bChanged = true;
+	}
 
 	for (APlayerState* PlayerState : GameState->PlayerArray)
 	{
 		if (IsValid(PlayerState) && !FindEntry(PlayerState))
 		{
-			FMTAttractiveAmountEntry& Entry = AttractiveAmounts.AddDefaulted_GetRef();
+			FMTAttractiveAmountEntry& Entry = AttractiveAmounts.Entries.AddDefaulted_GetRef();
 			Entry.PlayerState = PlayerState;
 			Entry.AttractiveAmount = 0.f;
+			Entry.RegenResumeTimeSeconds = 0.0;
+			AttractiveAmounts.MarkItemDirty(Entry);
 			bChanged = true;
 		}
 	}
@@ -61,31 +91,31 @@ void UMTAttractiveComponent::SynchronizePlayers()
 	}
 }
 
-//매료도 목록에 플레이어 추가
+// 서버에서 새 플레이어의 매료도 항목을 추가한다.
 void UMTAttractiveComponent::AddPlayerState(APlayerState* PlayerState)
 {
-	AActor* Owner = GetOwner();
-	if (!Owner || !Owner->HasAuthority() || !IsValid(PlayerState) || FindEntry(PlayerState))
+	if (!HasServerAuthority() || !IsValid(PlayerState) || FindEntry(PlayerState))
 	{
 		return;
 	}
 
-	FMTAttractiveAmountEntry& Entry = AttractiveAmounts.AddDefaulted_GetRef();
+	FMTAttractiveAmountEntry& Entry = AttractiveAmounts.Entries.AddDefaulted_GetRef();
 	Entry.PlayerState = PlayerState;
 	Entry.AttractiveAmount = 0.f;
+	Entry.RegenResumeTimeSeconds = 0.0;
+	AttractiveAmounts.MarkItemDirty(Entry);
 	NotifyAmountsChanged();
 }
 
-//매료도 목록에 플레이어 제거
+// 서버에서 퇴장한 플레이어의 매료도 항목을 제거한다.
 void UMTAttractiveComponent::RemovePlayerState(APlayerState* PlayerState)
 {
-	AActor* Owner = GetOwner();
-	if (!Owner || !Owner->HasAuthority() || !PlayerState)
+	if (!HasServerAuthority() || !PlayerState)
 	{
 		return;
 	}
 
-	const int32 RemovedCount = AttractiveAmounts.RemoveAll(
+	const int32 RemovedCount = AttractiveAmounts.Entries.RemoveAll(
 		[PlayerState](const FMTAttractiveAmountEntry& Entry)
 		{
 			return Entry.PlayerState == PlayerState;
@@ -95,52 +125,91 @@ void UMTAttractiveComponent::RemovePlayerState(APlayerState* PlayerState)
 	{
 		LastAttacker.Reset();
 	}
+
 	if (RemovedCount > 0)
 	{
+		AttractiveAmounts.MarkArrayDirty();
 		NotifyAmountsChanged();
 	}
 }
 
-//매료도 추가
+// 서버에서 특정 플레이어의 매료도를 올리고 해당 플레이어의 Regen 대기시간만 갱신한다.
 float UMTAttractiveComponent::AddAttractiveAmount(APlayerState* PlayerState, float Amount)
 {
-	AActor* Owner = GetOwner();
-	if (!Owner || !Owner->HasAuthority() || !IsValid(PlayerState) || Amount <= 0.f)
+	if (!HasServerAuthority() || !IsValid(PlayerState) || Amount <= 0.f)
 	{
 		return GetAttractiveAmount(PlayerState);
 	}
 
-	AddPlayerState(PlayerState);
 	FMTAttractiveAmountEntry* Entry = FindEntry(PlayerState);
 	if (!Entry)
 	{
-		return 0.f;
+		FMTAttractiveAmountEntry& NewEntry = AttractiveAmounts.Entries.AddDefaulted_GetRef();
+		NewEntry.PlayerState = PlayerState;
+		NewEntry.AttractiveAmount = 0.f;
+		NewEntry.RegenResumeTimeSeconds = 0.0;
+		AttractiveAmounts.MarkItemDirty(NewEntry);
+		Entry = &NewEntry;
 	}
 
+	const float PreviousAmount = Entry->AttractiveAmount;
 	Entry->AttractiveAmount = FMath::Clamp(
-		Entry->AttractiveAmount + Amount,
+		PreviousAmount + Amount,
 		0.f,
 		MaxAttractiveAmount);
+	Entry->RegenResumeTimeSeconds =
+		(GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0) + RegenDelayAfterInteraction;
 	LastAttacker = PlayerState;
-	NotifyAmountsChanged();
+
+	if (!FMath::IsNearlyEqual(PreviousAmount, Entry->AttractiveAmount))
+	{
+		AttractiveAmounts.MarkItemDirty(*Entry);
+		NotifyAmountsChanged();
+	}
+
 	return Entry->AttractiveAmount;
 }
 
-//모든 플레이어 매료도 감소
-void UMTAttractiveComponent::DecreaseAllAttractiveAmounts(float Amount)
+// 서버에서 상호작용 대기시간이 끝난 미완료 매료도만 주기적으로 감소시킨다.
+void UMTAttractiveComponent::DecreaseEligibleAttractiveAmounts(float Amount)
 {
-	AActor* Owner = GetOwner();
-	if (!Owner || !Owner->HasAuthority() || Amount <= 0.f)
+	if (!HasServerAuthority() || Amount <= 0.f)
 	{
 		return;
 	}
 
+	const double CurrentTimeSeconds = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 	bool bChanged = false;
-	for (FMTAttractiveAmountEntry& Entry : AttractiveAmounts)
+
+	for (FMTAttractiveAmountEntry& Entry : AttractiveAmounts.Entries)
 	{
+		// 매료 완료된 수치는 Regen 대상에서 제외한다.
+		if (Entry.AttractiveAmount >= MaxAttractiveAmount)
+		{
+			continue;
+		}
+
+		const bool bCanDecrease =
+			Entry.AttractiveAmount > 0.f
+			&& CurrentTimeSeconds >= Entry.RegenResumeTimeSeconds;
+		if (!bCanDecrease)
+		{
+			continue;
+		}
+
 		const float NewAmount = FMath::Max(0.f, Entry.AttractiveAmount - Amount);
-		bChanged |= !FMath::IsNearlyEqual(NewAmount, Entry.AttractiveAmount);
+		if (FMath::IsNearlyEqual(NewAmount, Entry.AttractiveAmount))
+		{
+			continue;
+		}
+
 		Entry.AttractiveAmount = NewAmount;
+		if (Entry.AttractiveAmount <= 0.f)
+		{
+			Entry.RegenResumeTimeSeconds = 0.0;
+		}
+		AttractiveAmounts.MarkItemDirty(Entry);
+		bChanged = true;
 	}
 
 	if (bChanged)
@@ -153,40 +222,60 @@ void UMTAttractiveComponent::DecreaseAllAttractiveAmounts(float Amount)
 	}
 }
 
-//모든 플레이어 매료도 0으로 초기화
+// 서버에서 모든 플레이어의 매료도와 Regen 대기시간을 초기화한다.
 void UMTAttractiveComponent::ResetAllAttractiveAmounts()
 {
-	AActor* Owner = GetOwner();
-	if (!Owner || !Owner->HasAuthority())
-	{
-		return;
-	}
-
-	for (FMTAttractiveAmountEntry& Entry : AttractiveAmounts)
-	{
-		Entry.AttractiveAmount = 0.f;
-	}
-	LastAttacker.Reset();
-	NotifyAmountsChanged();
-}
-
-// 매료 완료 플레이어는 유지하고 나머지 플레이어 수치를 0으로 초기화
-void UMTAttractiveComponent::ResetOtherAttractiveAmounts(APlayerState* KeptPlayerState)
-{
-	AActor* Owner = GetOwner();
-	if (!Owner || !Owner->HasAuthority() || !IsValid(KeptPlayerState))
+	if (!HasServerAuthority())
 	{
 		return;
 	}
 
 	bool bChanged = false;
-	for (FMTAttractiveAmountEntry& Entry : AttractiveAmounts)
+	for (FMTAttractiveAmountEntry& Entry : AttractiveAmounts.Entries)
 	{
-		if (Entry.PlayerState != KeptPlayerState && Entry.AttractiveAmount > 0.f)
+		Entry.RegenResumeTimeSeconds = 0.0;
+		if (Entry.AttractiveAmount <= 0.f)
 		{
-			Entry.AttractiveAmount = 0.f;
-			bChanged = true;
+			continue;
 		}
+
+		Entry.AttractiveAmount = 0.f;
+		AttractiveAmounts.MarkItemDirty(Entry);
+		bChanged = true;
+	}
+
+	LastAttacker.Reset();
+	if (bChanged)
+	{
+		NotifyAmountsChanged();
+	}
+}
+
+// 서버에서 매료 완료 플레이어를 제외한 모든 플레이어 수치와 대기시간을 초기화한다.
+void UMTAttractiveComponent::ResetOtherAttractiveAmounts(APlayerState* KeptPlayerState)
+{
+	if (!HasServerAuthority() || !IsValid(KeptPlayerState))
+	{
+		return;
+	}
+
+	bool bChanged = false;
+	for (FMTAttractiveAmountEntry& Entry : AttractiveAmounts.Entries)
+	{
+		if (Entry.PlayerState == KeptPlayerState)
+		{
+			continue;
+		}
+
+		Entry.RegenResumeTimeSeconds = 0.0;
+		if (Entry.AttractiveAmount <= 0.f)
+		{
+			continue;
+		}
+
+		Entry.AttractiveAmount = 0.f;
+		AttractiveAmounts.MarkItemDirty(Entry);
+		bChanged = true;
 	}
 
 	LastAttacker = KeptPlayerState;
@@ -196,18 +285,18 @@ void UMTAttractiveComponent::ResetOtherAttractiveAmounts(APlayerState* KeptPlaye
 	}
 }
 
-//현재 매료도 확인
+// 특정 플레이어의 현재 매료도를 반환한다.
 float UMTAttractiveComponent::GetAttractiveAmount(APlayerState* PlayerState) const
 {
 	const FMTAttractiveAmountEntry* Entry = FindEntry(PlayerState);
 	return Entry ? Entry->AttractiveAmount : 0.f;
 }
 
-//가장 높은 매료도 확인
+// 유효한 플레이어 항목 중 가장 높은 매료도를 반환한다.
 float UMTAttractiveComponent::GetHighestAttractiveAmount() const
 {
 	float HighestAmount = 0.f;
-	for (const FMTAttractiveAmountEntry& Entry : AttractiveAmounts)
+	for (const FMTAttractiveAmountEntry& Entry : AttractiveAmounts.Entries)
 	{
 		if (IsValid(Entry.PlayerState))
 		{
@@ -217,11 +306,12 @@ float UMTAttractiveComponent::GetHighestAttractiveAmount() const
 	return HighestAmount;
 }
 
-//특정 플레이어 제외 가장 높은 매료도 확인 (데미지 감쇄 계산용)
-float UMTAttractiveComponent::GetHighestAttractiveAmountExcluding(APlayerState* ExcludedPlayerState) const
+// 지정한 플레이어를 제외한 가장 높은 매료도를 반환한다.
+float UMTAttractiveComponent::GetHighestAttractiveAmountExcluding(
+	APlayerState* ExcludedPlayerState) const
 {
 	float HighestAmount = 0.f;
-	for (const FMTAttractiveAmountEntry& Entry : AttractiveAmounts)
+	for (const FMTAttractiveAmountEntry& Entry : AttractiveAmounts.Entries)
 	{
 		if (IsValid(Entry.PlayerState) && Entry.PlayerState != ExcludedPlayerState)
 		{
@@ -231,7 +321,7 @@ float UMTAttractiveComponent::GetHighestAttractiveAmountExcluding(APlayerState* 
 	return HighestAmount;
 }
 
-//가장 매료도 높은 플레이어 확인
+// 동점이면 마지막 공격자를 우선해 현재 선두 플레이어를 반환한다.
 APlayerState* UMTAttractiveComponent::GetLeadingPlayer() const
 {
 	const float HighestAmount = GetHighestAttractiveAmount();
@@ -250,7 +340,7 @@ APlayerState* UMTAttractiveComponent::GetLeadingPlayer() const
 		}
 	}
 
-	for (const FMTAttractiveAmountEntry& Entry : AttractiveAmounts)
+	for (const FMTAttractiveAmountEntry& Entry : AttractiveAmounts.Entries)
 	{
 		if (IsValid(Entry.PlayerState)
 			&& FMath::IsNearlyEqual(Entry.AttractiveAmount, HighestAmount, 0.01f))
@@ -261,8 +351,9 @@ APlayerState* UMTAttractiveComponent::GetLeadingPlayer() const
 	return nullptr;
 }
 
-// 특정 플레이어를 제외한 최고 매료도 플레이어 확인 (로컬 UI의 경쟁자 표시용)
-APlayerState* UMTAttractiveComponent::GetLeadingPlayerExcluding(APlayerState* ExcludedPlayerState) const
+// 지정한 플레이어를 제외하고 동점 우선순위를 적용한 선두 플레이어를 반환한다.
+APlayerState* UMTAttractiveComponent::GetLeadingPlayerExcluding(
+	APlayerState* ExcludedPlayerState) const
 {
 	const float HighestAmount = GetHighestAttractiveAmountExcluding(ExcludedPlayerState);
 	if (HighestAmount <= 0.f)
@@ -280,7 +371,7 @@ APlayerState* UMTAttractiveComponent::GetLeadingPlayerExcluding(APlayerState* Ex
 		}
 	}
 
-	for (const FMTAttractiveAmountEntry& Entry : AttractiveAmounts)
+	for (const FMTAttractiveAmountEntry& Entry : AttractiveAmounts.Entries)
 	{
 		if (IsValid(Entry.PlayerState)
 			&& Entry.PlayerState != ExcludedPlayerState
@@ -292,38 +383,51 @@ APlayerState* UMTAttractiveComponent::GetLeadingPlayerExcluding(APlayerState* Ex
 	return nullptr;
 }
 
-// 특정 플레이어의의 매료도로 등록된 요소를 목록에서 확인
+// 현재 실행 주체가 매료도 데이터를 변경할 수 있는 서버인지 확인한다.
+bool UMTAttractiveComponent::HasServerAuthority() const
+{
+	const AActor* OwnerActor = GetOwner();
+	return OwnerActor && OwnerActor->HasAuthority();
+}
+
+// 지정한 플레이어의 수정 가능한 FastArray 항목을 찾는다.
 FMTAttractiveAmountEntry* UMTAttractiveComponent::FindEntry(APlayerState* PlayerState)
 {
-	return AttractiveAmounts.FindByPredicate(
+	return AttractiveAmounts.Entries.FindByPredicate(
 		[PlayerState](const FMTAttractiveAmountEntry& Entry)
 		{
 			return Entry.PlayerState == PlayerState;
 		});
 }
 
-// 특정 플레이어의의 매료도로 등록된 요소를 목록에서 확인
-const FMTAttractiveAmountEntry* UMTAttractiveComponent::FindEntry(APlayerState* PlayerState) const
+// 지정한 플레이어의 읽기 전용 FastArray 항목을 찾는다.
+const FMTAttractiveAmountEntry* UMTAttractiveComponent::FindEntry(
+	APlayerState* PlayerState) const
 {
-	return AttractiveAmounts.FindByPredicate(
+	return AttractiveAmounts.Entries.FindByPredicate(
 		[PlayerState](const FMTAttractiveAmountEntry& Entry)
 		{
 			return Entry.PlayerState == PlayerState;
 		});
 }
 
-//변경사항 Replication 알림
+// 서버 변경을 즉시 네트워크 갱신 대상으로 만들고 로컬 표시를 갱신한다.
 void UMTAttractiveComponent::NotifyAmountsChanged()
 {
-	if (AActor* Owner = GetOwner())
+	if (!HasServerAuthority())
 	{
-		Owner->ForceNetUpdate();
+		return;
 	}
-	OnRep_AttractiveAmounts();
+
+	if (AActor* OwnerActor = GetOwner())
+	{
+		OwnerActor->ForceNetUpdate();
+	}
+	HandleReplicatedAmountsChanged();
 }
 
-//
-void UMTAttractiveComponent::OnRep_AttractiveAmounts()
+// 서버 또는 FastArray 복제 수신 후 행인의 UI와 선두 상태를 갱신한다.
+void UMTAttractiveComponent::HandleReplicatedAmountsChanged()
 {
 	if (AMTPedestrianBase* Pedestrian = Cast<AMTPedestrianBase>(GetOwner()))
 	{

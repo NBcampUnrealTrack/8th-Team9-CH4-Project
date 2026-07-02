@@ -1,13 +1,15 @@
-﻿#pragma once
+#pragma once
 
 #include "CoreMinimal.h"
 #include "Components/ActorComponent.h"
+#include "Net/Serialization/FastArraySerializer.h"
 #include "MTAttractiveComponent.generated.h"
 
 class APlayerState;
+class UMTAttractiveComponent;
 
 USTRUCT(BlueprintType)
-struct FMTAttractiveAmountEntry
+struct FMTAttractiveAmountEntry : public FFastArraySerializerItem
 {
 	GENERATED_BODY()
 
@@ -16,11 +18,48 @@ struct FMTAttractiveAmountEntry
 
 	UPROPERTY(BlueprintReadOnly, Category = "Attractive")
 	float AttractiveAmount = 0.f;
+
+	// 서버 전용: 이 시각 전까지 해당 플레이어의 매료도 감소를 정지한다.
+	double RegenResumeTimeSeconds = 0.0;
+};
+
+USTRUCT()
+struct FMTAttractiveAmountContainer : public FFastArraySerializer
+{
+	GENERATED_BODY()
+
+	UPROPERTY()
+	TArray<FMTAttractiveAmountEntry> Entries;
+
+	// FastArray의 변경된 항목만 네트워크로 직렬화한다.
+	bool NetDeltaSerialize(FNetDeltaSerializeInfo& DeltaParams)
+	{
+		return FastArrayDeltaSerialize<FMTAttractiveAmountEntry, FMTAttractiveAmountContainer>(
+			Entries,
+			DeltaParams,
+			*this);
+	}
+
+	void SetOwner(UMTAttractiveComponent* InOwner);
+	void PostReplicatedReceive(const FFastArraySerializer::FPostReplicatedReceiveParameters& Parameters);
+
+private:
+	TWeakObjectPtr<UMTAttractiveComponent> Owner;
+};
+
+template<>
+struct TStructOpsTypeTraits<FMTAttractiveAmountContainer>
+	: public TStructOpsTypeTraitsBase2<FMTAttractiveAmountContainer>
+{
+	enum
+	{
+		WithNetDeltaSerializer = true
+	};
 };
 
 /**
- * 행인 한 명에 대한 플레이어별 매료 수치를 관리한다.
- * 서버가 값을 변경하고 전체 배열을 클라이언트에 복제한다.
+ * 행인 한 명에 대한 플레이어별 매료 수치를 서버 권위로 관리한다.
+ * 클라이언트에는 FFastArraySerializer를 통해 변경된 항목만 복제한다.
  */
 UCLASS(ClassGroup = (MeowTractive), meta = (BlueprintSpawnableComponent))
 class MEOWTRACTIVE_API UMTAttractiveComponent : public UActorComponent
@@ -38,7 +77,7 @@ public:
 	void RemovePlayerState(APlayerState* PlayerState);
 
 	float AddAttractiveAmount(APlayerState* PlayerState, float Amount);
-	void DecreaseAllAttractiveAmounts(float Amount);
+	void DecreaseEligibleAttractiveAmounts(float Amount);
 	void ResetAllAttractiveAmounts();
 	void ResetOtherAttractiveAmounts(APlayerState* KeptPlayerState);
 
@@ -61,21 +100,25 @@ public:
 	float GetMaxAttractiveAmount() const { return MaxAttractiveAmount; }
 
 	UFUNCTION(BlueprintPure, Category = "Attractive")
-	TArray<FMTAttractiveAmountEntry> GetAttractiveAmounts() const { return AttractiveAmounts; }
+	TArray<FMTAttractiveAmountEntry> GetAttractiveAmounts() const { return AttractiveAmounts.Entries; }
 
 private:
-	UPROPERTY(ReplicatedUsing = OnRep_AttractiveAmounts)
-	TArray<FMTAttractiveAmountEntry> AttractiveAmounts;
+	friend struct FMTAttractiveAmountContainer;
+
+	UPROPERTY(Replicated)
+	FMTAttractiveAmountContainer AttractiveAmounts;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Attractive", meta = (ClampMin = "1.0"))
 	float MaxAttractiveAmount = 100.f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Attractive|Regen", meta = (ClampMin = "0.0"))
+	float RegenDelayAfterInteraction = 7.f;
+
 	TWeakObjectPtr<APlayerState> LastAttacker;
 
+	bool HasServerAuthority() const;
 	FMTAttractiveAmountEntry* FindEntry(APlayerState* PlayerState);
 	const FMTAttractiveAmountEntry* FindEntry(APlayerState* PlayerState) const;
 	void NotifyAmountsChanged();
-
-	UFUNCTION()
-	void OnRep_AttractiveAmounts();
+	void HandleReplicatedAmountsChanged();
 };
