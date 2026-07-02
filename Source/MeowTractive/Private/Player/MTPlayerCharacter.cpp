@@ -9,6 +9,7 @@
 #include "Game/MTLog.h"
 #include "Player/MTPlayerState.h"
 #include "Engine/Engine.h"
+#include "Game/MTMatchGameMode.h"
 
 AMTPlayerCharacter::AMTPlayerCharacter()
 {
@@ -211,6 +212,49 @@ void AMTPlayerCharacter::MeowPunch()
 
 	AbilitySystemComponent->TryActivateAbilitiesByTag(
 		FGameplayTagContainer(MTGameplayTags::Ability::TAG_Skill_Attack_MeowPunch), true);
+}
+
+void AMTPlayerCharacter::Die()
+{
+	  if (!HasAuthority() || bIsDead)
+        {
+            return;
+        }
+        bIsDead = true;
+
+        if (MTLogEnabled())
+        {
+            UE_LOG(LogMT, Warning, TEXT("%s 사망 처리"), *GetName());
+        }
+
+        // 캐싱
+        AController* MyController = GetController();
+
+        // 이동/입력/충돌 정지 (애님 필요)
+        if (UCharacterMovementComponent* Move = GetCharacterMovement())
+        {
+            Move->StopMovementImmediately();
+            Move->DisableMovement();
+        }
+        SetActorEnableCollision(false);
+
+        // 진행 중이던 스킬 캔슬
+        if (AbilitySystemComponent)
+        {
+            AbilitySystemComponent->CancelAllAbilities();
+        }
+
+        if (MyController)
+        {
+            if (AMTMatchGameMode* GM = GetWorld()->GetAuthGameMode<AMTMatchGameMode>())
+            {
+                GM->RequestRespawn(MyController);
+            }
+        }
+
+        // 컨트롤러와 분리만 하고 실제 파괴는 사망 이펙트 이후
+        DetachFromControllerPendingDestroy();
+        SetLifeSpan(2.0f);
 }
 
 void AMTPlayerCharacter::StopJump()

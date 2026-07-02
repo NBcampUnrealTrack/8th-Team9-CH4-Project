@@ -4,6 +4,7 @@
 #include "GameplayEffectExtension.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/Engine.h"
+#include "Player/MTPlayerCharacter.h"
 
 UMTPlayerAttributeSet::UMTPlayerAttributeSet()
 {
@@ -70,7 +71,27 @@ void UMTPlayerAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCa
 				}
 			}
 
-			// TODO: Hp <= 0 시 기절/리스폰 처리 (미구현)
+			// Hp <= 0 시 기절/리스폰 처리
+			if (NewHp <= 0.f && OldHp > 0.f)
+			{
+				AActor* Owner = GetOwningActor();
+				// 서버 권한 체크
+				if (Owner && Owner->HasAuthority())
+				{
+					if (AMTPlayerCharacter* Char = Cast<AMTPlayerCharacter>(Owner))
+					{
+						if (MTLogEnabled())
+						{
+							const FString Dead = FString::Printf(
+							   TEXT("%s Die"), *GetNameSafe(Owner));
+							UE_LOG(LogMT, Warning, TEXT("%s"), *Dead);
+							if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Dead);
+						}
+
+						Char->Die();
+					}
+				}
+			}
 		}
 	}
 }

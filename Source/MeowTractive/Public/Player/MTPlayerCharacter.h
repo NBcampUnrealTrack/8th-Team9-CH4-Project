@@ -103,9 +103,14 @@ public:
 	// 근접/대시 데미지 대상 판정: 서로 다른 고양이 + 적팀(개인전은 자기 외 전원 적)
 	static bool IsEnemyCat(const AActor* SourceActor, const AActor* TargetActor);
 
+	void Die();
+
 private:
 	// State.Stun 태그 변화 → 이동/입력 잠금 토글 (소유 클라 기준)
 	void OnStunTagChanged(const FGameplayTag Tag, int32 NewCount);
 
 	bool bStunned = false;
+
+	UPROPERTY(Transient)
+	bool bIsDead = false;
 };
