@@ -17,6 +17,7 @@ public class MeowTractive : ModuleRules
 			"GameplayAbilities",
 			"GameplayTags",
 			"GameplayTasks",
+			"NetCore",
 			"OnlineSubsystem",
 			"OnlineSubsystemUtils",
 			"OnlineSubsystemSteam",

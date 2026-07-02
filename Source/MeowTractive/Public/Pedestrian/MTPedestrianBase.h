@@ -87,10 +87,7 @@ protected:
 
 	// 행인 GE (서버/클라 공통). 매료도 초기화, 매료도 최대치 설정, 매료도 회복 주기 부여
 	UPROPERTY(EditDefaultsOnly, Category = "Attractive|GE")
-	TSubclassOf<UGameplayEffect> RegenGE;           // 무한+주기, Ongoing Req: Ignore State.AttractiveInProgress
-
-	UPROPERTY(EditDefaultsOnly, Category = "Attractive|GE")
-	TSubclassOf<UGameplayEffect> AttractiveInProgressGE; // 7s, grants State.AttractiveInProgress, 적용 시 Duration Refresh
+	TSubclassOf<UGameplayEffect> RegenGE;           // 무한+주기, 플레이어별 감소 가능 여부는 Component가 판정
 
 	UPROPERTY(EditDefaultsOnly, Category = "Attractive|GE")
 	TSubclassOf<UGameplayEffect> InvulnerableGE;    // 15s, grants State.Invulnerable
@@ -120,7 +117,6 @@ private:
 
 	// 캐시 태그
 	FGameplayTag InvulnerableTag;
-	FGameplayTag AttractiveInProgressTag;
 
 	void BecomeAttracted(APlayerState* Winner);
 	void ResetAttractiveAmounts();

@@ -7,6 +7,7 @@
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
 
+// Widget 생성 시 캐시된 현재 플레이어와 경쟁자 매료도를 즉시 반영한다.
 void UMTAttractivenessBarWidget::NativeConstruct()
 {
     Super::NativeConstruct();
