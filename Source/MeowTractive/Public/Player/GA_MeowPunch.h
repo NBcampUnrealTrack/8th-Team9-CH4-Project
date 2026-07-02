@@ -25,9 +25,9 @@ protected:
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
 
-	// 펀치 몽타주 (미할당 시 즉시 판정)
+	// 펀치 몽타주들: 2개 이상 넣으면 시전할 때마다 번갈아 재생. 미할당 시 즉시 판정.
 	UPROPERTY(EditDefaultsOnly, Category = "MeowPunch")
-	TObjectPtr<UAnimMontage> PunchMontage;
+	TArray<TObjectPtr<UAnimMontage>> PunchMontages;
 
 	// 데미지 창을 여는 AnimNotify GameplayEvent 태그
 	UPROPERTY(EditDefaultsOnly, Category = "MeowPunch")
@@ -75,4 +75,7 @@ private:
 	// 몽타주 종료 → 어빌리티 종료
 	UFUNCTION()
 	void OnMontageEnded();
+
+	// 번갈아 재생용 인덱스 (InstancedPerActor라 시전 간 유지)
+	int32 MontageIndex = 0;
 };

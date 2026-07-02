@@ -1,4 +1,4 @@
-#include "Player/MTPlayerAttributeSet.h"
+﻿#include "Player/MTPlayerAttributeSet.h"
 
 #include "Game/MTLog.h"
 #include "GameplayEffectExtension.h"
@@ -65,7 +65,7 @@ void UMTPlayerAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCa
 				if (NewHp <= 0.f)
 				{
 					const FString Dead = FString::Printf(
-						TEXT("[MTDamage] %s Hp 0 도달 → 사망/기절/리스폰 미구현"), *GetNameSafe(GetOwningActor()));
+						TEXT("[MTDamage] %s Hp 0 도달 → 사망/기절/리스폰"), *GetNameSafe(GetOwningActor()));
 					UE_LOG(LogMT, Warning, TEXT("%s"), *Dead);
 					if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Dead);
 				}

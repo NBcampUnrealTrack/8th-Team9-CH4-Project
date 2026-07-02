@@ -39,11 +39,19 @@ void UGA_MeowPunch::ActivateAbility(
 
 	OnPunch(); // 연출 훅
 
+	// 시전할 때마다 번갈아 재생 (2개면 A→B→A→B...)
+	UAnimMontage* Montage = nullptr;
+	if (PunchMontages.Num() > 0)
+	{
+		Montage = PunchMontages[MontageIndex % PunchMontages.Num()];
+		MontageIndex = (MontageIndex + 1) % PunchMontages.Num();
+	}
+
 	// 몽타주가 있으면: 재생 + notify(GameplayEvent) 시점에 판정. 없으면 즉시 판정 후 종료.
-	if (PunchMontage)
+	if (Montage)
 	{
 		UAbilityTask_PlayMontageAndWait* MontageTask =
-			UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, PunchMontage, 1.f);
+			UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(this, NAME_None, Montage, 1.f);
 		MontageTask->OnCompleted.AddDynamic(this, &UGA_MeowPunch::OnMontageEnded);
 		MontageTask->OnInterrupted.AddDynamic(this, &UGA_MeowPunch::OnMontageEnded);
 		MontageTask->OnCancelled.AddDynamic(this, &UGA_MeowPunch::OnMontageEnded);
