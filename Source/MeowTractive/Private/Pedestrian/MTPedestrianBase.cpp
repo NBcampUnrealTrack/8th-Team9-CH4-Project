@@ -19,7 +19,7 @@
 #include "Game/MTGameState.h"
 #include "Net/UnrealNetwork.h"
 
-// 자기 자신에게 GE 적용 (회복/태그/무적 — 전부 데이터 주도형)
+// 행인 자신의 ASC에 Regen 또는 전역 상태 GameplayEffect를 적용한다.
 static void ApplySelfGE(UAbilitySystemComponent* ASC, TSubclassOf<UGameplayEffect> GE, AActor* Source)
 {
 	if (!ASC || !GE)
@@ -35,6 +35,7 @@ static void ApplySelfGE(UAbilitySystemComponent* ASC, TSubclassOf<UGameplayEffec
 	}
 }
 
+// 행인의 이동, GAS, 매료도 Component와 UI Component를 생성한다.
 AMTPedestrianBase::AMTPedestrianBase()
 {
 	PrimaryActorTick.bCanEverTick = true;
@@ -69,6 +70,7 @@ AMTPedestrianBase::AMTPedestrianBase()
 	AttractiveBarWidget->SetDrawSize(FVector2D(240.f, 32.f));
 }
 
+// 행인의 매료 결과와 현재 선두 플레이어를 복제 속성으로 등록한다.
 void AMTPedestrianBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -77,11 +79,13 @@ void AMTPedestrianBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(AMTPedestrianBase, LeadingPlayer);
 }
 
+// 행인이 소유한 AbilitySystemComponent를 반환한다.
 UAbilitySystemComponent* AMTPedestrianBase::GetAbilitySystemComponent() const
 {
 	return AbilitySystemComponent;
 }
 
+// 매치 종료 시 서버에서 행인의 AI와 이동을 완전히 중지한다.
 void AMTPedestrianBase::FreezeForMatchEnd()
 {
 	if (!HasAuthority())
@@ -109,12 +113,12 @@ void AMTPedestrianBase::FreezeForMatchEnd()
 	SetActorTickEnabled(false);
 }
 
+// GAS ActorInfo와 Regen GE를 초기화하고 최초 UI 값을 반영한다.
 void AMTPedestrianBase::BeginPlay()
 {
 	Super::BeginPlay();
 
 	InvulnerableTag = MTGameplayTags::Pedestrian::Invulnerable.GetTag();
-	AttractiveInProgressTag = MTGameplayTags::Pedestrian::AttractiveInProgress.GetTag();
 
 	if (AbilitySystemComponent)
 	{
@@ -128,7 +132,7 @@ void AMTPedestrianBase::BeginPlay()
 
 	if (HasAuthority())
 	{
-		// 회복 GE 1회 부여: 무한+주기. AttractiveInProgress/Invulnerable 태그가 있으면 Ongoing Req로 정지.
+		// 회복 GE 1회 부여: 무한+주기. 플레이어별 감소 대기시간은 AttractiveComponent가 판정한다.
 		// 배회/이동은 StateTree(ST_Pedestrian)가 시작·관리한다.
 		ApplySelfGE(AbilitySystemComponent, RegenGE, this);
 	}
@@ -136,6 +140,7 @@ void AMTPedestrianBase::BeginPlay()
 	BroadcastAttractiveChanged(); // 초기값 바 반영
 }
 
+// AI Controller 빙의 후 GAS ActorInfo를 다시 연결한다.
 void AMTPedestrianBase::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
@@ -145,6 +150,7 @@ void AMTPedestrianBase::PossessedBy(AController* NewController)
 	}
 }
 
+// UI 가시성과 매료 완료 상태의 플레이어 방향 회전을 갱신한다.
 void AMTPedestrianBase::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
@@ -181,6 +187,7 @@ void AMTPedestrianBase::Tick(float DeltaTime)
 
 // --- 매료 처리 (AttributeSet에서 서버 호출) ---
 
+// 서버에서 공격한 플레이어의 매료도만 증가시키고 개인 Regen 대기시간을 갱신한다.
 void AMTPedestrianBase::HandleAttractiveHit(APlayerState* Source, float Amount)
 {
 	if (!HasAuthority() || !AttractiveComponent || !Source || Amount <= 0.f)
@@ -196,9 +203,6 @@ void AMTPedestrianBase::HandleAttractiveHit(APlayerState* Source, float Amount)
 	const float NewAttractiveAmount = AttractiveComponent->AddAttractiveAmount(Source, Amount);
 	UpdateLeadingPlayer();
 
-	// 7초 전투중 태그 갱신 → 회복 GE 정지 (AttractiveInProgressGE는 적용 시 Duration Refresh)
-	ApplySelfGE(AbilitySystemComponent, AttractiveInProgressGE, this);
-
 	BroadcastAttractiveChanged();
 
 	if (NewAttractiveAmount >= AttractiveComponent->GetMaxAttractiveAmount() && !bIsAttracted)
@@ -210,6 +214,7 @@ void AMTPedestrianBase::HandleAttractiveHit(APlayerState* Source, float Amount)
 	}
 }
 
+// 서버에서 전역 무적 상태가 아닐 때 감소 가능한 플레이어 항목만 감소시킨다.
 void AMTPedestrianBase::HandleAttractiveRegen(float Amount)
 {
 	if (!HasAuthority() || !AttractiveComponent || Amount <= 0.f)
@@ -217,21 +222,19 @@ void AMTPedestrianBase::HandleAttractiveRegen(float Amount)
 		return;
 	}
 
-	// 피격 진행/매료 직후 무적 동안에는 RegenGE가 실행돼도 수치를 감소시키지 않는다.
+	// 매료 완료 직후 전역 무적 동안에는 어떤 플레이어의 수치도 감소시키지 않는다.
 	if (AbilitySystemComponent
-		&& (AbilitySystemComponent->HasMatchingGameplayTag(AttractiveInProgressTag)
-			|| AbilitySystemComponent->HasMatchingGameplayTag(InvulnerableTag)))
+		&& AbilitySystemComponent->HasMatchingGameplayTag(InvulnerableTag))
 	{
 		return;
 	}
 
-	AttractiveComponent->DecreaseAllAttractiveAmounts(Amount);
+	AttractiveComponent->DecreaseEligibleAttractiveAmounts(Amount);
 	UpdateLeadingPlayer();
 	BroadcastAttractiveChanged();
 
 	// 모든 플레이어 매료 수치가 0이면 중립 복귀한다.
-	if (AttractiveComponent->GetHighestAttractiveAmount() <= 0.f
-		&& (AttractedBy || LeadingPlayer || bIsAttracted))
+	if (AttractiveComponent->GetHighestAttractiveAmount() <= 0.f && (AttractedBy || LeadingPlayer || bIsAttracted))
 	{
 		if (AttractedBy)
 		{
@@ -246,17 +249,21 @@ void AMTPedestrianBase::HandleAttractiveRegen(float Amount)
 	}
 }
 
+// Component의 현재 수치를 기준으로 선두 플레이어를 갱신한다.
 void AMTPedestrianBase::UpdateLeadingPlayer()
 {
 	LeadingPlayer = AttractiveComponent ? AttractiveComponent->GetLeadingPlayer() : nullptr;
 }
 
+// 100에 도달한 플레이어를 매료 소유자로 설정하고 전역 무적 상태를 적용한다.
 void AMTPedestrianBase::BecomeAttracted(APlayerState* Winner)
 {
 	if (!Winner)
 	{
 		return;
 	}
+
+	APlayerState* PreviousOwner = AttractedBy;
 	bIsAttracted = true;
 	AttractedBy = Winner;
 
@@ -269,10 +276,17 @@ void AMTPedestrianBase::BecomeAttracted(APlayerState* Winner)
 	// 15초 무적 (State.Invulnerable) — 3초 응시와 별개. 회복도 이 동안 정지.
 	ApplySelfGE(AbilitySystemComponent, InvulnerableGE, this);
 
-	// 점수: 매료 소유자 +1
+	// 점수: 소유자가 바뀌면 기존 소유자 -1, 새 소유자 +1
 	if (AMTGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMTGameState>() : nullptr)
 	{
-		GS->AddAttractedCount(Winner);
+		if (PreviousOwner != Winner)
+		{
+			if (PreviousOwner)
+			{
+				GS->RemoveAttractedCount(PreviousOwner);
+			}
+			GS->AddAttractedCount(Winner);
+		}
 	}
 
 	BroadcastAttractiveChanged();
@@ -280,6 +294,7 @@ void AMTPedestrianBase::BecomeAttracted(APlayerState* Winner)
 	OnAttracted.Broadcast(Winner);
 }
 
+// StateTree의 매료 반응 시간이 끝나면 행인의 회전·정지 상태를 해제한다.
 void AMTPedestrianBase::EndAttracted()
 {
 	if (!HasAuthority())
@@ -290,6 +305,7 @@ void AMTPedestrianBase::EndAttracted()
 	bIsAttracted = false;
 }
 
+// 모든 플레이어 매료도와 선두 플레이어를 초기화한다.
 void AMTPedestrianBase::ResetAttractiveAmounts()
 {
 	if (AttractiveComponent)
@@ -299,16 +315,19 @@ void AMTPedestrianBase::ResetAttractiveAmounts()
 	LeadingPlayer = nullptr;
 }
 
+// 클라이언트에서 매료 소유자 복제 변경을 UI에 반영한다.
 void AMTPedestrianBase::OnRep_Attracted()
 {
 	BroadcastAttractiveChanged(); // 바 색 갱신 (회전은 서버 복제로 처리됨)
 }
 
+// 클라이언트에서 선두 플레이어 복제 변경을 UI에 반영한다.
 void AMTPedestrianBase::OnRep_Leader()
 {
 	BroadcastAttractiveChanged();
 }
 
+// 매료 소유자 또는 현재 선두 플레이어의 팀 색상을 반환한다.
 FLinearColor AMTPedestrianBase::GetLeaderColor() const
 {
 	const APlayerState* PS = AttractedBy ? AttractedBy : LeadingPlayer;
@@ -319,6 +338,7 @@ FLinearColor AMTPedestrianBase::GetLeaderColor() const
 	return FLinearColor::White;
 }
 
+// 현재 로컬 플레이어와 경쟁자 매료도 값을 World Space UI에 전달한다.
 void AMTPedestrianBase::BroadcastAttractiveChanged()
 {
 	const float Amount = GetHighestAttractiveAmountValue();
@@ -361,6 +381,7 @@ void AMTPedestrianBase::BroadcastAttractiveChanged()
 	}
 }
 
+// 서버 또는 FastArray 수신 후 선두 상태와 UI를 갱신한다.
 void AMTPedestrianBase::HandleAttractiveAmountsChanged()
 {
 	if (HasAuthority())
@@ -370,21 +391,25 @@ void AMTPedestrianBase::HandleAttractiveAmountsChanged()
 	BroadcastAttractiveChanged();
 }
 
+// 지정한 플레이어의 매료도를 Component에서 조회한다.
 float AMTPedestrianBase::GetAttractiveAmountValue(APlayerState* TargetPlayerState) const
 {
 	return AttractiveComponent ? AttractiveComponent->GetAttractiveAmount(TargetPlayerState) : 0.f;
 }
 
+// 모든 플레이어 중 최고 매료도를 Component에서 조회한다.
 float AMTPedestrianBase::GetHighestAttractiveAmountValue() const
 {
 	return AttractiveComponent ? AttractiveComponent->GetHighestAttractiveAmount() : 0.f;
 }
 
+// Component에 설정된 최대 매료도를 반환한다.
 float AMTPedestrianBase::GetMaxAttractiveAmountValue() const
 {
 	return AttractiveComponent ? AttractiveComponent->GetMaxAttractiveAmount() : 100.f;
 }
 
+// 로컬 카메라와 거리를 기준으로 매료도 UI 가시성을 결정한다.
 void AMTPedestrianBase::UpdateAttractiveBarVisibility()
 {
 	if (!AttractiveBarWidget)
