@@ -44,6 +44,12 @@ protected:
 	// 스턴 중이면 스킬/이동 입력 무시
 	bool IsStunned() const;
 
+	// 사망 애니메이션
+	UPROPERTY(EditDefaultsOnly, Category = "Die")
+	TArray<UAnimMontage*> DeathMontages; // R, L 등록
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayDeathMontage(UAnimMontage* MontageToPlay);
 #pragma region PlayerInput
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Camera, meta = (AllowPrivateAccess = "true"))
@@ -103,6 +109,8 @@ public:
 	// 근접/대시 데미지 대상 판정: 서로 다른 고양이 + 적팀(개인전은 자기 외 전원 적)
 	static bool IsEnemyCat(const AActor* SourceActor, const AActor* TargetActor);
 
+	bool IsDead() const { return bIsDead; }
+
 	void Die();
 
 private:
@@ -111,6 +119,9 @@ private:
 
 	bool bStunned = false;
 
-	UPROPERTY(Transient)
+	UPROPERTY(Transient, ReplicatedUsing = OnRep_IsDead)
 	bool bIsDead = false;
+
+	UFUNCTION()
+	void OnRep_IsDead();
 };

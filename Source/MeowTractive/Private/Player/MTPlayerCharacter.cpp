@@ -10,6 +10,7 @@
 #include "Player/MTPlayerState.h"
 #include "Engine/Engine.h"
 #include "Game/MTMatchGameMode.h"
+#include "Net/UnrealNetwork.h"
 
 AMTPlayerCharacter::AMTPlayerCharacter()
 {
@@ -85,6 +86,12 @@ void AMTPlayerCharacter::BeginPlay()
 void AMTPlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+}
+
+void AMTPlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AMTPlayerCharacter, bIsDead);
 }
 
 void AMTPlayerCharacter::PossessedBy(AController* NewController)
@@ -244,6 +251,17 @@ void AMTPlayerCharacter::Die()
             AbilitySystemComponent->CancelAllAbilities();
         }
 
+		// 사망 애니메이션 재생
+		UAnimMontage* ChosenMontage = nullptr;
+		float DeathLifeSpan = 2.0f; // 몽타주가 없을 때의 fallback 값
+
+		if (DeathMontages.Num() > 0)
+		{
+			ChosenMontage = DeathMontages[FMath::RandRange(0, DeathMontages.Num() - 1)];
+			DeathLifeSpan = ChosenMontage->GetPlayLength();
+		}
+		MulticastPlayDeathMontage(ChosenMontage);
+
         if (MyController)
         {
             if (AMTMatchGameMode* GM = GetWorld()->GetAuthGameMode<AMTMatchGameMode>())
@@ -254,7 +272,7 @@ void AMTPlayerCharacter::Die()
 
         // 컨트롤러와 분리만 하고 실제 파괴는 사망 이펙트 이후
         DetachFromControllerPendingDestroy();
-        SetLifeSpan(2.0f);
+        SetLifeSpan(DeathLifeSpan);
 }
 
 void AMTPlayerCharacter::StopJump()
@@ -307,6 +325,17 @@ UAbilitySystemComponent* AMTPlayerCharacter::GetAbilitySystemComponent() const
 bool AMTPlayerCharacter::IsStunned() const
 {
 	return bStunned;
+}
+
+void AMTPlayerCharacter::MulticastPlayDeathMontage_Implementation(UAnimMontage* MontageToPlay)
+{
+	if (MontageToPlay)
+	{
+		if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
+		{
+			AnimInst->Montage_Play(MontageToPlay);
+		}
+	}
 }
 
 bool AMTPlayerCharacter::IsEnemyCat(const AActor* SourceActor, const AActor* TargetActor)
@@ -363,4 +392,9 @@ void AMTPlayerCharacter::OnStunTagChanged(const FGameplayTag Tag, int32 NewCount
 			Move->SetMovementMode(MOVE_Walking);
 		}
 	}
+}
+
+void AMTPlayerCharacter::OnRep_IsDead()
+{
+	// 필요하면 여기서 클라이언트 측 후처리
 }

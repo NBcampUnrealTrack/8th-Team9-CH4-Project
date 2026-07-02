@@ -124,6 +124,15 @@ void UGA_MeowPunch::PerformHit()
 		{
 			continue;
 		}
+
+		if (AMTPlayerCharacter* TargetChar = Cast<AMTPlayerCharacter>(Target))
+		{
+			if (TargetChar->IsDead())
+			{
+				continue;
+			}
+		}
+
 		Damaged.Add(Target);
 
 		UAbilitySystemComponent* TargetASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Target);
