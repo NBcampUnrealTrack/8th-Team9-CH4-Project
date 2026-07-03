@@ -58,7 +58,7 @@ protected:
     UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
     int32 MaxNormalPedestrians = 20;
 
-	TArray<APlayerStart*> UsedStarts; // 플레이어 스타트 지점
+	TArray<class APlayerStart*> UsedStarts; // 플레이어 스타트 지점
 
 	UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
     float RespawnDelay = 5.f; // 리스폰 쿨타임
