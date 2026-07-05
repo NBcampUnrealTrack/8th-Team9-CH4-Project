@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "MTTypes.generated.h"
@@ -21,4 +21,22 @@ enum class EMTMatchPhase : uint8
 	WaitingLoad,
 	InProgress,
 	PostMatch,
+};
+
+USTRUCT(BlueprintType)
+struct FMTPlayerResult
+{
+    GENERATED_BODY()
+
+    UPROPERTY(BlueprintReadOnly)
+    FString PlayerName;
+
+    UPROPERTY(BlueprintReadOnly)
+    FLinearColor TeamColor = FLinearColor::White;
+
+    UPROPERTY(BlueprintReadOnly)
+    int32 AttractedCount = 0;
+
+    UPROPERTY(BlueprintReadOnly)
+    int32 Rank = 0;
 };

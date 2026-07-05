@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
@@ -20,6 +20,16 @@ public:
 
 	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "MT|Lobby")
 	void Server_RequestStartMatch();
+
+	// 결과 화면 "로비로" 버튼 → 세션 유지 + 전원 로비 복귀 (호스트가 ServerTravel)
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "MT|Match")
+	void Server_ReturnToLobby();
+
+	UFUNCTION(Client, Reliable)
+	void ClientShowResult();
+
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TSubclassOf<class UMTMatchGameResultWidget> ResultWidgetClass;
 
 private:
 	float LastReadyToggleTime = -100.f;     // 서버 쿨다운 기준 시각

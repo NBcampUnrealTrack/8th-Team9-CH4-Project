@@ -16,6 +16,7 @@ void AMTPlayerState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLi
 	DOREPLIFETIME(AMTPlayerState, TeamId);
 	DOREPLIFETIME(AMTPlayerState, bIsLoaded);
 	DOREPLIFETIME(AMTPlayerState, bIsHost);
+	DOREPLIFETIME(AMTPlayerState, TeamColor);
 }
 
 void AMTPlayerState::SetSelectedCat(EMTCatType NewCat)
@@ -93,5 +94,6 @@ void AMTPlayerState::CopyProperties(APlayerState* NewPlayerState)
 		NewMTPS->PlayerSlot = PlayerSlot;
 		NewMTPS->TeamId = TeamId;
 		NewMTPS->bIsHost = bIsHost;
+		NewMTPS->TeamColor = TeamColor;   // 슬롯 색도 트래블 간 유지
 	}
 }

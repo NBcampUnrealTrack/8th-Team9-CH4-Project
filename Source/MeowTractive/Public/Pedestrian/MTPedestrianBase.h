@@ -1,30 +1,26 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "AbilitySystemInterface.h"
+#include "GameplayTagContainer.h"
 #include "GameFramework/Character.h"
-#include "Components/WidgetComponent.h"
 #include "MTPedestrianBase.generated.h"
 
+class UAbilitySystemComponent;
+class UMTPedestrianAttributeSet;
+class UMTAttractiveComponent;
+class UWidgetComponent;
+class UGameplayEffect;
 class APlayerState;
 
-//행인 매료도 저장 구조체
-USTRUCT(BlueprintType)
-struct FPedestrianAttractiveness
-{
-	GENERATED_BODY()
+// 최고 매료 수치 변경 알림 (Current, Max). 클라 프로그레스바가 이벤트로 구독.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FMTOnAttractiveAmountChanged, float, AttractiveAmount, float, MaxAttractiveAmount);
 
-	UPROPERTY(BlueprintReadOnly, Category = "Pedestrian|Attractiveness")
-	TObjectPtr<APlayerState> PlayerState = nullptr;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Pedestrian|Attractiveness")
-	float Value = 0.0f;
-
-};
+// 매료된 순간. StateTree/BP가 구독해 Attracted 상태(이동 정지)로 전환.
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnAttracted, APlayerState*, AttractedBy);
 
 UCLASS()
-class MEOWTRACTIVE_API AMTPedestrianBase : public ACharacter
+class MEOWTRACTIVE_API AMTPedestrianBase : public ACharacter, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
@@ -32,75 +28,110 @@ public:
 	AMTPedestrianBase();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
 
-	UFUNCTION(BlueprintCallable, Category = "Pedestrian|Attractiveness")
-	float GetAttractiveness(APlayerState* TargetPlayerState) const;
+	// --- AttributeSet에서 호출 (서버) ---
+	void HandleAttractiveHit(APlayerState* Source, float Amount);
+	void HandleAttractiveRegen(float Amount);
 
-	UFUNCTION(BlueprintCallable, Category = "Pedestrian|Attractiveness")
-	void AddAttractiveness(APlayerState* TargetPlayerState, float Delta);
+	// 서버/클라 공통 — 델리게이트 방송 (이벤트 기반 바 갱신)
+	void BroadcastAttractiveChanged();
+	void HandleAttractiveAmountsChanged();
 
-	UFUNCTION(Server, Reliable)
-	void ServerAddAttractiveness(APlayerState* TargetPlayerState, float Delta);
+	// 매치 종료 시 AI 정지 (서버 전용). 서버에서 멈추면 이동 복제로 전 클라에 반영됨.
+	void FreezeForMatchEnd();
+
+	// --- 표시용 (BP 바인딩) ---
+	UPROPERTY(BlueprintAssignable, Category = "Attractive")
+	FMTOnAttractiveAmountChanged OnAttractiveAmountChanged;
+
+	// 매료된 순간 1회 — StateTree/BP가 Attracted 상태 전환에 사용
+	UPROPERTY(BlueprintAssignable, Category = "Attractive")
+	FMTOnAttracted OnAttracted;
+
+	// StateTree가 3초 후 호출 → 매료 반응 종료(매료도 풀 복구, 이동 재개)
+	UFUNCTION(BlueprintCallable, Category = "Attractive")
+	void EndAttracted();
+
+	UFUNCTION(BlueprintPure, Category = "Attractive")
+	float GetAttractiveAmountValue(APlayerState* TargetPlayerState) const;
+
+	UFUNCTION(BlueprintPure, Category = "Attractive")
+	float GetHighestAttractiveAmountValue() const;
+
+	UFUNCTION(BlueprintPure, Category = "Attractive")
+	float GetMaxAttractiveAmountValue() const;
+
+	UFUNCTION(BlueprintPure, Category = "Attractive")
+	UMTAttractiveComponent* GetAttractiveComponent() const { return AttractiveComponent; }
+
+	UFUNCTION(BlueprintPure, Category = "Attractive")
+	bool IsAttracted() const { return bIsAttracted; }
 
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
+	virtual void PossessedBy(AController* NewController) override;
 
-	UPROPERTY(ReplicatedUsing = OnRep_Attractivenesses)
-	TArray<FPedestrianAttractiveness> Attractivenesses;
+	// --- GAS ---
+	UPROPERTY(VisibleAnywhere, Category = "Attractive|GAS")
+	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
+
+	//AT는 GAS공격에서의 데미지를 중계해주는 용도로만 사용
+	UPROPERTY()
+	TObjectPtr<UMTPedestrianAttributeSet> AttributeSet;
+
+	//실제 매료도 저장/관리 컴포넌트
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Attractive", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UMTAttractiveComponent> AttractiveComponent;
+
+	// 행인 GE (서버/클라 공통). 매료도 초기화, 매료도 최대치 설정, 매료도 회복 주기 부여
+	UPROPERTY(EditDefaultsOnly, Category = "Attractive|GE")
+	TSubclassOf<UGameplayEffect> RegenGE;           // 무한+주기, 플레이어별 감소 가능 여부는 Component가 판정
+
+	UPROPERTY(EditDefaultsOnly, Category = "Attractive|GE")
+	TSubclassOf<UGameplayEffect> InvulnerableGE;    // 15s, grants State.Invulnerable
+
+	// 매료 소유자 (복제). 기여도 테이블 전체가 아닌 결과만 동기화.
+	UPROPERTY(ReplicatedUsing = OnRep_Attracted)
+	TObjectPtr<APlayerState> AttractedBy;
 
 	UFUNCTION()
-	void OnRep_Attractivenesses();
+	void OnRep_Attracted();
 
-	UPROPERTY(VisibleAnywhere, Category = "UI")
-	UWidgetComponent* AttractivenessBarWidget;
+	// 현재 선두 기여자 (바 색용). 기여도 테이블 전체 대신 이것만 복제.
+	UPROPERTY(ReplicatedUsing = OnRep_Leader)
+	TObjectPtr<APlayerState> LeadingPlayer;
 
-	UPROPERTY(EditAnywhere, Category = "Pedestrian|UI")
-	float AttractivenessBarVisibleDistance = 1500.f;
+	UFUNCTION()
+	void OnRep_Leader();
 
-	float UIUpdateTimer = 0.f;
+	UPROPERTY(VisibleAnywhere, Category = "Attractive|UI")
+	TObjectPtr<UWidgetComponent> AttractiveBarWidget;
 
-	UPROPERTY(EditAnywhere, Category = "Pedestrian|UI")
-	float UIUpdateInterval = 0.1f; // 0.1초마다 체크
+	UPROPERTY(EditAnywhere, Category = "Attractive|UI")
+	float AttractiveBarVisibleDistance = 1500.f;
 
 private:
-	//걷기 속도
+	bool bIsAttracted = false;
+
+	// 캐시 태그
+	FGameplayTag InvulnerableTag;
+
+	void BecomeAttracted(APlayerState* Winner);
+	void ResetAttractiveAmounts();
+	void UpdateLeadingPlayer();
+
+	void UpdateAttractiveBarVisibility();
+	FLinearColor GetLeaderColor() const;   // AttractedBy/LeadingPlayer의 팀 색
+
+	// 이동/배회는 StateTree(ST_Pedestrian)가 담당. 여기선 이동 속도만 설정.
 	UPROPERTY(EditAnywhere, Category = "Pedestrian|Movement")
 	float WalkSpeed = 180.0f;
 
-	//랜덤 지점 선택 반경
+	// 매료 시 플레이어를 향해 도는 속도
 	UPROPERTY(EditAnywhere, Category = "Pedestrian|Movement")
-	float WanderRadius = 700.0f;
+	float AttractiveTurnSpeed = 6.0f;
 
-	//목표지점 도착 판정 반경
-	UPROPERTY(EditAnywhere, Category = "Pedestrian|Movement")
-	float AcceptanceRadius = 80.0f;
-
-	//최소 대기 시간
-	UPROPERTY(EditAnywhere, Category = "Pedestrian|Movement")
-	float MinWaitTime = 1.0f;
-
-	//최대 대기 시간
-	UPROPERTY(EditAnywhere, Category = "Pedestrian|Movement")
-	float MaxWaitTime = 3.0f;
-
-	// 이동 체크 간격
-	UPROPERTY(EditAnywhere, Category = "Pedestrian|Movement")
-	float MoveCheckDistance = 120.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Pedestrian|Attractiveness")
-	float MaxAttraction = 100.f;
-
-	FTimerHandle WaitTimerHandle;
-
-	FVector CurrentDestination = FVector::ZeroVector;
-
-	bool bIsWaiting = false;
-	bool bHasDestination = false;
-
-	void MoveToRandomLocation();
-	void WaitBeforeNextMove();
-	void ResumeWander();
-	bool HasReachedDestination() const;
-
+	float BarVisibilityTimer = 0.f;
 };

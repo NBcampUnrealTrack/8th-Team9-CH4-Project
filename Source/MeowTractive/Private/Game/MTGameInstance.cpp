@@ -31,6 +31,12 @@ void UMTGameInstance::Init()
 		SessionSubsystem->OnFindSessionsComplete.AddUObject(this, &UMTGameInstance::HandleFindSessions);
 		SessionSubsystem->OnJoinSessionComplete.AddUObject(this, &UMTGameInstance::HandleJoinSession);
 	}
+
+	// 세션 튕김/연결 끊김 감지
+	if (GEngine)
+	{
+		NetworkFailureHandle = GEngine->OnNetworkFailure().AddUObject(this, &UMTGameInstance::HandleNetworkFailure);
+	}
 }
 
 void UMTGameInstance::Shutdown()
@@ -40,6 +46,11 @@ void UMTGameInstance::Shutdown()
 		SessionSubsystem->OnCreateSessionComplete.RemoveAll(this);
 		SessionSubsystem->OnFindSessionsComplete.RemoveAll(this);
 		SessionSubsystem->OnJoinSessionComplete.RemoveAll(this);
+	}
+	if (GEngine && NetworkFailureHandle.IsValid())
+	{
+		GEngine->OnNetworkFailure().Remove(NetworkFailureHandle);
+		NetworkFailureHandle.Reset();
 	}
 	Super::Shutdown();
 }
@@ -87,6 +98,52 @@ void UMTGameInstance::JoinSessionData(UMTSessionData* Data)
 	}
 }
 
+void UMTGameInstance::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString)
+{
+	// 호스트(리슨 서버)는 자기 세션 유지 — 튕김 복귀는 클라 전용
+	if (World && World->GetNetMode() != NM_Client)
+	{
+		return;
+	}
+
+	// 실패 사유별 안내 (표시는 메뉴 위젯이 ConsumeDisconnectMessage로 가져감)
+	FString Reason;
+	switch (FailureType)
+	{
+	case ENetworkFailure::ConnectionLost:
+	case ENetworkFailure::ConnectionTimeout:
+		Reason = TEXT("서버와의 연결이 끊어졌습니다.");
+		break;
+	case ENetworkFailure::FailureReceived:
+		Reason = TEXT("서버에서 연결이 종료되었습니다.");
+		break;
+	default:
+		Reason = TEXT("세션 연결이 종료되었습니다.");
+		break;
+	}
+	PendingDisconnectMessage = FText::FromString(Reason + TEXT("\n메인 메뉴로 돌아갑니다."));
+	bHasPendingDisconnect = true;
+
+	MTScreen(FColor::Red, FString::Printf(TEXT("[MTFlow] NetworkError(%d) → 메인메뉴 복귀"), (int32)FailureType));
+
+	// 메인메뉴로 복귀
+	if (APlayerController* PC = GetFirstLocalPlayerController())
+	{
+		PC->ClientTravel(MainMenuPath, TRAVEL_Absolute);
+	}
+}
+
+bool UMTGameInstance::ConsumeDisconnectMessage(FText& OutMessage)
+{
+	if (!bHasPendingDisconnect)
+	{
+		return false;
+	}
+	OutMessage = PendingDisconnectMessage;
+	bHasPendingDisconnect = false;   // 1회성 — 이후 메뉴 재진입엔 안 뜸
+	return true;
+}
+
 void UMTGameInstance::HandleCreateSession(bool bWasSuccessful)
 {
 	OnHostResult.Broadcast(bWasSuccessful);
@@ -114,8 +171,9 @@ void UMTGameInstance::HandleCreateSession(bool bWasSuccessful)
 
 void UMTGameInstance::HandleFindSessions(const TArray<FOnlineSessionSearchResult>& Results, bool bWasSuccessful)
 {
-	// 결과를 BP용 UMTSessionData로 변환해 서버 브라우저에 전달 (자동 참가 안 함)
-	TArray<UMTSessionData*> Sessions;
+	// 결과를 BP용 UMTSessionData로 변환해 서버 브라우저에 전달 (선택 후 수동 참가)
+	FoundSessions.Reset();
+	TArray<UMTSessionData*> Sessions;   // 방송용 (dynamic 델리게이트는 raw 포인터 배열)
 	if (bWasSuccessful)
 	{
 		for (const FOnlineSessionSearchResult& Result : Results)
@@ -126,17 +184,20 @@ void UMTGameInstance::HandleFindSessions(const TArray<FOnlineSessionSearchResult
 			Data->PingMs = Result.PingInMs;
 			Data->MaxSlots = Result.Session.SessionSettings.NumPublicConnections;
 			Data->OpenSlots = Result.Session.NumOpenPublicConnections;
+			Data->CurrentPlayers = FMath::Max(0, Data->MaxSlots - Data->OpenSlots);
+			FoundSessions.Add(Data);   // GC 방지 캐시
 			Sessions.Add(Data);
+
+			MTScreen(FColor::Cyan, FString::Printf(TEXT("[MTFind]  #%d %s | 인원 %d/%d | %dms"),
+				Sessions.Num() - 1, *Data->ServerName, Data->CurrentPlayers, Data->MaxSlots, Data->PingMs));
 		}
 	}
+	MTScreen(Sessions.Num() > 0 ? FColor::Green : FColor::Orange,
+		FString::Printf(TEXT("[MTFind] 검색 완료: Success=%d, 세션 %d개 → OnSessionsFound 방송"),
+			bWasSuccessful ? 1 : 0, Sessions.Num()));
+
 	OnSearchResult.Broadcast(Sessions.Num());
 	OnSessionsFound.Broadcast(Sessions);
-
-	// TODO(임시): 서버 브라우저 붙이기 전 테스트용 — 첫 세션 자동 참가. 브라우저 완성 시 제거.
-	if (Sessions.Num() > 0 && SessionSubsystem)
-	{
-		SessionSubsystem->JoinSession(Sessions[0]->Result);
-	}
 }
 
 void UMTGameInstance::HandleJoinSession(EOnJoinSessionCompleteResult::Type Result)

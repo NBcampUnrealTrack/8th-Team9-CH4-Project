@@ -13,20 +13,41 @@ AMTLobbyGameMode::AMTLobbyGameMode()
 void AMTLobbyGameMode::PostLogin(APlayerController* NewPlayer)
 {
 	Super::PostLogin(NewPlayer);
+	SetupLobbyPlayer(NewPlayer);   // 신규 접속(세션 참가)
+}
 
+void AMTLobbyGameMode::HandleSeamlessTravelPlayer(AController*& C)
+{
+	Super::HandleSeamlessTravelPlayer(C);
+	SetupLobbyPlayer(C);           // 매치→로비 복귀: 슬롯 그대로 재사용
+}
+
+void AMTLobbyGameMode::SetupLobbyPlayer(AController* C)
+{
 	if (UsedSlots.Num() != MaxPlayers)
 	{
 		UsedSlots.Init(false, MaxPlayers);
 	}
 
-	if (NewPlayer)
+	AMTPlayerState* MTPS = C ? C->GetPlayerState<AMTPlayerState>() : nullptr;
+	if (!MTPS)
 	{
-		if (AMTPlayerState* MTPS = NewPlayer->GetPlayerState<AMTPlayerState>())
-		{
-			MTPS->SetPlayerSlot(AcquireSlot());
-			MTPS->SetHost(NewPlayer->IsLocalController());   // 리슨 서버의 로컬 PC = 호스트
-		}
+		return;
 	}
+
+	// 매치에서 돌아온 경우 PlayerState에 슬롯이 실려 옴 → 그 슬롯 그대로 점유. 없으면 새로 배정.
+	const int32 Carried = MTPS->GetPlayerSlot();
+	if (UsedSlots.IsValidIndex(Carried) && !UsedSlots[Carried])
+	{
+		UsedSlots[Carried] = true;
+	}
+	else
+	{
+		MTPS->SetPlayerSlot(AcquireSlot());
+	}
+
+	MTPS->SetHost(C->IsLocalController());   // 리슨 서버의 로컬 PC = 호스트
+	// 팀색은 매치 게임모드가 슬롯 기준으로 결정 (AMTMatchGameMode::AssignTeamColor)
 }
 
 void AMTLobbyGameMode::Logout(AController* Exiting)
@@ -44,14 +65,22 @@ void AMTLobbyGameMode::Logout(AController* Exiting)
 bool AMTLobbyGameMode::CanStartMatch() const
 {
 	const AGameStateBase* GS = GameState;
-	if (!GS || GS->PlayerArray.Num() == 0)
+	if (!GS || GS->PlayerArray.Num() < 2)   // 호스트 혼자 시작 불가 (최소 2명)
 	{
 		return false;
 	}
 	for (const APlayerState* PS : GS->PlayerArray)
 	{
 		const AMTPlayerState* MTPS = Cast<AMTPlayerState>(PS);
-		if (!MTPS || !MTPS->IsReady())
+		if (!MTPS)
+		{
+			return false;
+		}
+		if (MTPS->IsHost())
+		{
+			continue;   // 호스트는 준비 불필요 (시작 권한 보유)
+		}
+		if (!MTPS->IsReady())
 		{
 			return false;
 		}
