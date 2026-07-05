@@ -23,6 +23,10 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "MT|Session")
 	int32 MaxSlots = 0;
 
+	// 현재 참여 인원 (Max - Open)
+	UPROPERTY(BlueprintReadOnly, Category = "MT|Session")
+	int32 CurrentPlayers = 0;
+
 	// C++ 전용 — JoinSession에 사용 (BP 비호환)
 	FOnlineSessionSearchResult Result;
 };

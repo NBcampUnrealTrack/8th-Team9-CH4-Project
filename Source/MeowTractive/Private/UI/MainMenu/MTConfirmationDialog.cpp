@@ -1,5 +1,6 @@
 #include "UI/MainMenu/MTConfirmationDialog.h"
 #include "Animation/WidgetAnimation.h"
+#include "Components/TextBlock.h"
 
 void UMTConfirmationDialog::NativeConstruct()
 {
@@ -20,4 +21,12 @@ void UMTConfirmationDialog::Cancel()
 {
 	OnCancelled.Broadcast();
 	RemoveFromParent();          // 아니요: 다이얼로그만 닫기
+}
+
+void UMTConfirmationDialog::SetMessage(FText InMessage)
+{
+	if (MessageText)
+	{
+		MessageText->SetText(InMessage);
+	}
 }

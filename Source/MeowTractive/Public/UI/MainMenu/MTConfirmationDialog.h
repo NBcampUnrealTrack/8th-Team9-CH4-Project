@@ -5,6 +5,7 @@
 #include "MTConfirmationDialog.generated.h"
 
 class UWidgetAnimation;
+class UTextBlock;
 
 // 확인(네) / 취소(아니요) 결과 — 여는 쪽이 바인딩
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMTOnDialogConfirmed);
@@ -26,6 +27,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MT|Dialog")
 	void Cancel();
 
+	// 본문 메시지 설정 (WBP에 MessageText가 있을 때만 표시). 튕김 안내 등 메시지 박스로 재사용.
+	UFUNCTION(BlueprintCallable, Category = "MT|Dialog")
+	void SetMessage(FText InMessage);
+
 	UPROPERTY(BlueprintAssignable, Category = "MT|Dialog")
 	FMTOnDialogConfirmed OnConfirmed;
 
@@ -38,4 +43,8 @@ protected:
 	// WBP 애니메이션 이름을 "FadeIn"으로 두면 자동 바인딩
 	UPROPERTY(meta = (BindWidgetAnimOptional), Transient)
 	TObjectPtr<UWidgetAnimation> FadeIn;
+
+	// WBP에 "MessageText"란 이름의 TextBlock이 있으면 자동 바인딩 (없어도 됨)
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> MessageText;
 };

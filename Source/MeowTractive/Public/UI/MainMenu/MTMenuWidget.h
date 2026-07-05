@@ -32,5 +32,5 @@ private:
 	TObjectPtr<UMTGameInstance> GameFlow;
 
 	int32 NumConnections = 4;
-	bool bUseLAN = false;
+	bool bUseLAN = true;
 };

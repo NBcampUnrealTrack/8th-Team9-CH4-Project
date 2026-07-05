@@ -39,6 +39,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
 	void JoinSessionData(UMTSessionData* Data);
 
+	// 세션 튕김/종료로 메뉴 복귀 시 대기 중인 안내 메시지를 1회 소비 — 메뉴 위젯이 Construct에서 호출
+	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
+	bool ConsumeDisconnectMessage(FText& OutMessage);
+
 	// 콘솔(`~`)에서 호출: 현재 로비/메뉴 경로·월드·세션 상태를 로그+화면에 덤프
 	UFUNCTION(Exec)
 	void MTHostInfo();
@@ -69,7 +73,20 @@ protected:
 	void HandleFindSessions(const TArray<FOnlineSessionSearchResult>& Results, bool bWasSuccessful);
 	void HandleJoinSession(EOnJoinSessionCompleteResult::Type Result);
 
+	// 세션 연결 끊김(튕김/호스트 종료 등) — GEngine->OnNetworkFailure 구독. 메시지 저장 후 메인메뉴 복귀.
+	void HandleNetworkFailure(UWorld* World, class UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString);
+
 private:
 	UPROPERTY()
 	TObjectPtr<UMTSessionSubsystem> SessionSubsystem;
+
+	// 검색 결과 캐시 — ListView가 참조를 잡기 전 GC되지 않도록 보관 (다음 검색 때 갱신)
+	UPROPERTY()
+	TArray<TObjectPtr<UMTSessionData>> FoundSessions;
+
+	// 메뉴 복귀 시 표시할 튕김 안내 (1회 소비)
+	FText PendingDisconnectMessage;
+	bool bHasPendingDisconnect = false;
+
+	FDelegateHandle NetworkFailureHandle;
 };
