@@ -3,6 +3,7 @@
 #include "Game/MTLog.h"
 #include "Player/MTPlayerState.h"
 #include "Player/MTPlayerController.h"
+#include "UI/InGame/MTPlayerHUD.h"
 #include "Pedestrian/MTPedestrianBase.h"
 #include "GameFramework/GameStateBase.h"
 #include "Kismet/GameplayStatics.h"
@@ -19,6 +20,7 @@ AMTMatchGameMode::AMTMatchGameMode()
 	GameStateClass = AMTGameState::StaticClass();
 	PlayerStateClass = AMTPlayerState::StaticClass();
 	PlayerControllerClass = AMTPlayerController::StaticClass();
+	HUDClass = AMTPlayerHUD::StaticClass();
 
 	// 고양이 캐릭터로 교체
 	static ConstructorHelpers::FClassFinder<APawn> PawnBP(TEXT("/Game/Blueprints/Player/BP_Cat"));
