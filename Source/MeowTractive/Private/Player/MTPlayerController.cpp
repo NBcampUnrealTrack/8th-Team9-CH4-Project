@@ -3,6 +3,7 @@
 #include "UI/InGame/MTMatchGameResultWidget.h"
 #include "Game/MTLobbyGameMode.h"
 #include "Game/MTMatchGameMode.h"
+#include "UI/InGame/MTPlayerWidget.h"
 
 void AMTPlayerController::Server_SetSelectedCat_Implementation(EMTCatType NewCat)
 {
@@ -71,4 +72,21 @@ void AMTPlayerController::ClientShowResult_Implementation()
             ResultWidget->ShowResult();
         }
     }
+}
+
+void AMTPlayerController::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// 로컬 플레이어만 UI 생성
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	if (PlayerWidgetClass)
+	{
+		PlayerWidget = CreateWidget<UMTPlayerWidget>(this, PlayerWidgetClass);
+		PlayerWidget->AddToViewport();
+	}
 }
