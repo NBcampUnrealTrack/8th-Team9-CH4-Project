@@ -29,7 +29,10 @@ public class MeowTractive : ModuleRules
 			//행인용 모듈
 			"NavigationSystem", "AIModule",
 			//StateTree (C++ 태스크용)
-			"StateTreeModule", "GameplayStateTreeModule" });
+			"StateTreeModule",
+			"GameplayStateTreeModule",
+			"Niagara"
+		});
 
 	}
 
