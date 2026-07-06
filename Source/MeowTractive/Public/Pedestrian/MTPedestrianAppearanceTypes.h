@@ -14,37 +14,65 @@ enum class EMTPedestrianGender : uint8
 };
 
 USTRUCT(BlueprintType)
+struct MEOWTRACTIVE_API FMTPedestrianMaterialSlotOption
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Material")
+	FName SlotName;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Material")
+	TArray<TSoftObjectPtr<UMaterialInterface>> Materials;
+};
+
+USTRUCT(BlueprintType)
+struct MEOWTRACTIVE_API FMTPedestrianMeshOption
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Mesh")
+	TSoftObjectPtr<USkeletalMesh> Mesh;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Material")
+	TArray<FMTPedestrianMaterialSlotOption> MaterialSlots;
+};
+
+USTRUCT(BlueprintType)
+struct MEOWTRACTIVE_API FMTPedestrianSelectedMaterial
+{
+	GENERATED_BODY()
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pedestrian|Material")
+	FName SlotName;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pedestrian|Material")
+	TObjectPtr<UMaterialInterface> Material;
+};
+
+USTRUCT(BlueprintType)
 struct MEOWTRACTIVE_API FMTPedestrianAppearancePool
 {
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Mesh")
-	TArray<TSoftObjectPtr<USkeletalMesh>> HeadMeshes;
+	TArray<FMTPedestrianMeshOption> HeadOptions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Mesh")
-	TArray<TSoftObjectPtr<USkeletalMesh>> UpperBodyMeshes;
+	TArray<FMTPedestrianMeshOption> UpperBodyOptions;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Mesh")
-	TArray<TSoftObjectPtr<USkeletalMesh>> LowerBodyMeshes;
+	TArray<FMTPedestrianMeshOption> LowerBodyOptions;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Material")
-	TArray<TSoftObjectPtr<UMaterialInterface>> HairMaterials;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Material")
-	TArray<TSoftObjectPtr<UMaterialInterface>> SkinMaterials;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Material")
-	TArray<TSoftObjectPtr<UMaterialInterface>> UpperBodyMaterials;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Material")
-	TArray<TSoftObjectPtr<UMaterialInterface>> LowerBodyMaterials;
-
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Material")
-	TArray<TSoftObjectPtr<UMaterialInterface>> ShoesMaterials;
+	// 현재 테스트 자산의 hands_N_1은 왼손과 오른손이 들어 있는 단일 Skeletal Mesh다.
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Mesh")
+	TArray<FMTPedestrianMeshOption> HandsOptions;
 
 	bool HasRequiredMeshes() const
 	{
-		return !HeadMeshes.IsEmpty() && !UpperBodyMeshes.IsEmpty() && !LowerBodyMeshes.IsEmpty();
+		return !HeadOptions.IsEmpty()
+			&& !UpperBodyOptions.IsEmpty()
+			&& !LowerBodyOptions.IsEmpty()
+			&& !HandsOptions.IsEmpty();
 	}
 };
 
@@ -81,31 +109,23 @@ struct MEOWTRACTIVE_API FMTPedestrianAppearance
 	TObjectPtr<USkeletalMesh> LowerBodyMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pedestrian")
-	TObjectPtr<UMaterialInterface> HairMaterial;
+	TObjectPtr<USkeletalMesh> HandsMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pedestrian")
-	TObjectPtr<UMaterialInterface> SkinMaterial;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pedestrian")
-	TObjectPtr<UMaterialInterface> UpperBodyMaterial;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pedestrian")
-	TObjectPtr<UMaterialInterface> LowerBodyMaterial;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Pedestrian")
-	TObjectPtr<UMaterialInterface> ShoesMaterial;
+	TArray<FMTPedestrianSelectedMaterial> SelectedMaterials;
 
 	bool HasRequiredMeshes() const
 	{
-		return HeadMesh && UpperBodyMesh && LowerBodyMesh;
+		return HeadMesh && UpperBodyMesh && LowerBodyMesh && HandsMesh;
 	}
 
 	FString BuildMeshCacheKey() const
 	{
 		return FString::Printf(
-			TEXT("%s|%s|%s"),
+			TEXT("%s|%s|%s|%s"),
 			*GetPathNameSafe(UpperBodyMesh),
 			*GetPathNameSafe(LowerBodyMesh),
-			*GetPathNameSafe(HeadMesh));
+			*GetPathNameSafe(HeadMesh),
+			*GetPathNameSafe(HandsMesh));
 	}
 };

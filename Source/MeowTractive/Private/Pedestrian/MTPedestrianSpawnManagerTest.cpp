@@ -14,24 +14,28 @@ bool FMTPedestrianMeshMergeTest::RunTest(const FString& Parameters)
 {
 	USkeletalMesh* Head = LoadObject<USkeletalMesh>(
 		nullptr,
-		TEXT("/Game/Mesh/Pedestrian/TestPedestrian_Rigged_Head.TestPedestrian_Rigged_Head"));
+		TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/meshes/head_N_1.head_N_1"));
 	USkeletalMesh* UpperBody = LoadObject<USkeletalMesh>(
 		nullptr,
-		TEXT("/Game/Mesh/Pedestrian/TestPedestrian_Rigged_Body.TestPedestrian_Rigged_Body"));
+		TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/meshes/torso_01.torso_01"));
 	USkeletalMesh* LowerBody = LoadObject<USkeletalMesh>(
 		nullptr,
-		TEXT("/Game/Mesh/Pedestrian/TestPedestrian_Rigged_LowerBody.TestPedestrian_Rigged_LowerBody"));
+		TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/meshes/legs_01.legs_01"));
+	USkeletalMesh* Hands = LoadObject<USkeletalMesh>(
+		nullptr,
+		TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/meshes/hands_N_1.hands_N_1"));
 
 	TestNotNull(TEXT("Head test mesh must load"), Head);
 	TestNotNull(TEXT("Upper-body test mesh must load"), UpperBody);
 	TestNotNull(TEXT("Lower-body test mesh must load"), LowerBody);
-	if (!Head || !UpperBody || !LowerBody)
+	TestNotNull(TEXT("Both-hands test mesh must load"), Hands);
+	if (!Head || !UpperBody || !LowerBody || !Hands)
 	{
 		return false;
 	}
 
 	FSkeletalMeshMergeParams MergeParams;
-	MergeParams.MeshesToMerge = {UpperBody, LowerBody, Head};
+	MergeParams.MeshesToMerge = {UpperBody, LowerBody, Head, Hands};
 	MergeParams.Skeleton = UpperBody->GetSkeleton();
 	MergeParams.bSkeletonBefore = MergeParams.Skeleton != nullptr;
 
