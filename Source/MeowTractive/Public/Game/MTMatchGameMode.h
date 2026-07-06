@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
+#include "Pedestrian/MTPedestrianAppearanceTypes.h"
 #include "MTMatchGameMode.generated.h"
 
 /** 인게임 매치 — bDelayedStart로 대기하다가 전원 로딩 완료 시 StartMatch. */
@@ -54,6 +55,9 @@ protected:
 
     UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
     TSubclassOf<class AMTPedestrianBase> NormalPedestrianClass; // 행인
+
+	UPROPERTY(EditDefaultsOnly, Category = "Match Rules|Pedestrian")
+	FMTPedestrianGenerationConfig PedestrianGenerationConfig;
 
     UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
     int32 MaxNormalPedestrians = 20;

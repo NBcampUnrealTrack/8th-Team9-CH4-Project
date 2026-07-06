@@ -4,6 +4,7 @@
 
 #include "Pedestrian/MTAttractiveComponent.h"
 #include "Pedestrian/MTPedestrianAttributeSet.h"
+#include "Pedestrian/MTPedestrianSpawnManager.h"
 #include "Game/MTGameplayTags.h"
 #include "UI/InGame/MTAttractivenessBarWidget.h"
 #include "Player/MTPlayerState.h"
@@ -77,6 +78,18 @@ void AMTPedestrianBase::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	// 기여도 테이블 전체가 아닌 '결과(소유자)'만 복제
 	DOREPLIFETIME(AMTPedestrianBase, AttractedBy);
 	DOREPLIFETIME(AMTPedestrianBase, LeadingPlayer);
+	DOREPLIFETIME(AMTPedestrianBase, Appearance);
+}
+
+void AMTPedestrianBase::SetAppearance(const FMTPedestrianAppearance& NewAppearance)
+{
+	Appearance = NewAppearance;
+	UMTPedestrianSpawnManager::ApplyAppearance(this, Appearance);
+}
+
+void AMTPedestrianBase::OnRep_Appearance()
+{
+	UMTPedestrianSpawnManager::ApplyAppearance(this, Appearance);
 }
 
 // 행인이 소유한 AbilitySystemComponent를 반환한다.
