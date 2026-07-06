@@ -3,6 +3,7 @@
 #include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
 #include "Pedestrian/MTAttractiveComponent.h"
+#include "Item/MTItemData.h"
 #include "Pedestrian/MTPedestrianBase.h"
 
 void AMTGameState::AddPlayerState(APlayerState* PlayerState)
@@ -39,6 +40,30 @@ void AMTGameState::RemovePlayerState(APlayerState* PlayerState)
             AttractiveComponent->RemovePlayerState(PlayerState);
         }
     }
+}
+
+void AMTGameState::PostInitializeComponents()
+{
+	Super::PostInitializeComponents();
+	ItemRegistry.Empty();
+	for (UMTItemData* Data : AllItemData)
+	{
+		if (Data && Data->ItemType != EMTItemType::None)
+		{
+			ItemRegistry.Add(Data->ItemType, Data);
+		}
+	}
+}
+
+UMTItemData* AMTGameState::GetItemData(EMTItemType Type) const
+{
+	if (Type == EMTItemType::None) return nullptr;
+
+	if (UMTItemData* const* Found = ItemRegistry.Find(Type))
+	{
+		return *Found;
+	}
+	return nullptr;
 }
 
 void AMTGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
