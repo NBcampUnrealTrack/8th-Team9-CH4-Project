@@ -32,6 +32,37 @@ TObjectType* LoadRandomAsset(const TArray<TSoftObjectPtr<TObjectType>>& Assets, 
 	return nullptr;
 }
 
+FName ResolveMaterialSlotName(const USkeletalMesh* Mesh, const FName ConfiguredName)
+{
+	if (!Mesh || ConfiguredName.IsNone())
+	{
+		return NAME_None;
+	}
+
+	const TArray<FSkeletalMaterial>& MeshMaterials = Mesh->GetMaterials();
+
+	// 실제 Skeletal Mesh SlotName을 입력한 경우 그대로 사용한다.
+	for (const FSkeletalMaterial& MeshMaterial : MeshMaterials)
+	{
+		if (MeshMaterial.MaterialSlotName == ConfiguredName)
+		{
+			return MeshMaterial.MaterialSlotName;
+		}
+	}
+
+	// BP에서 Material asset 이름을 입력한 경우 해당 Material이 연결된 실제 SlotName으로 변환한다.
+	for (const FSkeletalMaterial& MeshMaterial : MeshMaterials)
+	{
+		if (MeshMaterial.MaterialInterface
+			&& MeshMaterial.MaterialInterface->GetFName() == ConfiguredName)
+		{
+			return MeshMaterial.MaterialSlotName;
+		}
+	}
+
+	return NAME_None;
+}
+
 bool SelectMeshOption(
 	const TArray<FMTPedestrianMeshOption>& Options,
 	FRandomStream& RandomStream,
@@ -56,15 +87,22 @@ bool SelectMeshOption(
 		OutMesh = LoadedMesh;
 		for (const FMTPedestrianMaterialSlotOption& SlotOption : Option.MaterialSlots)
 		{
-			if (SlotOption.SlotName.IsNone())
+			const FName ResolvedSlotName = ResolveMaterialSlotName(LoadedMesh, SlotOption.SlotName);
+			if (ResolvedSlotName.IsNone())
 			{
+				UE_LOG(
+					LogTemp,
+					Warning,
+					TEXT("[PedestrianSpawnManager] Material Slot을 찾을 수 없습니다. Mesh=%s ConfiguredName=%s"),
+					*GetNameSafe(LoadedMesh),
+					*SlotOption.SlotName.ToString());
 				continue;
 			}
 
 			if (UMaterialInterface* Material = LoadRandomAsset(SlotOption.Materials, RandomStream))
 			{
 				FMTPedestrianSelectedMaterial& Selected = OutMaterials.AddDefaulted_GetRef();
-				Selected.SlotName = SlotOption.SlotName;
+				Selected.SlotName = ResolvedSlotName;
 				Selected.Material = Material;
 			}
 		}
@@ -291,3 +329,96 @@ FMTPedestrianGenerationConfig UMTPedestrianSpawnManager::MakeTestConfiguration()
 	Config.Female = TestPool;
 	return Config;
 }
+
+#if WITH_DEV_AUTOMATION_TESTS
+
+#include "Misc/AutomationTest.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FMTPedestrianMaterialSlotResolutionTest,
+	"MeowTractive.Pedestrian.MaterialSlotResolution",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FMTPedestrianMaterialSlotResolutionTest::RunTest(const FString& Parameters)
+{
+	USkeletalMesh* Legs02 = LoadObject<USkeletalMesh>(
+		nullptr,
+		TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/meshes/legs_02.legs_02"));
+	USkeletalMesh* Legs03 = LoadObject<USkeletalMesh>(
+		nullptr,
+		TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/meshes/legs_03.legs_03"));
+
+	TestNotNull(TEXT("legs_02 must load"), Legs02);
+	TestNotNull(TEXT("legs_03 must load"), Legs03);
+	if (!Legs02 || !Legs03)
+	{
+		return false;
+	}
+
+	TestEqual(
+		TEXT("legs_02 material asset name must resolve to actual shoe slot"),
+		ResolveMaterialSlotName(Legs02, TEXT("M_shoes01")),
+		FName(TEXT("M_Shoe02")));
+	TestEqual(
+		TEXT("legs_03 material asset name must resolve to actual shoe slot"),
+		ResolveMaterialSlotName(Legs03, TEXT("M_shoes03")),
+		FName(TEXT("M_Shoe02")));
+	TestEqual(
+		TEXT("actual slot name must remain valid"),
+		ResolveMaterialSlotName(Legs02, TEXT("M_Shoe02")),
+		FName(TEXT("M_Shoe02")));
+
+	TArray<TSoftObjectPtr<UMaterialInterface>> ShoeMaterials = {
+		TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(
+			TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/clothing/M_shoes01.M_shoes01"))),
+		TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(
+			TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/clothing/M_shoes03.M_shoes03")))
+	};
+	TSet<FName> SelectedMaterialNames;
+	for (int32 Seed = 0; Seed < 32; ++Seed)
+	{
+		FRandomStream RandomStream(Seed);
+		if (UMaterialInterface* Selected = LoadRandomAsset(ShoeMaterials, RandomStream))
+		{
+			SelectedMaterialNames.Add(Selected->GetFName());
+		}
+	}
+	TestTrue(TEXT("both configured shoe materials must be selected"), SelectedMaterialNames.Num() == 2);
+
+	USkeletalMesh* Head = LoadObject<USkeletalMesh>(
+		nullptr,
+		TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/meshes/head_N_1.head_N_1"));
+	USkeletalMesh* UpperBody = LoadObject<USkeletalMesh>(
+		nullptr,
+		TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/meshes/torso_01.torso_01"));
+	USkeletalMesh* Hands = LoadObject<USkeletalMesh>(
+		nullptr,
+		TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/meshes/hands_N_1.hands_N_1"));
+	TestNotNull(TEXT("head must load"), Head);
+	TestNotNull(TEXT("upper body must load"), UpperBody);
+	TestNotNull(TEXT("hands must load"), Hands);
+	if (!Head || !UpperBody || !Hands)
+	{
+		return false;
+	}
+
+	FSkeletalMeshMergeParams MergeParams;
+	MergeParams.MeshesToMerge = {UpperBody, Legs02, Head, Hands};
+	MergeParams.Skeleton = UpperBody->GetSkeleton();
+	MergeParams.bSkeletonBefore = MergeParams.Skeleton != nullptr;
+	USkeletalMesh* MergedMesh = USkeletalMergingLibrary::MergeMeshes(MergeParams);
+	TestNotNull(TEXT("legs_02 combination must merge"), MergedMesh);
+	if (MergedMesh)
+	{
+		const bool bHasResolvedShoeSlot = MergedMesh->GetMaterials().ContainsByPredicate(
+			[](const FSkeletalMaterial& Material)
+			{
+				return Material.MaterialSlotName == TEXT("M_Shoe02");
+			});
+		TestTrue(TEXT("merged mesh must preserve resolved shoe slot"), bHasResolvedShoeSlot);
+	}
+
+	return !HasAnyErrors();
+}
+
+#endif
