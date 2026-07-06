@@ -2,6 +2,7 @@
 #include "Game/MTGameState.h"
 #include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
+#include "GameFramework/PlayerState.h" 
 #include "Pedestrian/MTAttractiveComponent.h"
 #include "Item/MTItemData.h"
 #include "Pedestrian/MTPedestrianBase.h"
@@ -66,6 +67,16 @@ UMTItemData* AMTGameState::GetItemData(EMTItemType Type) const
 	return nullptr;
 }
 
+TArray<FPlayerScore> AMTGameState::GetSortedPlayerScores() const
+{
+	TArray<FPlayerScore> Sorted = PlayerScores;
+    Sorted.Sort([](const FPlayerScore& A, const FPlayerScore& B)
+    {
+        return A.AttractedCount > B.AttractedCount;
+    });
+    return Sorted;
+}
+
 void AMTGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
@@ -112,6 +123,22 @@ int32 AMTGameState::GetAttractedCount(APlayerState* TargetPlayerState) const
 void AMTGameState::OnRep_PlayerScores()
 {
     // UI 갱신 필요하면 여기서
+	OnPlayerScoresUpdated.Broadcast();
+
+	if (GEngine)
+    {
+        TArray<FPlayerScore> Sorted = GetSortedPlayerScores();
+        for (int32 i = 0; i < Sorted.Num(); ++i)
+        {
+            const FString PlayerName = Sorted[i].PlayerState ? Sorted[i].PlayerState->GetPlayerName()
+                : TEXT("Unknown");
+
+            const FString Line = FString::Printf(
+                TEXT("%d위 : %s - %d"), i + 1, *PlayerName, Sorted[i].AttractedCount);
+
+            GEngine->AddOnScreenDebugMessage(100 + i, 5.f, FColor::Green, Line);
+        }
+    }
 }
 
 void AMTGameState::RemoveAttractedCount(APlayerState* TargetPlayerState)
