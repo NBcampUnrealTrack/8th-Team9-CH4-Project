@@ -26,6 +26,7 @@ public class MeowTractive : ModuleRules
 			"UMG",
 			"Slate",
 			"SlateCore",
+			"SkeletalMerging",
 			//행인용 모듈
 			"NavigationSystem", "AIModule",
 			//StateTree (C++ 태스크용)

@@ -5,6 +5,7 @@
 #include "Player/MTPlayerController.h"
 #include "UI/InGame/MTPlayerHUD.h"
 #include "Pedestrian/MTPedestrianBase.h"
+#include "Pedestrian/MTPedestrianSpawnManager.h"
 #include "GameFramework/GameStateBase.h"
 #include "Kismet/GameplayStatics.h"
 #include "EngineUtils.h"
@@ -36,6 +37,8 @@ AMTMatchGameMode::AMTMatchGameMode()
 		FLinearColor(0.2f, 0.8f, 0.2f),
 		FLinearColor(1.f, 0.8f, 0.f),
 	};
+
+	PedestrianGenerationConfig = UMTPedestrianSpawnManager::MakeTestConfiguration();
 }
 
 void AMTMatchGameMode::PostLogin(APlayerController* NewPlayer)
@@ -125,7 +128,7 @@ void AMTMatchGameMode::UpdateMatchTimer()
 
 void AMTMatchGameMode::SpawnInitialPedestrians()
 {
-if (!NormalPedestrianClass) return;
+	if (!NormalPedestrianClass) return;
 
     UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
     if (!NavSys) return;
@@ -155,13 +158,12 @@ if (!NormalPedestrianClass) return;
         SpawnLocation.Z += 50.f;
 
         FRotator SpawnRotation = FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f);
-        FActorSpawnParameters SpawnParams;
-        SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AdjustIfPossibleButAlwaysSpawn;
-
-        if (APawn* SpawnedPed = GetWorld()->SpawnActor<APawn>(NormalPedestrianClass, SpawnLocation, SpawnRotation, SpawnParams))
-        {
-            SpawnedPed->SpawnDefaultController();
-        }
+		const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
+		UMTPedestrianSpawnManager::SpawnPedestrian(
+			this,
+			NormalPedestrianClass,
+			SpawnTransform,
+			PedestrianGenerationConfig);
     }
 }
 

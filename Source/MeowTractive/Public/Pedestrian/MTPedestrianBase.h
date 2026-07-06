@@ -4,6 +4,7 @@
 #include "AbilitySystemInterface.h"
 #include "GameplayTagContainer.h"
 #include "GameFramework/Character.h"
+#include "Pedestrian/MTPedestrianAppearanceTypes.h"
 #include "MTPedestrianBase.generated.h"
 
 class UAbilitySystemComponent;
@@ -29,6 +30,11 @@ public:
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 	virtual UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+
+	void SetAppearance(const FMTPedestrianAppearance& NewAppearance);
+
+	UFUNCTION(BlueprintPure, Category = "Pedestrian")
+	const FMTPedestrianAppearance& GetAppearance() const { return Appearance; }
 
 	// --- AttributeSet에서 호출 (서버) ---
 	void HandleAttractiveHit(APlayerState* Source, float Amount);
@@ -111,6 +117,12 @@ protected:
 
 	UPROPERTY(EditAnywhere, Category = "Attractive|UI")
 	float AttractiveBarVisibleDistance = 1500.f;
+
+	UPROPERTY(ReplicatedUsing = OnRep_Appearance, VisibleInstanceOnly, Category = "Pedestrian")
+	FMTPedestrianAppearance Appearance;
+
+	UFUNCTION()
+	void OnRep_Appearance();
 
 private:
 	bool bIsAttracted = false;
