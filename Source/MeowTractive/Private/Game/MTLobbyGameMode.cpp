@@ -1,13 +1,82 @@
 ﻿#include "Game/MTLobbyGameMode.h"
+#include "Game/MTLobbyGameState.h"
+#include "Game/MTGameInstance.h"
 #include "Player/MTPlayerState.h"
 #include "Player/MTPlayerController.h"
 #include "GameFramework/GameStateBase.h"
+#include "GameFramework/GameSession.h"
 
 AMTLobbyGameMode::AMTLobbyGameMode()
 {
 	bUseSeamlessTravel = true;
+	GameStateClass = AMTLobbyGameState::StaticClass();
 	PlayerStateClass = AMTPlayerState::StaticClass();
 	PlayerControllerClass = AMTPlayerController::StaticClass();
+
+	MatchMapPaths.Add(EMTRoomMap::Insadong, TEXT("/Game/Map/Map_Insa/Prototype_Insadong"));
+}
+
+void AMTLobbyGameMode::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// 방 생성 시 GameInstance에 저장된 설정을 로비 GameState로 (전 클라 복제)
+	if (AMTLobbyGameState* GS = GetGameState<AMTLobbyGameState>())
+	{
+		if (const UMTGameInstance* GI = Cast<UMTGameInstance>(GetGameInstance()))
+		{
+			GS->SetRoomSettings(GI->GetRoomSettings());
+		}
+	}
+}
+
+void AMTLobbyGameMode::ApplyRoomSettings(AController* Requestor, FMTRoomSettings NewSettings)
+{
+	// 호스트 검증: 리슨 서버에서 로컬 컨트롤러 = 방장
+	if (!Requestor || !Requestor->IsLocalController())
+	{
+		return;
+	}
+
+	AMTLobbyGameState* GS = GetGameState<AMTLobbyGameState>();
+	if (!GS)
+	{
+		return;
+	}
+
+	// 이름 비우면 기존 이름 유지
+	if (NewSettings.RoomName.TrimStartAndEnd().IsEmpty())
+	{
+		NewSettings.RoomName = GS->GetRoomName();
+	}
+
+	GS->SetRoomSettings(NewSettings);   // 전 클라 복제 (플레이어는 그대로)
+
+	// 세션 광고 갱신 (검색 목록에 새 이름/설정 반영)
+	if (UMTGameInstance* GI = Cast<UMTGameInstance>(GetGameInstance()))
+	{
+		GI->ApplyRoomSettings(NewSettings);
+	}
+}
+
+void AMTLobbyGameMode::KickPlayer(AController* Requestor, APlayerState* Target)
+{
+	if (!Requestor || !Requestor->IsLocalController() || !Target)
+	{
+		return;   // 호스트만 강퇴 가능
+	}
+
+	APlayerController* TargetPC = Target->GetPlayerController();
+	if (!TargetPC || TargetPC->IsLocalController())
+	{
+		return;   // 호스트 자신은 강퇴 불가
+	}
+
+	if (GameSession)
+	{
+		GameSession->KickPlayer(TargetPC, FText::FromString(TEXT("방장에 의해 강퇴되었습니다.")));
+	}
+	// 슬롯 반환은 Logout에서 처리됨
 }
 
 void AMTLobbyGameMode::PostLogin(APlayerController* NewPlayer)
@@ -88,14 +157,35 @@ bool AMTLobbyGameMode::CanStartMatch() const
 	return true;
 }
 
+FString AMTLobbyGameMode::ResolveMatchMapPath() const
+{
+	const AMTLobbyGameState* GS = GetGameState<AMTLobbyGameState>();
+	const EMTRoomMap Selected = GS ? GS->GetRoomMap() : EMTRoomMap::Insadong;
+
+	if (Selected == EMTRoomMap::Random)
+	{
+		TArray<FString> Candidates;
+		MatchMapPaths.GenerateValueArray(Candidates);
+		if (Candidates.Num() > 0)
+		{
+			return Candidates[FMath::RandRange(0, Candidates.Num() - 1)];
+		}
+	}
+	else if (const FString* Found = MatchMapPaths.Find(Selected))
+	{
+		return *Found;
+	}
+	return NextMapPath;   // 폴백
+}
+
 void AMTLobbyGameMode::TryStartMatch()
 {
 	if (!HasAuthority() || !CanStartMatch())
 	{
 		return;
 	}
-	// 리슨 서버로 전환 (M2에서 세션 잠금·입력 차단·Trans_Map으로 확장)
-	GetWorld()->ServerTravel(NextMapPath + TEXT("?listen"));
+	// 방 설정의 맵으로 리슨 서버 전환
+	GetWorld()->ServerTravel(ResolveMatchMapPath() + TEXT("?listen"));
 }
 
 int32 AMTLobbyGameMode::AcquireSlot()

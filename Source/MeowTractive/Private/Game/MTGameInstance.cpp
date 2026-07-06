@@ -4,6 +4,7 @@
 #include "Online/MTSessionData.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/Engine.h"
+#include "Engine/LocalPlayer.h"
 #include "Misc/PackageName.h"
 
 // 로그 + 화면 동시 출력. bForce=true면 MT.Log 토글 무시 (수동 명령용)
@@ -55,17 +56,46 @@ void UMTGameInstance::Shutdown()
 	Super::Shutdown();
 }
 
-void UMTGameInstance::HostGame(int32 NumPublicConnections, bool bIsLAN)
+void UMTGameInstance::HostGame(FMTRoomSettings RoomSettings, int32 NumPublicConnections, bool bIsLAN)
 {
-	MTScreen(FColor::Cyan, FString::Printf(TEXT("[MTHost] HostGame (Conn=%d, LAN=%d, SS=%d)"),
-		NumPublicConnections, bIsLAN ? 1 : 0, SessionSubsystem ? 1 : 0));
+	// 방이름 미입력 → 호스트 닉네임
+	if (RoomSettings.RoomName.TrimStartAndEnd().IsEmpty())
+	{
+		const ULocalPlayer* LP = GetFirstGamePlayer();
+		RoomSettings.RoomName = LP ? LP->GetNickname() : TEXT("MeowTractive");
+	}
+	CurrentRoomSettings = RoomSettings;
+
+	MTScreen(FColor::Cyan, FString::Printf(TEXT("[MTHost] HostGame '%s' (PW=%d, Mode=%d, Map=%d, Conn=%d, LAN=%d)"),
+		*RoomSettings.RoomName, RoomSettings.HasPassword() ? 1 : 0,
+		(int32)RoomSettings.GameMode, (int32)RoomSettings.Map, NumPublicConnections, bIsLAN ? 1 : 0));
+
 	if (SessionSubsystem)
 	{
-		SessionSubsystem->CreateSession(NumPublicConnections, bIsLAN);
+		SessionSubsystem->CreateSession(NumPublicConnections, bIsLAN, RoomSettings);
 	}
 	else
 	{
 		MTScreen(FColor::Red, TEXT("[MTHost] SessionSubsystem null → 방생성 불가"));
+	}
+}
+
+void UMTGameInstance::ApplyRoomSettings(const FMTRoomSettings& NewSettings)
+{
+	CurrentRoomSettings = NewSettings;
+	if (SessionSubsystem)
+	{
+		SessionSubsystem->UpdateRoomSettings(NewSettings);
+	}
+}
+
+void UMTGameInstance::SetPendingDisconnectMessage(const FText& Message)
+{
+	// 먼저 온 구체적 사유(강퇴 등)를 나중의 일반 사유가 덮지 않게
+	if (!bHasPendingDisconnect)
+	{
+		PendingDisconnectMessage = Message;
+		bHasPendingDisconnect = true;
 	}
 }
 
@@ -90,12 +120,41 @@ void UMTGameInstance::LeaveGame()
 	}
 }
 
-void UMTGameInstance::JoinSessionData(UMTSessionData* Data)
+void UMTGameInstance::JoinSessionData(UMTSessionData* Data, const FString& Password)
 {
-	if (SessionSubsystem && Data)
+	if (!SessionSubsystem || !Data)
 	{
-		SessionSubsystem->JoinSession(Data->Result);
+		return;
 	}
+
+	// 간이 비밀번호 검증 (초대 수락 경로는 서브시스템 직행이라 검증 없음)
+	if (Data->bHasPassword && !Password.Equals(Data->AdvertisedPassword))
+	{
+		OnJoinFailed.Broadcast(FText::FromString(TEXT("비밀번호가 틀렸습니다.")));
+		return;
+	}
+
+	SessionSubsystem->JoinSession(Data->Result);
+}
+
+void UMTGameInstance::JoinSessionByName(const FString& RoomName, const FString& Password)
+{
+	const FString Trimmed = RoomName.TrimStartAndEnd();
+	if (Trimmed.IsEmpty())
+	{
+		OnJoinFailed.Broadcast(FText::FromString(TEXT("방 이름을 입력해 주세요.")));
+		return;
+	}
+
+	for (UMTSessionData* Data : FoundSessions)
+	{
+		if (Data && Data->ServerName.Equals(Trimmed, ESearchCase::IgnoreCase))
+		{
+			JoinSessionData(Data, Password);
+			return;
+		}
+	}
+	OnJoinFailed.Broadcast(FText::FromString(TEXT("해당 이름의 방을 찾을 수 없습니다.\n새로고침 후 다시 시도해 주세요.")));
 }
 
 void UMTGameInstance::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString)
@@ -121,8 +180,8 @@ void UMTGameInstance::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver,
 		Reason = TEXT("세션 연결이 종료되었습니다.");
 		break;
 	}
-	PendingDisconnectMessage = FText::FromString(Reason + TEXT("\n메인 메뉴로 돌아갑니다."));
-	bHasPendingDisconnect = true;
+	// 강퇴 등 먼저 기록된 구체 사유가 있으면 유지됨
+	SetPendingDisconnectMessage(FText::FromString(Reason + TEXT("\n메인 메뉴로 돌아갑니다.")));
 
 	MTScreen(FColor::Red, FString::Printf(TEXT("[MTFlow] NetworkError(%d) → 메인메뉴 복귀"), (int32)FailureType));
 
@@ -180,16 +239,44 @@ void UMTGameInstance::HandleFindSessions(const TArray<FOnlineSessionSearchResult
 		{
 			UMTSessionData* Data = NewObject<UMTSessionData>(this);
 			Data->Result = Result;
-			Data->ServerName = Result.Session.OwningUserName;
 			Data->PingMs = Result.PingInMs;
 			Data->MaxSlots = Result.Session.SessionSettings.NumPublicConnections;
 			Data->OpenSlots = Result.Session.NumOpenPublicConnections;
 			Data->CurrentPlayers = FMath::Max(0, Data->MaxSlots - Data->OpenSlots);
+
+			// 방 설정 광고값 읽기 (없으면 기본값 유지)
+			FString RoomName;
+			Result.Session.SessionSettings.Get(FName("ROOMNAME"), RoomName);
+			Data->ServerName = RoomName.IsEmpty() ? Result.Session.OwningUserName : RoomName;
+
+			int32 HasPw = 0, ModeInt = 0, MapInt = 0;
+			Result.Session.SessionSettings.Get(FName("HASPW"), HasPw);
+			Result.Session.SessionSettings.Get(FName("PW"), Data->AdvertisedPassword);
+			Result.Session.SessionSettings.Get(FName("ROOMMODE"), ModeInt);
+			Result.Session.SessionSettings.Get(FName("ROOMMAP"), MapInt);
+			Data->bHasPassword = HasPw != 0;
+			Data->GameMode = (EMTRoomGameMode)ModeInt;
+			Data->Map = (EMTRoomMap)MapInt;
+
 			FoundSessions.Add(Data);   // GC 방지 캐시
 			Sessions.Add(Data);
+		}
 
-			MTScreen(FColor::Cyan, FString::Printf(TEXT("[MTFind]  #%d %s | 인원 %d/%d | %dms"),
-				Sessions.Num() - 1, *Data->ServerName, Data->CurrentPlayers, Data->MaxSlots, Data->PingMs));
+		// 공개방 먼저, 같은 그룹 안에선 핑 낮은 순
+		Sessions.Sort([](const UMTSessionData& A, const UMTSessionData& B)
+		{
+			if (A.bHasPassword != B.bHasPassword)
+			{
+				return !A.bHasPassword;
+			}
+			return A.PingMs < B.PingMs;
+		});
+
+		for (int32 i = 0; i < Sessions.Num(); ++i)
+		{
+			MTScreen(FColor::Cyan, FString::Printf(TEXT("[MTFind]  #%d %s | 인원 %d/%d | %dms | PW=%d"),
+				i, *Sessions[i]->ServerName, Sessions[i]->CurrentPlayers, Sessions[i]->MaxSlots,
+				Sessions[i]->PingMs, Sessions[i]->bHasPassword ? 1 : 0));
 		}
 	}
 	MTScreen(Sessions.Num() > 0 ? FColor::Green : FColor::Orange,
@@ -213,7 +300,30 @@ void UMTGameInstance::HandleJoinSession(EOnJoinSessionCompleteResult::Type Resul
 		{
 			PC->ClientTravel(Address, TRAVEL_Absolute);
 		}
+		return;
 	}
+
+	// 실패 사유 → 안내 문구 (메뉴가 OnJoinFailed 구독 → MessageDialog 표시)
+	FString Reason;
+	switch (Result)
+	{
+	case EOnJoinSessionCompleteResult::SessionIsFull:
+		Reason = TEXT("방이 가득 찼습니다.");
+		break;
+	case EOnJoinSessionCompleteResult::SessionDoesNotExist:
+		Reason = TEXT("세션이 더 이상 존재하지 않습니다.\n목록을 새로고침해 주세요.");
+		break;
+	case EOnJoinSessionCompleteResult::AlreadyInSession:
+		Reason = TEXT("이미 세션에 참가해 있습니다.");
+		break;
+	case EOnJoinSessionCompleteResult::CouldNotRetrieveAddress:
+	default:
+		Reason = TEXT("세션 참가에 실패했습니다.");
+		break;
+	}
+
+	MTScreen(FColor::Orange, FString::Printf(TEXT("[MTFlow] Join 실패 (Result=%d): %s"), (int32)Result, *Reason));
+	OnJoinFailed.Broadcast(FText::FromString(Reason));
 }
 
 void UMTGameInstance::MTHostInfo()

@@ -23,6 +23,46 @@ enum class EMTMatchPhase : uint8
 	PostMatch,
 };
 
+// 방 게임모드 (세션 설정으로 광고. 팀전/고양이전투는 자리만)
+UENUM(BlueprintType)
+enum class EMTRoomGameMode : uint8
+{
+	FFA      UMETA(DisplayName = "개인전"),
+	Team     UMETA(DisplayName = "팀전"),
+	CatFight UMETA(DisplayName = "고양이 전투"),
+};
+
+// 매치 맵 선택
+UENUM(BlueprintType)
+enum class EMTRoomMap : uint8
+{
+	Insadong UMETA(DisplayName = "인사동"),
+	Random   UMETA(DisplayName = "랜덤"),
+};
+
+// 방 설정 (생성/로비 변경 공용)
+USTRUCT(BlueprintType)
+struct FMTRoomSettings
+{
+	GENERATED_BODY()
+
+	// 비어 있으면 호스트 닉네임 사용
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MT|Session")
+	FString RoomName;
+
+	// 비어 있으면 공개방
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MT|Session")
+	FString Password;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MT|Session")
+	EMTRoomGameMode GameMode = EMTRoomGameMode::FFA;
+
+	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MT|Session")
+	EMTRoomMap Map = EMTRoomMap::Insadong;
+
+	bool HasPassword() const { return !Password.IsEmpty(); }
+};
+
 USTRUCT(BlueprintType)
 struct FMTPlayerResult
 {

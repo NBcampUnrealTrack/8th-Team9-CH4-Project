@@ -3,6 +3,7 @@
 #include "UI/InGame/MTMatchGameResultWidget.h"
 #include "Game/MTLobbyGameMode.h"
 #include "Game/MTMatchGameMode.h"
+#include "Game/MTGameInstance.h"
 
 void AMTPlayerController::Server_SetSelectedCat_Implementation(EMTCatType NewCat)
 {
@@ -35,6 +36,34 @@ void AMTPlayerController::Server_RequestStartMatch_Implementation()
 	if (AMTLobbyGameMode* Lobby = GetWorld() ? GetWorld()->GetAuthGameMode<AMTLobbyGameMode>() : nullptr)
 	{
 		Lobby->TryStartMatch();
+	}
+}
+
+void AMTPlayerController::Server_UpdateRoomSettings_Implementation(FMTRoomSettings NewSettings)
+{
+	// 호스트 검증·적용은 GameMode가 담당
+	if (AMTLobbyGameMode* Lobby = GetWorld() ? GetWorld()->GetAuthGameMode<AMTLobbyGameMode>() : nullptr)
+	{
+		Lobby->ApplyRoomSettings(this, NewSettings);
+	}
+}
+
+void AMTPlayerController::Server_KickPlayer_Implementation(APlayerState* TargetPlayer)
+{
+	if (AMTLobbyGameMode* Lobby = GetWorld() ? GetWorld()->GetAuthGameMode<AMTLobbyGameMode>() : nullptr)
+	{
+		Lobby->KickPlayer(this, TargetPlayer);
+	}
+}
+
+void AMTPlayerController::ClientWasKicked_Implementation(const FText& KickReason)
+{
+	// 메인메뉴 복귀 시 MessageDialog가 이 사유를 표시 (ConsumeDisconnectMessage)
+	if (UMTGameInstance* GI = GetGameInstance<UMTGameInstance>())
+	{
+		GI->SetPendingDisconnectMessage(KickReason.IsEmpty()
+			? FText::FromString(TEXT("방장에 의해 강퇴되었습니다."))
+			: KickReason);
 	}
 }
 

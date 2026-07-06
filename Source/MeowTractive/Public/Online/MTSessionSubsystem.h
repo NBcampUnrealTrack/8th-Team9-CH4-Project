@@ -6,6 +6,7 @@
 #include "Subsystems/GameInstanceSubsystem.h"
 #include "Interfaces/OnlineSessionInterface.h"
 #include "OnlineSessionSettings.h"
+#include "Game/MTTypes.h"
 #include "MTSessionSubsystem.generated.h"
 
 // 세션 생성, 검색, 참가 완료 시 델리게이트 선언
@@ -28,9 +29,12 @@ public:
 	// 종료 시 세션 인터페이스 참조 해제 (Null OSS의 IsUnique ensure 방지)
 	virtual void Deinitialize() override;
 
-	// 방 생성
+	// 방 생성 (방이름/비번/모드/맵은 세션 설정으로 광고)
 	UFUNCTION(BlueprintCallable, Category = "MT|Session")
-	void CreateSession(int32 NumPublicConnections, bool bIsLAN);
+	void CreateSession(int32 NumPublicConnections, bool bIsLAN, const FMTRoomSettings& RoomSettings);
+
+	// 로비 중 방 설정 변경 → 세션 광고 갱신 (호스트 전용)
+	void UpdateRoomSettings(const FMTRoomSettings& RoomSettings);
 
 	// 방 검색
 	UFUNCTION(BlueprintCallable, Category = "MT|Session")
@@ -70,6 +74,9 @@ protected:
 	void HandleSessionUserInviteAccepted(const bool bWasSuccessful, const int32 ControllerId, FUniqueNetIdPtr UserId, const FOnlineSessionSearchResult& InviteResult);
 
 private:
+	// 방 설정을 세션 광고 키로 기록 (Create/Update 공용)
+	static void ApplyRoomSettingsTo(FOnlineSessionSettings& Settings, const FMTRoomSettings& Room);
+
 	IOnlineSessionPtr SessionInterface; // 온라인 세션 인터페이스
 	TSharedPtr<FOnlineSessionSearch> LastSessionSearch; // 마지막 세션 검색 결과 저장
 	TSharedPtr<FOnlineSessionSettings> LastSessionSettings; // 마지막 세션 설정 저장

@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "CommonActivatableWidget.h"
+#include "Game/MTTypes.h"
 #include "MTMenuWidget.generated.h"
 
 class UMTGameInstance;
@@ -16,9 +17,13 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MT|Menu")
 	void MenuSetup(int32 NumPublicConnections = 4, bool bIsLAN = false);
 
-	// 버튼 OnClicked → Flow에 의도 전달
+	// 버튼 OnClicked → Flow에 의도 전달 (기본 설정 빠른 호스트)
 	UFUNCTION(BlueprintCallable, Category = "MT|Menu")
 	void HostButtonClicked();
+
+	// 방생성 창의 설정으로 호스트 (Conn/LAN은 MenuSetup 값 사용)
+	UFUNCTION(BlueprintCallable, Category = "MT|Menu")
+	void HostWithSettings(FMTRoomSettings RoomSettings);
 
 	UFUNCTION(BlueprintCallable, Category = "MT|Menu")
 	void JoinButtonClicked();
