@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
 #include "Interfaces/OnlineSessionInterface.h"
+#include "Game/MTTypes.h"
 #include "MTGameInstance.generated.h"
 
 class UMTSessionSubsystem;
@@ -12,6 +13,7 @@ class UMTSessionData;
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnHostResult, bool, bSuccess);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnSearchResult, int32, NumFound);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnJoinResult, bool, bSuccess);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnJoinFailed, FText, Reason);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnSessionsFound, const TArray<UMTSessionData*>&, Sessions);
 
 /** 온라인 플로 코디네이터: 세션 이벤트 구독 → 트래블 오케스트레이션. (위젯/서브시스템은 트래블 안 함) */
@@ -24,9 +26,9 @@ public:
 	virtual void Init() override;
 	virtual void Shutdown() override;
 
-	// UI가 전달하는 "의도"
+	// UI가 전달하는 "의도" — 방이름 비면 호스트 닉네임, 비번 비면 공개방
 	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
-	void HostGame(int32 NumPublicConnections = 4, bool bIsLAN = false);
+	void HostGame(FMTRoomSettings RoomSettings, int32 NumPublicConnections = 4, bool bIsLAN = false);
 
 	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
 	void JoinGame(bool bIsLAN = false);
@@ -35,9 +37,23 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
 	void LeaveGame();
 
-	// 서버 브라우저에서 선택한 세션 참가
+	// 서버 브라우저에서 선택한 세션 참가 (비밀번호 방이면 Password 필요. 초대 경로는 검증 없음)
 	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
-	void JoinSessionData(UMTSessionData* Data);
+	void JoinSessionData(UMTSessionData* Data, const FString& Password = TEXT(""));
+
+	// 방 이름으로 참가 (마지막 검색 결과에서 대소문자 무시 검색)
+	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
+	void JoinSessionByName(const FString& RoomName, const FString& Password);
+
+	// 현재 방 설정 (호스트 로컬 기준. 로비 표시는 MTLobbyGameState 복제값 사용)
+	UFUNCTION(BlueprintPure, Category = "MT|Flow")
+	FMTRoomSettings GetRoomSettings() const { return CurrentRoomSettings; }
+
+	// 로비에서 방 설정 변경 시 세션 광고 갱신 (LobbyGameMode가 호출)
+	void ApplyRoomSettings(const FMTRoomSettings& NewSettings);
+
+	// 강퇴 등 외부 사유로 메뉴 복귀 시 표시할 메시지 지정 (이미 있으면 유지)
+	void SetPendingDisconnectMessage(const FText& Message);
 
 	// 세션 튕김/종료로 메뉴 복귀 시 대기 중인 안내 메시지를 1회 소비 — 메뉴 위젯이 Construct에서 호출
 	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
@@ -54,6 +70,10 @@ public:
 	FMTOnSearchResult OnSearchResult;
 	UPROPERTY(BlueprintAssignable, Category = "MT|Flow")
 	FMTOnJoinResult OnJoinResult;
+
+	// 참가 실패 시 사유 텍스트 (메뉴가 구독해 MessageDialog로 표시)
+	UPROPERTY(BlueprintAssignable, Category = "MT|Flow")
+	FMTOnJoinFailed OnJoinFailed;
 
 	// 검색된 세션 목록 (서버 브라우저가 구독)
 	UPROPERTY(BlueprintAssignable, Category = "MT|Flow")
@@ -87,6 +107,9 @@ private:
 	// 메뉴 복귀 시 표시할 튕김 안내 (1회 소비)
 	FText PendingDisconnectMessage;
 	bool bHasPendingDisconnect = false;
+
+	// 호스트가 만든/변경한 방 설정 (로비 GameState 초기화·세션 광고 갱신용)
+	FMTRoomSettings CurrentRoomSettings;
 
 	FDelegateHandle NetworkFailureHandle;
 };

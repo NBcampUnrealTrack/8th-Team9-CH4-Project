@@ -38,7 +38,27 @@ void UMTSessionSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-void UMTSessionSubsystem::CreateSession(int32 NumPublicConnections, bool bIsLAN)
+void UMTSessionSubsystem::ApplyRoomSettingsTo(FOnlineSessionSettings& Settings, const FMTRoomSettings& Room)
+{
+	Settings.Set(FName("ROOMNAME"), Room.RoomName, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+	Settings.Set(FName("HASPW"), Room.HasPassword() ? 1 : 0, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+	// 간이 검증용 평문 광고 — 파티게임 스코프. 강한 보안 필요 시 서버측 PreLogin 검증으로 교체
+	Settings.Set(FName("PW"), Room.Password, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+	Settings.Set(FName("ROOMMODE"), (int32)Room.GameMode, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+	Settings.Set(FName("ROOMMAP"), (int32)Room.Map, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+}
+
+void UMTSessionSubsystem::UpdateRoomSettings(const FMTRoomSettings& RoomSettings)
+{
+	if (!SessionInterface.IsValid() || !LastSessionSettings.IsValid())
+	{
+		return;
+	}
+	ApplyRoomSettingsTo(*LastSessionSettings, RoomSettings);
+	SessionInterface->UpdateSession(NAME_GameSession, *LastSessionSettings, true);
+}
+
+void UMTSessionSubsystem::CreateSession(int32 NumPublicConnections, bool bIsLAN, const FMTRoomSettings& RoomSettings)
 {
 	const ULocalPlayer* LocalPlayer = GetGameInstance() ? GetGameInstance()->GetFirstGamePlayer() : nullptr;
 	if (!SessionInterface.IsValid() || !LocalPlayer)
@@ -67,6 +87,7 @@ void UMTSessionSubsystem::CreateSession(int32 NumPublicConnections, bool bIsLAN)
 	LastSessionSettings->bUseLobbiesIfAvailable = bUseSteamFeatures;
 	LastSessionSettings->BuildUniqueId = 1;
 	LastSessionSettings->Set(FName("MatchType"), MatchType, EOnlineDataAdvertisementType::ViaOnlineServiceAndPing);
+	ApplyRoomSettingsTo(*LastSessionSettings, RoomSettings);
 	// 세션 생성 완료 델리게이트 등록
 	CreateSessionCompleteDelegateHandle = SessionInterface->AddOnCreateSessionCompleteDelegate_Handle(CreateSessionCompleteDelegate);
 

@@ -36,10 +36,16 @@ void UMTMenuWidget::MenuSetup(int32 NumPublicConnections, bool bIsLAN)
 
 void UMTMenuWidget::HostButtonClicked()
 {
-	MTMenuScreen(FColor::Cyan, FString::Printf(TEXT("[MTMenu] HostButtonClicked (GameFlow=%d)"), GameFlow ? 1 : 0));
+	HostWithSettings(FMTRoomSettings());   // 기본 설정 (이름=닉네임, 공개방, 개인전, 인사동)
+}
+
+void UMTMenuWidget::HostWithSettings(FMTRoomSettings RoomSettings)
+{
+	MTMenuScreen(FColor::Cyan, FString::Printf(TEXT("[MTMenu] HostWithSettings '%s' (GameFlow=%d)"),
+		*RoomSettings.RoomName, GameFlow ? 1 : 0));
 	if (GameFlow)
 	{
-		GameFlow->HostGame(NumConnections, bUseLAN);
+		GameFlow->HostGame(RoomSettings, NumConnections, bUseLAN);
 	}
 	else
 	{

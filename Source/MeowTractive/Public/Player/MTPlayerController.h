@@ -5,8 +5,6 @@
 #include "Game/MTTypes.h"
 #include "MTPlayerController.generated.h"
 
-class UMTPlayerWidget;
-
 UCLASS()
 class MEOWTRACTIVE_API AMTPlayerController : public APlayerController
 {
@@ -27,22 +25,24 @@ public:
 	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "MT|Match")
 	void Server_ReturnToLobby();
 
+	// 로비 방 설정 변경 (호스트만 — GameMode가 검증)
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "MT|Lobby")
+	void Server_UpdateRoomSettings(FMTRoomSettings NewSettings);
+
+	// 강퇴 요청 (호스트만 — GameMode가 검증)
+	UFUNCTION(BlueprintCallable, Server, Reliable, Category = "MT|Lobby")
+	void Server_KickPlayer(APlayerState* TargetPlayer);
+
+	// 강퇴 통보 → 메뉴 복귀 시 MessageDialog로 표시되게 사유 저장
+	virtual void ClientWasKicked_Implementation(const FText& KickReason) override;
+
 	UFUNCTION(Client, Reliable)
 	void ClientShowResult();
 
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
 	TSubclassOf<class UMTMatchGameResultWidget> ResultWidgetClass;
 
-	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
-	TSubclassOf<UMTPlayerWidget> PlayerWidgetClass;
-
-protected:
-	virtual void BeginPlay() override;
-
 private:
 	float LastReadyToggleTime = -100.f;     // 서버 쿨다운 기준 시각
 	static constexpr float ReadyCooldown = 0.5f;
-
-	UPROPERTY()
-	TObjectPtr<UMTPlayerWidget> PlayerWidget;
 };
