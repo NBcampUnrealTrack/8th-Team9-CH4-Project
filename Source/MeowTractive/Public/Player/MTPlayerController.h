@@ -5,6 +5,8 @@
 #include "Game/MTTypes.h"
 #include "MTPlayerController.generated.h"
 
+class UMTPlayerWidget;
+
 UCLASS()
 class MEOWTRACTIVE_API AMTPlayerController : public APlayerController
 {
@@ -42,7 +44,16 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
 	TSubclassOf<class UMTMatchGameResultWidget> ResultWidgetClass;
 
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TSubclassOf<UMTPlayerWidget> PlayerWidgetClass;
+
+protected:
+	virtual void BeginPlay() override;
+
 private:
 	float LastReadyToggleTime = -100.f;     // 서버 쿨다운 기준 시각
 	static constexpr float ReadyCooldown = 0.5f;
+
+	UPROPERTY()
+	TObjectPtr<UMTPlayerWidget> PlayerWidget;
 };
