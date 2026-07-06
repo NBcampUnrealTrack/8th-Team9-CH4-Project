@@ -17,7 +17,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MT|Menu")
 	void MenuSetup(int32 NumPublicConnections = 4, bool bIsLAN = false);
 
-	// 버튼 OnClicked → Flow에 의도 전달 (기본 설정 빠른 호스트)
+	// 빠른 시작: 참가 가능한 공개방 있으면 참가, 없으면 기본 설정 방 생성
 	UFUNCTION(BlueprintCallable, Category = "MT|Menu")
 	void HostButtonClicked();
 
