@@ -5,6 +5,7 @@
 #include "GA_Dash.generated.h"
 
 class UGameplayEffect;
+class UAbilitySystemComponent;
 
 UCLASS()
 class MEOWTRACTIVE_API UGA_Dash : public UGameplayAbility
@@ -62,6 +63,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Dash|Hit")
 	bool bDrawDebug = false;
 
+	// 충전 1개 재충전에 걸리는 시간 (s). 순차 충전 — 최대 미만이면 반복
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Dash|Charge", meta = (ClampMin = "0.0"))
+	float RechargeInterval = 10.f;
+
 public:
 	UFUNCTION()
 	void OnDashFinished();
@@ -70,7 +75,22 @@ private:
 	// 대시 중 주기 충돌 판정 (서버)
 	void CheckDashHit();
 
+	// 충전 미만이고 타이머 미가동이면 재충전 타이머 시작 (서버, 순차)
+	void EnsureRechargeTimerRunning();
+
+	// 타이머를 ASC에 바인딩해 EndAbility의 ClearAllTimersForObject(this)에서 살아남게 함
+	void ArmRechargeTimer(UAbilitySystemComponent* ASC, UWorld* World);
+
+	// 재충전 1회: +1 충전 후 아직 최대 미만이면 다음 충전 재예약 (서버)
+	void OnRechargeTick();
+
 	FTimerHandle HitTimerHandle;
+
+	// 충전 재충전 타이머. 대시 EndAbility 이후에도 유지되어야 함 (인스턴스 퍼 액터)
+	FTimerHandle RechargeTimerHandle;
+
+	// 재충전 타이머는 EndAbility 후에 발동됨 → ActorInfo 대신 캐시한 ASC를 사용 (서버)
+	TWeakObjectPtr<UAbilitySystemComponent> CachedASC;
 
 	// 이번 대시에 이미 맞은 대상 (중복 방지). 서버 전용, GC 대비 약참조.
 	TSet<TWeakObjectPtr<AActor>> HitActors;

@@ -13,10 +13,16 @@ UMTPlayerAttributeSet::UMTPlayerAttributeSet()
 	InitStamina(100.f);
 	InitMaxStamina(100.f);
 	InitEyeBeamRange(1.f);
+	InitMaxDashCharges(3.f);
+	InitDashCharges(3.f);
 }
 
 void UMTPlayerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
+	// GameplayDebugger(shift+' → 3)가 RepLayout 생성 전에 직접 호출하면 RepIndex가 전부 0이라
+	// 혼합 조건(None/OwnerOnly) assert로 크래시 → 선초기화 (플래그 가드로 1회만 수행됨)
+	GetClass()->SetUpRuntimeReplicationData();
+
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	// Hp는 적 머리 위 체력바 등으로 모두가 볼 수 있게. 스태미나는 본인만.
 	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, Hp, COND_None, REPNOTIFY_Always);
@@ -25,6 +31,9 @@ void UMTPlayerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, MaxStamina, COND_OwnerOnly, REPNOTIFY_Always);
 	// 소유 클라가 눈빛 어빌리티 예측 시 올바른 사거리 계산에 필요
 	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, EyeBeamRange, COND_None, REPNOTIFY_Always);
+	// 대시 충전: 본인 HUD 표시 + 소유 클라 Cost GE 예측용
+	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, DashCharges, COND_OwnerOnly, REPNOTIFY_Always);
+	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, MaxDashCharges, COND_OwnerOnly, REPNOTIFY_Always);
 }
 
 void UMTPlayerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
@@ -38,6 +47,10 @@ void UMTPlayerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribu
 	else if (Attribute == GetStaminaAttribute())
 	{
 		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxStamina());
+	}
+	else if (Attribute == GetDashChargesAttribute())
+	{
+		NewValue = FMath::Clamp(NewValue, 0.f, GetMaxDashCharges());
 	}
 }
 
@@ -112,4 +125,14 @@ void UMTPlayerAttributeSet::OnRep_MaxStamina(const FGameplayAttributeData& OldVa
 void UMTPlayerAttributeSet::OnRep_EyeBeamRange(const FGameplayAttributeData& OldValue)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UMTPlayerAttributeSet, EyeBeamRange, OldValue);
+}
+
+void UMTPlayerAttributeSet::OnRep_DashCharges(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UMTPlayerAttributeSet, DashCharges, OldValue);
+}
+
+void UMTPlayerAttributeSet::OnRep_MaxDashCharges(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UMTPlayerAttributeSet, MaxDashCharges, OldValue);
 }

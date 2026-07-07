@@ -25,6 +25,8 @@ public:
 	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, MaxStamina);
 	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, IncomingDamage);
 	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, EyeBeamRange);
+	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, DashCharges);
+	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, MaxDashCharges);
 
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
@@ -51,6 +53,14 @@ private:
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_EyeBeamRange, Category = "MT|Stat", meta = (AllowPrivateAccess = "true"))
 	FGameplayAttributeData EyeBeamRange;
 
+	// 대시 충전 (0~MaxDashCharges). Cost GE가 -1, 재충전 타이머가 +1
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_DashCharges, Category = "MT|Stat", meta = (AllowPrivateAccess = "true"))
+	FGameplayAttributeData DashCharges;
+
+	// 대시 최대 충전 수 (기본 3). 버프로 증가 가능
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MaxDashCharges, Category = "MT|Stat", meta = (AllowPrivateAccess = "true"))
+	FGameplayAttributeData MaxDashCharges;
+
 	UFUNCTION()
 	void OnRep_Hp(const FGameplayAttributeData& OldValue);
 
@@ -65,4 +75,10 @@ private:
 
 	UFUNCTION()
 	void OnRep_EyeBeamRange(const FGameplayAttributeData& OldValue);
+
+	UFUNCTION()
+	void OnRep_DashCharges(const FGameplayAttributeData& OldValue);
+
+	UFUNCTION()
+	void OnRep_MaxDashCharges(const FGameplayAttributeData& OldValue);
 };
