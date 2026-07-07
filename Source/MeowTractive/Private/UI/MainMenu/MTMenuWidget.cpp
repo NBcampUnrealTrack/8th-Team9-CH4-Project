@@ -36,7 +36,16 @@ void UMTMenuWidget::MenuSetup(int32 NumPublicConnections, bool bIsLAN)
 
 void UMTMenuWidget::HostButtonClicked()
 {
-	HostWithSettings(FMTRoomSettings());   // 기본 설정 (이름=닉네임, 공개방, 개인전, 인사동)
+	// 빠른 시작: 참가 가능한 공개방 검색 → 있으면 참가, 없으면 기본 설정으로 방 생성
+	MTMenuScreen(FColor::Cyan, FString::Printf(TEXT("[MTMenu] QuickStart (GameFlow=%d)"), GameFlow ? 1 : 0));
+	if (GameFlow)
+	{
+		GameFlow->QuickStart(NumConnections, bUseLAN);
+	}
+	else
+	{
+		MTMenuScreen(FColor::Red, TEXT("[MTMenu] GameFlow null → MenuSetup 호출 안 됨! (Event Construct에서 MenuSetup 필요)"));
+	}
 }
 
 void UMTMenuWidget::HostWithSettings(FMTRoomSettings RoomSettings)

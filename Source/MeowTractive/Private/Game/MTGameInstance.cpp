@@ -107,6 +107,21 @@ void UMTGameInstance::JoinGame(bool bIsLAN)
 	}
 }
 
+void UMTGameInstance::QuickStart(int32 NumPublicConnections, bool bIsLAN)
+{
+	if (!SessionSubsystem)
+	{
+		return;
+	}
+	// 검색 완료 콜백(HandleFindSessions)에서 참가/생성 분기
+	bQuickStartPending = true;
+	QuickStartConnections = NumPublicConnections;
+	bQuickStartLAN = bIsLAN;
+
+	MTScreen(FColor::Cyan, TEXT("[MTQuick] 빠른 시작: 세션 검색 중..."));
+	SessionSubsystem->FindSessions(10000, bIsLAN);
+}
+
 void UMTGameInstance::LeaveGame()
 {
 	if (SessionSubsystem)
@@ -239,7 +254,6 @@ void UMTGameInstance::HandleFindSessions(const TArray<FOnlineSessionSearchResult
 		{
 			UMTSessionData* Data = NewObject<UMTSessionData>(this);
 			Data->Result = Result;
-			Data->PingMs = Result.PingInMs;
 			Data->MaxSlots = Result.Session.SessionSettings.NumPublicConnections;
 			Data->OpenSlots = Result.Session.NumOpenPublicConnections;
 			Data->CurrentPlayers = FMath::Max(0, Data->MaxSlots - Data->OpenSlots);
@@ -262,26 +276,42 @@ void UMTGameInstance::HandleFindSessions(const TArray<FOnlineSessionSearchResult
 			Sessions.Add(Data);
 		}
 
-		// 공개방 먼저, 같은 그룹 안에선 핑 낮은 순
+		// 열린 방(비번 없음) 먼저 — 핑은 Steam 로비 검색에서 미제공이라 정렬 기준에서 제외
 		Sessions.Sort([](const UMTSessionData& A, const UMTSessionData& B)
 		{
-			if (A.bHasPassword != B.bHasPassword)
-			{
-				return !A.bHasPassword;
-			}
-			return A.PingMs < B.PingMs;
+			return !A.bHasPassword && B.bHasPassword;
 		});
 
 		for (int32 i = 0; i < Sessions.Num(); ++i)
 		{
-			MTScreen(FColor::Cyan, FString::Printf(TEXT("[MTFind]  #%d %s | 인원 %d/%d | %dms | PW=%d"),
+			MTScreen(FColor::Cyan, FString::Printf(TEXT("[MTFind]  #%d %s | 인원 %d/%d | PW=%d"),
 				i, *Sessions[i]->ServerName, Sessions[i]->CurrentPlayers, Sessions[i]->MaxSlots,
-				Sessions[i]->PingMs, Sessions[i]->bHasPassword ? 1 : 0));
+				Sessions[i]->bHasPassword ? 1 : 0));
 		}
 	}
 	MTScreen(Sessions.Num() > 0 ? FColor::Green : FColor::Orange,
 		FString::Printf(TEXT("[MTFind] 검색 완료: Success=%d, 세션 %d개 → OnSessionsFound 방송"),
 			bWasSuccessful ? 1 : 0, Sessions.Num()));
+
+	// 빠른 시작: 참가 가능한 공개방(자리 있음) 첫 방 참가, 없으면 기본 설정으로 방 생성
+	if (bQuickStartPending)
+	{
+		bQuickStartPending = false;
+
+		for (UMTSessionData* Data : Sessions)
+		{
+			if (Data && !Data->bHasPassword && Data->OpenSlots > 0)
+			{
+				MTScreen(FColor::Green, FString::Printf(TEXT("[MTQuick] 참가 가능 방 발견 → '%s' 참가"), *Data->ServerName));
+				SessionSubsystem->JoinSession(Data->Result);
+				return;
+			}
+		}
+
+		MTScreen(FColor::Yellow, TEXT("[MTQuick] 참가 가능한 방 없음 → 기본 설정으로 방 생성"));
+		HostGame(FMTRoomSettings(), QuickStartConnections, bQuickStartLAN);
+		return;
+	}
 
 	OnSearchResult.Broadcast(Sessions.Num());
 	OnSessionsFound.Broadcast(Sessions);
