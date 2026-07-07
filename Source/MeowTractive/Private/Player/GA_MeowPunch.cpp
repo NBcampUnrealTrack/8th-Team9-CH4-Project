@@ -20,6 +20,12 @@ UGA_MeowPunch::UGA_MeowPunch()
 	// TryActivateAbilitiesByTag가 찾을 식별 태그 (BP 설정에 의존하지 않음)
 	SetAssetTags(FGameplayTagContainer(MTGameplayTags::Ability::TAG_Skill_Attack_MeowPunch));
 
+	// 스킬 상호배제: 시전 중 State.Casting 부여 + 동일 태그 시 발동 차단 (이동 스킬은 미부여라 예외)
+	ActivationOwnedTags.AddTag(MTGameplayTags::State::TAG_State_Casting);
+	ActivationBlockedTags.AddTag(MTGameplayTags::State::TAG_State_Casting);
+	// 스킬 발동 시 진행 중인 기본공격(매료빔) 취소
+	CancelAbilitiesWithTag.AddTag(MTGameplayTags::Ability::TAG_Skill_Attract_Beam);
+
 	HitEventTag = MTGameplayTags::Event::TAG_Event_MeowPunch_Hit;
 }
 

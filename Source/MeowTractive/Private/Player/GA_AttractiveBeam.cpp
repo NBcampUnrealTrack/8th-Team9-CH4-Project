@@ -1,6 +1,7 @@
-#include "Player/GA_AttractiveBeam.h"
+﻿#include "Player/GA_AttractiveBeam.h"
 
 #include "Pedestrian/MTPedestrianBase.h"
+#include "Game/MTGameplayTags.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameFramework/PlayerController.h"
@@ -15,6 +16,11 @@ UGA_AttractiveBeam::UGA_AttractiveBeam()
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
 	// 클라 예측 + 서버 실행: 빔/디버그는 즉시, 실제 매료 적용은 서버에서.
 	NetExecutionPolicy = EGameplayAbilityNetExecutionPolicy::LocalPredicted;
+
+	SetAssetTags(FGameplayTagContainer(MTGameplayTags::Ability::TAG_Skill_Attract_Beam));
+
+	// 기본공격: State.Casting 미부여(스킬을 막지 않음). 스킬 시전 중엔 발동만 차단 + 스킬이 이 어빌리티를 취소.
+	ActivationBlockedTags.AddTag(MTGameplayTags::State::TAG_State_Casting);
 }
 
 void UGA_AttractiveBeam::FireBeam()

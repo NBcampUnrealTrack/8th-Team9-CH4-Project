@@ -4,6 +4,7 @@
 #include "AbilitySystemInterface.h"
 #include "AbilitySystemComponent.h"
 #include "MTPlayerAttributeSet.h"
+#include "Game/MTTypes.h"
 #include "GameFramework/Character.h"
 #include "MTPlayerCharacter.generated.h"
 
@@ -12,6 +13,33 @@ class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
 struct FInputActionValue;
+
+// 어빌리티 입력 슬롯 (FGameplayAbilitySpec.InputID). 고양이별로 다른 스킬이 같은 슬롯에 매핑됨.
+UENUM(BlueprintType)
+enum class EMTAbilitySlot : uint8
+{
+	SkillA = 0, // 주 스킬 (예: Q)
+	SkillB = 1, // 보조 스킬 (예: E)
+};
+
+// 종류별 전용 어빌리티 묶음 (TMap 값). 슬롯 명시형 — 입력은 슬롯만 알고 실제 스킬은 데이터로 갈림.
+USTRUCT(BlueprintType)
+struct FMTCatAbilitySet
+{
+	GENERATED_BODY()
+
+	// SkillA 슬롯에 바인딩 (InputID = EMTAbilitySlot::SkillA)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AbilitySystem")
+	TSubclassOf<UGameplayAbility> SkillA;
+
+	// SkillB 슬롯에 바인딩 (InputID = EMTAbilitySlot::SkillB)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AbilitySystem")
+	TSubclassOf<UGameplayAbility> SkillB;
+
+	// 입력 없이 Grant (자동 발동 패시브 등)
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AbilitySystem")
+	TArray<TSubclassOf<UGameplayAbility>> Passives;
+};
 
 UCLASS()
 class MEOWTRACTIVE_API AMTPlayerCharacter : public ACharacter, public IAbilitySystemInterface
@@ -40,6 +68,12 @@ protected:
 	void AttractiveBeamReleased();
 
 	void MeowPunch();
+
+	// 종류별 스킬 슬롯: 입력은 슬롯 InputID만 GAS에 전달, 실제 어빌리티는 CatAbilities가 결정
+	void OnSkillAPressed();
+	void OnSkillAReleased();
+	void OnSkillBPressed();
+	void OnSkillBReleased();
 
 	// 스턴 중이면 스킬/이동 입력 무시
 	bool IsStunned() const;
@@ -79,10 +113,26 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* MeowPunchAction;
 
+	// 종류별 스킬 슬롯 (고양이마다 실제 스킬 다름)
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* SkillAAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* SkillBAction;
+
 #pragma endregion
 
+	// 전 고양이 공통 부여 어빌리티
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AbilitySystem")
 	TArray<TSubclassOf< UGameplayAbility>> DefaultAbilities;
+
+	// 종류별 전용 어빌리티: PossessedBy에서 PlayerState의 SelectedCat에 맞는 세트만 Grant
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AbilitySystem")
+	TMap<EMTCatType, FMTCatAbilitySet> CatAbilities;
+
+	// 로비 선택이 없을 때(단독 PIE/테스트) 사용할 폴백 고양이. None이면 폴백 없음.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "AbilitySystem")
+	EMTCatType DefaultCatType = EMTCatType::None;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "AbilitySystem")
 	TObjectPtr<UAbilitySystemComponent> AbilitySystemComponent;
@@ -111,11 +161,21 @@ public:
 
 	bool IsDead() const { return bIsDead; }
 
-	void Die();
+	void Die(AController* KillerController = nullptr);
 
 private:
 	// State.Stun 태그 변화 → 이동/입력 잠금 토글 (소유 클라 기준)
 	void OnStunTagChanged(const FGameplayTag Tag, int32 NewCount);
+
+	// State.Slow 태그 변화 → MaxWalkSpeed 배율 토글 (째려보기)
+	void OnSlowTagChanged(const FGameplayTag Tag, int32 NewCount);
+
+	// 슬로우 시 이동속도 배율 (0.7 = 30% 감소)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Stat", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	float SlowSpeedMultiplier = 0.7f;
+
+	// 슬로우 복구 기준 원본 속도 (BeginPlay 캐시)
+	float BaseWalkSpeed = 500.f;
 
 	bool bStunned = false;
 

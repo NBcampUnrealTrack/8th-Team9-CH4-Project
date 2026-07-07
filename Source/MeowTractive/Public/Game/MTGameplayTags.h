@@ -10,12 +10,25 @@ namespace MTGameplayTags
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Skill_Move_Dash);
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Skill_Attract_Beam);
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Skill_Attack_MeowPunch);
+
+		// 고등어(범이) 눈빛 키트
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Skill_EyeBeam_Glare);     // 째려보기 (단일 CC)
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Skill_EyeBeam_HeartBeam); // 하트광선 (5초 지속 전방 빔)
+	}
+
+	// --- 쿨다운 식별 태그 (쿨다운 중 부여) ---
+	namespace Cooldown
+	{
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_EyeBeam_Glare);
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Cooldown_EyeBeam_HeartBeam);
 	}
 
 	// --- 고양이 상태 ---
 	namespace State
 	{
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Stun); // 피격 스턴 (입력/이동 정지)
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Stun);    // 피격 스턴 (입력/이동 정지)
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Slow);    // 이동속도 감소 (째려보기)
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Casting); // 액션 스킬 시전 중 (타 액션 상호배제, 이동은 예외)
 	}
 
 	// --- 몽타주 AnimNotify 이벤트 ---
