@@ -305,19 +305,30 @@ void AMTPlayerCharacter::OnSkillBReleased()
 
 void AMTPlayerCharacter::Die()
 {
-	  if (!HasAuthority() || bIsDead)
-        {
-            return;
-        }
-        bIsDead = true;
+	if (!HasAuthority() || bIsDead)
+	{
+		return;
+	}
+	bIsDead = true;
 
-        if (MTLogEnabled())
-        {
-            UE_LOG(LogMT, Warning, TEXT("%s 사망 처리"), *GetName());
-        }
+	if (MTLogEnabled())
+	{
+		const FString VictimName = GetPlayerState() ? GetPlayerState()->GetPlayerName() : GetName();
+		const FString KillerName = (KillerController && KillerController->PlayerState)
+			? KillerController->PlayerState->GetPlayerName()
+			: TEXT("Unknown");
 
-        // 캐싱
-        AController* MyController = GetController();
+		const FString Msg = FString::Printf(TEXT("[처치] %s → %s"), *KillerName, *VictimName);
+		UE_LOG(LogMT, Warning, TEXT("%s"), *Msg);
+
+		if (GEngine)
+		{
+			GEngine->AddOnScreenDebugMessage(999, 8.f, FColor::Red, Msg);
+		}
+	}
+
+	// 캐싱
+	AController* MyController = GetController();
 
         // 이동/입력/충돌 정지 (애님 필요)
         if (UCharacterMovementComponent* Move = GetCharacterMovement())

@@ -161,7 +161,7 @@ public:
 
 	bool IsDead() const { return bIsDead; }
 
-	void Die();
+	void Die(AController* KillerController = nullptr);
 
 private:
 	// State.Stun 태그 변화 → 이동/입력 잠금 토글 (소유 클라 기준)

@@ -2,7 +2,8 @@
 #include "Game/MTGameState.h"
 #include "EngineUtils.h"
 #include "Net/UnrealNetwork.h"
-#include "GameFramework/PlayerState.h" 
+#include "GameFramework/PlayerState.h" // 플레이어 순위 디버깅용
+#include "Game/MTLog.h" // 로그
 #include "Pedestrian/MTAttractiveComponent.h"
 #include "Item/MTItemData.h"
 #include "Pedestrian/MTPedestrianBase.h"
@@ -15,6 +16,17 @@ void AMTGameState::AddPlayerState(APlayerState* PlayerState)
     {
         return;
     }
+
+	// 매료 카운트 0으로 미리 등록 (랭킹에 항상 표시되도록)
+	if (!PlayerScores.FindByPredicate(
+		[PlayerState](const FPlayerScore& Item) { return Item.PlayerState == PlayerState; }))
+	{
+		FPlayerScore NewEntry;
+		NewEntry.PlayerState = PlayerState;
+		NewEntry.AttractedCount = 0;
+		PlayerScores.Add(NewEntry);
+		OnRep_PlayerScores();
+	}
 
     for (TActorIterator<AMTPedestrianBase> It(GetWorld()); It; ++It)
     {
@@ -93,10 +105,11 @@ void AMTGameState::AddAttractedCount(APlayerState* TargetPlayerState)
             return Item.PlayerState == TargetPlayerState;
         }
     );
-
+	int32 NewCount = 0;
     if (Entry)
     {
         Entry->AttractedCount++;
+    	NewCount = Entry->AttractedCount;
     }
     else
     {
@@ -104,9 +117,15 @@ void AMTGameState::AddAttractedCount(APlayerState* TargetPlayerState)
         NewEntry.PlayerState = TargetPlayerState;
         NewEntry.AttractedCount = 1;
         PlayerScores.Add(NewEntry);
+    	NewCount = 1;
     }
 
-    OnRep_PlayerScores();
+	if (MTLogEnabled())
+	{
+		UE_LOG(LogMT, Log, TEXT("[매료] %s - 누적 %d명"),
+			*TargetPlayerState->GetPlayerName(), NewCount);
+	}
+	OnRep_PlayerScores();
 }
 
 int32 AMTGameState::GetAttractedCount(APlayerState* TargetPlayerState) const
@@ -125,6 +144,7 @@ void AMTGameState::OnRep_PlayerScores()
     // UI 갱신 필요하면 여기서
 	OnPlayerScoresUpdated.Broadcast();
 
+	// ------- 플레이어 순위 화면 표시 -------
 	if (GEngine)
     {
         TArray<FPlayerScore> Sorted = GetSortedPlayerScores();
@@ -139,6 +159,7 @@ void AMTGameState::OnRep_PlayerScores()
             GEngine->AddOnScreenDebugMessage(100 + i, 5.f, FColor::Green, Line);
         }
     }
+	// ------- 플레이어 순위 화면 표시 -------
 }
 
 void AMTGameState::RemoveAttractedCount(APlayerState* TargetPlayerState)
