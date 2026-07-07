@@ -16,9 +16,6 @@ public:
 	FString ServerName;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MT|Session")
-	int32 PingMs = 0;
-
-	UPROPERTY(BlueprintReadOnly, Category = "MT|Session")
 	int32 OpenSlots = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MT|Session")

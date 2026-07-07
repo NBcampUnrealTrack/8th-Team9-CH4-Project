@@ -33,6 +33,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
 	void JoinGame(bool bIsLAN = false);
 
+	// 빠른 시작: 검색 → 참가 가능한 공개방 있으면 첫 방 참가, 없으면 기본 설정으로 방 생성
+	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
+	void QuickStart(int32 NumPublicConnections = 4, bool bIsLAN = false);
+
 	// 세션 정리 후 메인메뉴로 복귀
 	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
 	void LeaveGame();
@@ -110,6 +114,11 @@ private:
 
 	// 호스트가 만든/변경한 방 설정 (로비 GameState 초기화·세션 광고 갱신용)
 	FMTRoomSettings CurrentRoomSettings;
+
+	// 빠른 시작 대기 상태 (검색 완료 콜백에서 1회 소비)
+	bool bQuickStartPending = false;
+	int32 QuickStartConnections = 4;
+	bool bQuickStartLAN = false;
 
 	FDelegateHandle NetworkFailureHandle;
 };
