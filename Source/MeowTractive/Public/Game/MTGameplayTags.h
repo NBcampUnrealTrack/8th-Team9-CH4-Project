@@ -26,8 +26,9 @@ namespace MTGameplayTags
 	// --- 고양이 상태 ---
 	namespace State
 	{
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Stun); // 피격 스턴 (입력/이동 정지)
-		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Slow); // 이동속도 감소 (째려보기)
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Stun);    // 피격 스턴 (입력/이동 정지)
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Slow);    // 이동속도 감소 (째려보기)
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_State_Casting); // 액션 스킬 시전 중 (타 액션 상호배제, 이동은 예외)
 	}
 
 	// --- 몽타주 AnimNotify 이벤트 ---

@@ -21,6 +21,7 @@ namespace MTGameplayTags
 	{
 		UE_DEFINE_GAMEPLAY_TAG(TAG_State_Stun, "State.Stun");
 		UE_DEFINE_GAMEPLAY_TAG(TAG_State_Slow, "State.Slow");
+		UE_DEFINE_GAMEPLAY_TAG(TAG_State_Casting, "State.Casting");
 	}
 
 	namespace Event
