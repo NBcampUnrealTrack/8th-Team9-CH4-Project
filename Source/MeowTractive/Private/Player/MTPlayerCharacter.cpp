@@ -303,7 +303,7 @@ void AMTPlayerCharacter::OnSkillBReleased()
 	}
 }
 
-void AMTPlayerCharacter::Die()
+void AMTPlayerCharacter::Die(AController* KillerController)
 {
 	if (!HasAuthority() || bIsDead)
 	{
