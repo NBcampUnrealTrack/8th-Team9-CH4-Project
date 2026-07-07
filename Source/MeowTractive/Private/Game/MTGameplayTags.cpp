@@ -7,11 +7,21 @@ namespace MTGameplayTags
 		UE_DEFINE_GAMEPLAY_TAG(TAG_Skill_Move_Dash, "Skill.Move.Dash");
 		UE_DEFINE_GAMEPLAY_TAG(TAG_Skill_Attract_Beam, "Skill.Attract.Beam");
 		UE_DEFINE_GAMEPLAY_TAG(TAG_Skill_Attack_MeowPunch, "Skill.Attack.MeowPunch");
+		UE_DEFINE_GAMEPLAY_TAG(TAG_Skill_EyeBeam_Glare, "Skill.EyeBeam.Glare");
+		UE_DEFINE_GAMEPLAY_TAG(TAG_Skill_EyeBeam_HeartBeam, "Skill.EyeBeam.HeartBeam");
+	}
+
+	namespace Cooldown
+	{
+		UE_DEFINE_GAMEPLAY_TAG(TAG_Cooldown_EyeBeam_Glare, "Cooldown.EyeBeam.Glare");
+		UE_DEFINE_GAMEPLAY_TAG(TAG_Cooldown_EyeBeam_HeartBeam, "Cooldown.EyeBeam.HeartBeam");
 	}
 
 	namespace State
 	{
 		UE_DEFINE_GAMEPLAY_TAG(TAG_State_Stun, "State.Stun");
+		UE_DEFINE_GAMEPLAY_TAG(TAG_State_Slow, "State.Slow");
+		UE_DEFINE_GAMEPLAY_TAG(TAG_State_Casting, "State.Casting");
 	}
 
 	namespace Event

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Abilities/GameplayAbility.h"
@@ -55,7 +55,7 @@ protected:
 
 	// 판정/틱 간격 (s)
 	UPROPERTY(EditDefaultsOnly, Category = "Beam")
-	float FireInterval = 0.1f;
+	float FireInterval = 0.5f;
 
 	// --- VFX 훅 (BP에서 Niagara 빔 제어). LocalPredicted라 소유 클라/서버에서 호출 ---
 	UFUNCTION(BlueprintImplementableEvent, Category = "AttractiveBeam")

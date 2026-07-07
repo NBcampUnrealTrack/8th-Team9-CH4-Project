@@ -57,12 +57,20 @@ void AMTPlayerCharacter::BeginPlay()
 
 	// 소유 클라 포함 모든 머신에서 ActorInfo 세팅 (LocalPredicted 어빌리티/속성·태그 복제 동작).
 	// 서버는 PossessedBy에서도 호출하지만 반복 호출 안전.
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		BaseWalkSpeed = Move->MaxWalkSpeed; // 슬로우 복구 기준
+	}
+
 	if (AbilitySystemComponent)
 	{
 		AbilitySystemComponent->InitAbilityActorInfo(this, this);
 		AbilitySystemComponent->RegisterGameplayTagEvent(
 			MTGameplayTags::State::TAG_State_Stun, EGameplayTagEventType::NewOrRemoved)
 			.AddUObject(this, &AMTPlayerCharacter::OnStunTagChanged);
+		AbilitySystemComponent->RegisterGameplayTagEvent(
+			MTGameplayTags::State::TAG_State_Slow, EGameplayTagEventType::NewOrRemoved)
+			.AddUObject(this, &AMTPlayerCharacter::OnSlowTagChanged);
 	}
 
 	// 클라는 보통 여기서 적용됨. 호스트(seamless)는 아직 미possess라 NotifyControllerChanged에서 적용.
@@ -102,11 +110,45 @@ void AMTPlayerCharacter::PossessedBy(AController* NewController)
 
 	if (HasAuthority() && AbilitySystemComponent)
 	{
+		// 공통 어빌리티
 		for (const TSubclassOf<UGameplayAbility>& Ability : DefaultAbilities)
 		{
 			if (Ability)
 			{
 				AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(Ability, 1, INDEX_NONE, this));
+			}
+		}
+
+		// 종류별 전용 (선택 고양이 기준). PlayerState는 Super::PossessedBy에서 세팅됨.
+		// 액티브는 슬롯 InputID로, 패시브는 InputID 없이 Grant.
+		EMTCatType Cat = EMTCatType::None;
+		if (const AMTPlayerState* PS = GetPlayerState<AMTPlayerState>())
+		{
+			Cat = PS->GetSelectedCat();
+		}
+		if (Cat == EMTCatType::None)
+		{
+			Cat = DefaultCatType; // 로비 선택 없을 때 폴백
+		}
+
+		if (const FMTCatAbilitySet* Set = CatAbilities.Find(Cat))
+		{
+			if (Set->SkillA)
+			{
+				AbilitySystemComponent->GiveAbility(
+					FGameplayAbilitySpec(Set->SkillA, 1, (int32)EMTAbilitySlot::SkillA, this));
+			}
+			if (Set->SkillB)
+			{
+				AbilitySystemComponent->GiveAbility(
+					FGameplayAbilitySpec(Set->SkillB, 1, (int32)EMTAbilitySlot::SkillB, this));
+			}
+			for (const TSubclassOf<UGameplayAbility>& Passive : Set->Passives)
+			{
+				if (Passive)
+				{
+					AbilitySystemComponent->GiveAbility(FGameplayAbilitySpec(Passive, 1, INDEX_NONE, this));
+				}
 			}
 		}
 	}
@@ -126,6 +168,12 @@ void AMTPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 		EnhancedInputComponent->BindAction(AttractiveBeamAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::AttractiveBeam);
 		EnhancedInputComponent->BindAction(AttractiveBeamAction, ETriggerEvent::Completed, this, &AMTPlayerCharacter::AttractiveBeamReleased);
 		EnhancedInputComponent->BindAction(MeowPunchAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::MeowPunch);
+
+		// 슬롯 입력: 눌림/뗌 모두 GAS에 전달 (홀드형 스킬도 슬롯만으로 지원)
+		EnhancedInputComponent->BindAction(SkillAAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::OnSkillAPressed);
+		EnhancedInputComponent->BindAction(SkillAAction, ETriggerEvent::Completed, this, &AMTPlayerCharacter::OnSkillAReleased);
+		EnhancedInputComponent->BindAction(SkillBAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::OnSkillBPressed);
+		EnhancedInputComponent->BindAction(SkillBAction, ETriggerEvent::Completed, this, &AMTPlayerCharacter::OnSkillBReleased);
 	}
 	else
 	{
@@ -221,7 +269,41 @@ void AMTPlayerCharacter::MeowPunch()
 		FGameplayTagContainer(MTGameplayTags::Ability::TAG_Skill_Attack_MeowPunch), true);
 }
 
-void AMTPlayerCharacter::Die(AController* KillerController)
+void AMTPlayerCharacter::OnSkillAPressed()
+{
+	if (!AbilitySystemComponent || IsStunned())
+	{
+		return;
+	}
+	AbilitySystemComponent->AbilityLocalInputPressed((int32)EMTAbilitySlot::SkillA);
+}
+
+void AMTPlayerCharacter::OnSkillAReleased()
+{
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->AbilityLocalInputReleased((int32)EMTAbilitySlot::SkillA);
+	}
+}
+
+void AMTPlayerCharacter::OnSkillBPressed()
+{
+	if (!AbilitySystemComponent || IsStunned())
+	{
+		return;
+	}
+	AbilitySystemComponent->AbilityLocalInputPressed((int32)EMTAbilitySlot::SkillB);
+}
+
+void AMTPlayerCharacter::OnSkillBReleased()
+{
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->AbilityLocalInputReleased((int32)EMTAbilitySlot::SkillB);
+	}
+}
+
+void AMTPlayerCharacter::Die()
 {
 	if (!HasAuthority() || bIsDead)
 	{
@@ -402,6 +484,15 @@ void AMTPlayerCharacter::OnStunTagChanged(const FGameplayTag Tag, int32 NewCount
 		{
 			Move->SetMovementMode(MOVE_Walking);
 		}
+	}
+}
+
+void AMTPlayerCharacter::OnSlowTagChanged(const FGameplayTag Tag, int32 NewCount)
+{
+	// GE(State.Slow)가 Full 복제로 전 머신에 도달 → 이동 권위(소유 클라)·서버 모두 속도 반영
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->MaxWalkSpeed = (NewCount > 0) ? BaseWalkSpeed * SlowSpeedMultiplier : BaseWalkSpeed;
 	}
 }
 
