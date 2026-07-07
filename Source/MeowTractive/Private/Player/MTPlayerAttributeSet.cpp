@@ -42,7 +42,6 @@ void UMTPlayerAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCa
 {
 	Super::PostGameplayEffectExecute(Data);
 
-	// 데미지 GE: 메타 IncomingDamage 만큼 Hp 차감
 	if (Data.EvaluatedData.Attribute == GetIncomingDamageAttribute())
 	{
 		const float LocalDamage = GetIncomingDamage();
@@ -53,42 +52,33 @@ void UMTPlayerAttributeSet::PostGameplayEffectExecute(const FGameplayEffectModCa
 			SetHp(FMath::Clamp(OldHp - LocalDamage, 0.f, GetMaxHp()));
 			const float NewHp = GetHp();
 
+			AActor* Attacker = Data.EffectSpec.GetContext().GetOriginalInstigator();
+
 			if (MTLogEnabled())
 			{
-				const AActor* Attacker = Data.EffectSpec.GetContext().GetOriginalInstigator();
 				const FString Msg = FString::Printf(
 					TEXT("[MTDamage] %s ← %.0f 데미지 (가해:%s) | Hp %.0f → %.0f"),
 					*GetNameSafe(GetOwningActor()), LocalDamage, *GetNameSafe(Attacker), OldHp, NewHp);
 				UE_LOG(LogMT, Log, TEXT("%s"), *Msg);
 				if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Orange, Msg);
-
-				if (NewHp <= 0.f)
-				{
-					const FString Dead = FString::Printf(
-						TEXT("[MTDamage] %s Hp 0 도달 → 사망/기절/리스폰"), *GetNameSafe(GetOwningActor()));
-					UE_LOG(LogMT, Warning, TEXT("%s"), *Dead);
-					if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Dead);
-				}
+				
 			}
 
 			// Hp <= 0 시 기절/리스폰 처리
 			if (NewHp <= 0.f && OldHp > 0.f)
 			{
 				AActor* Owner = GetOwningActor();
-				// 서버 권한 체크
 				if (Owner && Owner->HasAuthority())
 				{
 					if (AMTPlayerCharacter* Char = Cast<AMTPlayerCharacter>(Owner))
 					{
-						if (MTLogEnabled())
+						AController* KillerController = nullptr;
+						if (APawn* AttackerPawn = Cast<APawn>(Attacker))
 						{
-							const FString Dead = FString::Printf(
-							   TEXT("%s Die"), *GetNameSafe(Owner));
-							UE_LOG(LogMT, Warning, TEXT("%s"), *Dead);
-							if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 5.f, FColor::Red, Dead);
+							KillerController = AttackerPawn->GetController();
 						}
 
-						Char->Die();
+						Char->Die(KillerController);
 					}
 				}
 			}
