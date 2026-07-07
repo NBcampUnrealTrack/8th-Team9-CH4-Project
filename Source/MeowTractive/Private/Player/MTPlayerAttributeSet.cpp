@@ -12,6 +12,7 @@ UMTPlayerAttributeSet::UMTPlayerAttributeSet()
 	InitMaxHp(100.f);
 	InitStamina(100.f);
 	InitMaxStamina(100.f);
+	InitEyeBeamRange(1.f);
 }
 
 void UMTPlayerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -22,6 +23,8 @@ void UMTPlayerAttributeSet::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>
 	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, MaxHp, COND_None, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, Stamina, COND_OwnerOnly, REPNOTIFY_Always);
 	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, MaxStamina, COND_OwnerOnly, REPNOTIFY_Always);
+	// 소유 클라가 눈빛 어빌리티 예측 시 올바른 사거리 계산에 필요
+	DOREPLIFETIME_CONDITION_NOTIFY(UMTPlayerAttributeSet, EyeBeamRange, COND_None, REPNOTIFY_Always);
 }
 
 void UMTPlayerAttributeSet::PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue)
@@ -114,4 +117,9 @@ void UMTPlayerAttributeSet::OnRep_Stamina(const FGameplayAttributeData& OldValue
 void UMTPlayerAttributeSet::OnRep_MaxStamina(const FGameplayAttributeData& OldValue)
 {
 	GAMEPLAYATTRIBUTE_REPNOTIFY(UMTPlayerAttributeSet, MaxStamina, OldValue);
+}
+
+void UMTPlayerAttributeSet::OnRep_EyeBeamRange(const FGameplayAttributeData& OldValue)
+{
+	GAMEPLAYATTRIBUTE_REPNOTIFY(UMTPlayerAttributeSet, EyeBeamRange, OldValue);
 }

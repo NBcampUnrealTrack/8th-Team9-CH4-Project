@@ -24,6 +24,7 @@ public:
 	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, Stamina);
 	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, MaxStamina);
 	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, IncomingDamage);
+	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, EyeBeamRange);
 
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
@@ -46,6 +47,10 @@ private:
 	UPROPERTY(BlueprintReadOnly, Category = "MT|Stat", meta = (AllowPrivateAccess = "true"))
 	FGameplayAttributeData IncomingDamage;
 
+	// 눈빛 스킬 사거리 배율 (기본 1.0). 고등어 패시브 '쳐다보냥'이 +0.5 → 1.5배
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_EyeBeamRange, Category = "MT|Stat", meta = (AllowPrivateAccess = "true"))
+	FGameplayAttributeData EyeBeamRange;
+
 	UFUNCTION()
 	void OnRep_Hp(const FGameplayAttributeData& OldValue);
 
@@ -57,4 +62,7 @@ private:
 
 	UFUNCTION()
 	void OnRep_MaxStamina(const FGameplayAttributeData& OldValue);
+
+	UFUNCTION()
+	void OnRep_EyeBeamRange(const FGameplayAttributeData& OldValue);
 };
