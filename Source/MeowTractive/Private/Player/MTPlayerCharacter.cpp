@@ -68,9 +68,9 @@ void AMTPlayerCharacter::BeginPlay()
 		AbilitySystemComponent->RegisterGameplayTagEvent(
 			MTGameplayTags::State::TAG_State_Stun, EGameplayTagEventType::NewOrRemoved)
 			.AddUObject(this, &AMTPlayerCharacter::OnStunTagChanged);
-		AbilitySystemComponent->RegisterGameplayTagEvent(
-			MTGameplayTags::State::TAG_State_Slow, EGameplayTagEventType::NewOrRemoved)
-			.AddUObject(this, &AMTPlayerCharacter::OnSlowTagChanged);
+		AbilitySystemComponent->GetGameplayAttributeValueChangeDelegate(
+			UMTPlayerAttributeSet::GetMoveSpeedMultAttribute())
+			.AddUObject(this, &AMTPlayerCharacter::OnMoveSpeedMultChanged);
 	}
 
 	// 클라는 보통 여기서 적용됨. 호스트(seamless)는 아직 미possess라 NotifyControllerChanged에서 적용.
@@ -351,7 +351,7 @@ void AMTPlayerCharacter::Die(AController* KillerController)
 		if (DeathMontages.Num() > 0)
 		{
 			ChosenMontage = DeathMontages[FMath::RandRange(0, DeathMontages.Num() - 1)];
-			DeathLifeSpan = ChosenMontage->GetPlayLength();
+			DeathLifeSpan = ChosenMontage->GetPlayLength() + 1.5f;
 		}
 		MulticastPlayDeathMontage(ChosenMontage);
 
@@ -422,12 +422,24 @@ bool AMTPlayerCharacter::IsStunned() const
 
 void AMTPlayerCharacter::MulticastPlayDeathMontage_Implementation(UAnimMontage* MontageToPlay)
 {
-	if (MontageToPlay)
+	// bIsDead 복제 도착 전에 히트 큐가 올 수 있어, 모든 머신에서 로컬 확정 (큐 게이트용)
+	bIsDead = true;
+
+	UAnimInstance* AnimInst = GetMesh() ? GetMesh()->GetAnimInstance() : nullptr;
+	float PlayResult = -1.f;
+	if (MontageToPlay && AnimInst)
 	{
-		if (UAnimInstance* AnimInst = GetMesh()->GetAnimInstance())
-		{
-			AnimInst->Montage_Play(MontageToPlay);
-		}
+		AnimInst->StopAllMontages(0.f);   // 진행 중이던 히트/스킬 몽타주 정리 후 사망 재생
+		PlayResult = AnimInst->Montage_Play(MontageToPlay);
+	}
+
+	if (MTLogEnabled())
+	{
+		// 진단: Montage=None → BP DeathMontages 미등록 / Result=0 → 스켈레톤 불일치 / Result>0인데 안 보임 → AnimBP Slot 누락
+		const FString Msg = FString::Printf(TEXT("[MTDeath] Montage=%s AnimInst=%d PlayResult=%.2f | %s"),
+			*GetNameSafe(MontageToPlay), AnimInst ? 1 : 0, PlayResult, *GetName());
+		UE_LOG(LogMT, Log, TEXT("%s"), *Msg);
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 8.f, FColor::Magenta, Msg);
 	}
 }
 
@@ -487,12 +499,22 @@ void AMTPlayerCharacter::OnStunTagChanged(const FGameplayTag Tag, int32 NewCount
 	}
 }
 
-void AMTPlayerCharacter::OnSlowTagChanged(const FGameplayTag Tag, int32 NewCount)
+void AMTPlayerCharacter::OnMoveSpeedMultChanged(const FOnAttributeChangeData& Data)
 {
-	// GE(State.Slow)가 Full 복제로 전 머신에 도달 → 이동 권위(소유 클라)·서버 모두 속도 반영
+	// GE가 Full 복제로 전 머신에 도달 → 이동 권위(소유 클라)·서버 모두 속도 반영
+	RecalcMoveSpeed();
+}
+
+void AMTPlayerCharacter::RecalcMoveSpeed()
+{
+	float Mult = 1.f;
+	if (AbilitySystemComponent)
+	{
+		Mult = AbilitySystemComponent->GetNumericAttribute(UMTPlayerAttributeSet::GetMoveSpeedMultAttribute());
+	}
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
 	{
-		Move->MaxWalkSpeed = (NewCount > 0) ? BaseWalkSpeed * SlowSpeedMultiplier : BaseWalkSpeed;
+		Move->MaxWalkSpeed = BaseWalkSpeed * FMath::Max(Mult, 0.05f);
 	}
 }
 

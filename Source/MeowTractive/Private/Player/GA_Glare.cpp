@@ -146,6 +146,8 @@ void UGA_Glare::ActivateAbility(
 				if (Spec.IsValid())
 				{
 					Spec.Data->SetSetByCallerMagnitude(DurationTag, SlowDuration);
+					Spec.Data->SetSetByCallerMagnitude(
+						FGameplayTag::RequestGameplayTag(FName("Data.SlowMult")), SlowMultiplier);
 					SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
 				}
 			}

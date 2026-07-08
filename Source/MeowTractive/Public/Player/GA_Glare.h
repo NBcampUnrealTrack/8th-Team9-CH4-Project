@@ -38,11 +38,15 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Glare", meta = (ClampMin = "0.0"))
 	float SlowDuration = 1.f;
 
+	// 감속 곱배율 (0.7 = 30% 감속) — GE에 SetByCaller Data.SlowMult로 주입
+	UPROPERTY(EditDefaultsOnly, Category = "Glare", meta = (ClampMin = "0.05", ClampMax = "1.0"))
+	float SlowMultiplier = 0.7f;
+
 	// 데미지 GE (GE_CatDamage — IncomingDamage / SetByCaller Data.Damage)
 	UPROPERTY(EditDefaultsOnly, Category = "Glare")
 	TSubclassOf<UGameplayEffect> DamageEffect;
 
-	// 슬로우 GE (GE_Slow — grants State.Slow, Duration = SetByCaller Data.Duration)
+	// 감속 GE (GE_MoveSlow — Duration=SetByCaller Data.Duration, Modifier: MoveSpeedMult Multiply SetByCaller Data.SlowMult)
 	UPROPERTY(EditDefaultsOnly, Category = "Glare")
 	TSubclassOf<UGameplayEffect> SlowEffect;
 

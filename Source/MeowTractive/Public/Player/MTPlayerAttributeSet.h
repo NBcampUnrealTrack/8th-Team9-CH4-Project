@@ -27,8 +27,10 @@ public:
 	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, EyeBeamRange);
 	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, DashCharges);
 	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, MaxDashCharges);
+	ATTRIBUTE_ACCESSORS(UMTPlayerAttributeSet, MoveSpeedMult);
 
 	virtual void PreAttributeChange(const FGameplayAttribute& Attribute, float& NewValue) override;
+	virtual void PostAttributeChange(const FGameplayAttribute& Attribute, float OldValue, float NewValue) override;
 	virtual void PostGameplayEffectExecute(const FGameplayEffectModCallbackData& Data) override;
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -61,6 +63,10 @@ private:
 	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MaxDashCharges, Category = "MT|Stat", meta = (AllowPrivateAccess = "true"))
 	FGameplayAttributeData MaxDashCharges;
 
+	// 이동속도 곱배율 (기본 1.0). 감속 GE는 Multiply로 스택 (0.7×0.8 등) — 캐릭터가 변화 구독해 CMC 반영
+	UPROPERTY(BlueprintReadOnly, ReplicatedUsing = OnRep_MoveSpeedMult, Category = "MT|Stat", meta = (AllowPrivateAccess = "true"))
+	FGameplayAttributeData MoveSpeedMult;
+
 	UFUNCTION()
 	void OnRep_Hp(const FGameplayAttributeData& OldValue);
 
@@ -81,4 +87,7 @@ private:
 
 	UFUNCTION()
 	void OnRep_MaxDashCharges(const FGameplayAttributeData& OldValue);
+
+	UFUNCTION()
+	void OnRep_MoveSpeedMult(const FGameplayAttributeData& OldValue);
 };

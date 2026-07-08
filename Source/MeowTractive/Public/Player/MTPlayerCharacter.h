@@ -159,6 +159,8 @@ public:
 	// 근접/대시 데미지 대상 판정: 서로 다른 고양이 + 적팀(개인전은 자기 외 전원 적)
 	static bool IsEnemyCat(const AActor* SourceActor, const AActor* TargetActor);
 
+	// 피격 큐(GC_CatHit) 등에서 사망자 연출 스킵용 — BP 노출
+	UFUNCTION(BlueprintPure, Category = "MT|State")
 	bool IsDead() const { return bIsDead; }
 
 	void Die(AController* KillerController = nullptr);
@@ -167,12 +169,11 @@ private:
 	// State.Stun 태그 변화 → 이동/입력 잠금 토글 (소유 클라 기준)
 	void OnStunTagChanged(const FGameplayTag Tag, int32 NewCount);
 
-	// State.Slow 태그 변화 → MaxWalkSpeed 배율 토글 (째려보기)
-	void OnSlowTagChanged(const FGameplayTag Tag, int32 NewCount);
+	// MoveSpeedMult 어트리뷰트 변화 → 속도 재계산 (패시브/감속 GE 공통 경로)
+	void OnMoveSpeedMultChanged(const FOnAttributeChangeData& Data);
 
-	// 슬로우 시 이동속도 배율 (0.7 = 30% 감소)
-	UPROPERTY(EditDefaultsOnly, Category = "MT|Stat", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float SlowSpeedMultiplier = 0.7f;
+	// 최종 속도 = BaseWalkSpeed × MoveSpeedMult
+	void RecalcMoveSpeed();
 
 	// 슬로우 복구 기준 원본 속도 (BeginPlay 캐시)
 	float BaseWalkSpeed = 500.f;
