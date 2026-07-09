@@ -434,8 +434,31 @@ void AMTPedestrianBase::UpdateAttractiveBarVisibility()
 	{
 		return;
 	}
+
 	FVector CamLoc;
 	FRotator CamRot;
 	PC->GetPlayerViewPoint(CamLoc, CamRot);
-	AttractiveBarWidget->SetVisibility(FVector::Dist(GetActorLocation(), CamLoc) <= AttractiveBarVisibleDistance);
+
+	const float DistSq = FVector::DistSquared(GetActorLocation(), CamLoc);
+	if (DistSq > FMath::Square(AttractiveBarVisibleDistance))
+	{
+		AttractiveBarWidget->SetVisibility(false);
+		return;
+	}
+
+	// 거리 안이면 벽에 가려졌는지 라인트레이스로 확인
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(this);
+	if (const APawn* LocalPawn = PC->GetPawn())
+	{
+		Params.AddIgnoredActor(LocalPawn);
+	}
+
+	const FVector TargetLoc = AttractiveBarWidget->GetComponentLocation();
+
+	FHitResult Hit;
+	const bool bBlocked = GetWorld()->LineTraceSingleByChannel(
+		Hit, CamLoc, TargetLoc, ECC_Visibility, Params);
+
+	AttractiveBarWidget->SetVisibility(!bBlocked);
 }
