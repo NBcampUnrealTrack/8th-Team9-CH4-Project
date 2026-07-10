@@ -103,7 +103,7 @@ void UMTGameInstance::JoinGame(bool bIsLAN)
 {
 	if (SessionSubsystem)
 	{
-		SessionSubsystem->FindSessions(10000, bIsLAN);
+		SessionSubsystem->FindSessions(50, bIsLAN);
 	}
 }
 
@@ -119,7 +119,7 @@ void UMTGameInstance::QuickStart(int32 NumPublicConnections, bool bIsLAN)
 	bQuickStartLAN = bIsLAN;
 
 	MTScreen(FColor::Cyan, TEXT("[MTQuick] 빠른 시작: 세션 검색 중..."));
-	SessionSubsystem->FindSessions(10000, bIsLAN);
+	SessionSubsystem->FindSessions(50, bIsLAN);
 }
 
 void UMTGameInstance::LeaveGame()

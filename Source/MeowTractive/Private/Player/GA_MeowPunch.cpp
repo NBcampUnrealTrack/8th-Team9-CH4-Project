@@ -1,6 +1,7 @@
 #include "Player/GA_MeowPunch.h"
 
 #include "Player/MTPlayerCharacter.h"
+#include "Player/MTLobbySelectable.h"
 #include "Game/MTGameplayTags.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
@@ -134,6 +135,15 @@ void UGA_MeowPunch::PerformHit()
 		{
 			continue;
 		}
+
+		// 로비 선택 조형물: IsEnemyCat 우회 — 데미지 대신 선택 순환 (서버 권위)
+		if (IMTLobbySelectable* Selectable = Cast<IMTLobbySelectable>(Target))
+		{
+			Damaged.Add(Target);
+			Selectable->OnPunchSelect(Avatar);
+			continue;
+		}
+
 		if (!AMTPlayerCharacter::IsEnemyCat(Avatar, Target))
 		{
 			continue;

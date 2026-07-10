@@ -69,6 +69,9 @@ protected:
 
 	void MeowPunch();
 
+	// 로비에서만 R키 → 준비 토글 (매치에선 무시). 서버 RPC는 컨트롤러가 처리.
+	void ToggleReady();
+
 	// 종류별 스킬 슬롯: 입력은 슬롯 InputID만 GAS에 전달, 실제 어빌리티는 CatAbilities가 결정
 	void OnSkillAPressed();
 	void OnSkillAReleased();
@@ -77,6 +80,9 @@ protected:
 
 	// 스턴 중이면 스킬/이동 입력 무시
 	bool IsStunned() const;
+
+	// 로비에서만 개인화: 내 폰만 표시(파생 조형물은 소유 슬롯 기준으로 override). 매치에선 무효.
+	virtual void UpdateLobbyVisibility();
 
 	// 사망 애니메이션
 	UPROPERTY(EditDefaultsOnly, Category = "Die")
@@ -119,6 +125,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SkillBAction;
+
+	// 로비 준비 토글 (R). 로비 전용 — 매치에선 핸들러가 무시
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ReadyAction;
 
 #pragma endregion
 

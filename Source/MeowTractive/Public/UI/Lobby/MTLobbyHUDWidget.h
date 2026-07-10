@@ -68,9 +68,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MT|LobbyHUD")
 	void LeaveLobby();
 
-	// 스팀 아바타 (없으면 nullptr → BP가 기본 아이콘/재시도)
+	// 스팀 아바타 (없으면 nullptr → BP가 기본 아이콘/재시도). 성공 시 캐시해 재생성 방지.
 	UFUNCTION(BlueprintCallable, Category = "MT|LobbyHUD")
-	UTexture2D* GetAvatar(AMTPlayerState* Target) const;
+	UTexture2D* GetAvatar(AMTPlayerState* Target);
 
 	// BP가 바인딩 → 목록/카운트다운 갱신
 	UPROPERTY(BlueprintAssignable, Category = "MT|LobbyHUD")
@@ -99,4 +99,8 @@ private:
 	void PollRefresh();
 
 	FTimerHandle RefreshTimer;
+
+	// 플레이어별 아바타 텍스처 캐시 (재생성/churn 방지)
+	UPROPERTY(Transient)
+	TMap<TObjectPtr<AMTPlayerState>, TObjectPtr<UTexture2D>> AvatarCache;
 };

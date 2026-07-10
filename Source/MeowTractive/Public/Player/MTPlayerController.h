@@ -42,7 +42,21 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
 	TSubclassOf<class UMTMatchGameResultWidget> ResultWidgetClass;
 
+	// ESC 일시정지 메뉴 토글 (열려 있으면 닫음). ESC 바인딩·위젯이 호출. 로컬 전용.
+	UFUNCTION(BlueprintCallable, Category = "MT|UI")
+	void TogglePauseMenu();
+
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TSubclassOf<class UMTPauseMenuWidget> PauseMenuClass;
+
+protected:
+	virtual void SetupInputComponent() override;
+
 private:
 	float LastReadyToggleTime = -100.f;     // 서버 쿨다운 기준 시각
 	static constexpr float ReadyCooldown = 0.5f;
+
+	// 열려 있는 일시정지 메뉴 인스턴스 (없으면 nullptr = 닫힘)
+	UPROPERTY(Transient)
+	TObjectPtr<class UMTPauseMenuWidget> PauseMenu;
 };

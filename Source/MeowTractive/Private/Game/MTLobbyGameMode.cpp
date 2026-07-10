@@ -5,6 +5,8 @@
 #include "Player/MTPlayerController.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/GameSession.h"
+#include "GameFramework/PlayerStart.h"
+#include "EngineUtils.h"
 
 AMTLobbyGameMode::AMTLobbyGameMode()
 {
@@ -62,6 +64,23 @@ UClass* AMTLobbyGameMode::GetDefaultPawnClassForController_Implementation(AContr
 		}
 	}
 	return Super::GetDefaultPawnClassForController_Implementation(InController);
+}
+
+AActor* AMTLobbyGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+	// 슬롯별 PlayerStart("Slot%d") — 자기 조형물(OwnerSlot 동일) 앞에 스폰
+	if (const AMTPlayerState* MTPS = Player ? Player->GetPlayerState<AMTPlayerState>() : nullptr)
+	{
+		const FString Tag = FString::Printf(TEXT("Slot%d"), MTPS->GetPlayerSlot());
+		for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+		{
+			if (It->PlayerStartTag == FName(*Tag))
+			{
+				return *It;
+			}
+		}
+	}
+	return Super::ChoosePlayerStart_Implementation(Player);
 }
 
 void AMTLobbyGameMode::ApplyRoomSettings(AController* Requestor, FMTRoomSettings NewSettings)

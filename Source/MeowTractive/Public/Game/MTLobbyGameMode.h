@@ -35,6 +35,9 @@ public:
 	// 선택 고양이에 따라 로비 조종 폰 결정
 	virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
 
+	// 슬롯별 PlayerStart("Slot%d")로 스폰 → 자기 조형물 앞에 배치 (개인화 로비)
+	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
+
 	// 방 설정 변경 — 호스트(리슨 로컬)만 허용. 접속 플레이어는 유지된다.
 	void ApplyRoomSettings(AController* Requestor, FMTRoomSettings NewSettings);
 

@@ -154,9 +154,27 @@ void UMTLobbyHUDWidget::LeaveLobby()
 	}
 }
 
-UTexture2D* UMTLobbyHUDWidget::GetAvatar(AMTPlayerState* Target) const
+UTexture2D* UMTLobbyHUDWidget::GetAvatar(AMTPlayerState* Target)
 {
-	return UMTOnlineUtils::GetSteamAvatar(Target);
+	if (!Target)
+	{
+		return nullptr;
+	}
+	// 이미 받아둔 게 있으면 재사용 (매 리프레시마다 새 텍스처 생성 방지)
+	if (const TObjectPtr<UTexture2D>* Cached = AvatarCache.Find(Target))
+	{
+		if (*Cached)
+		{
+			return *Cached;
+		}
+	}
+	// 스팀에서 시도 — 성공 시에만 캐시 (아직 로딩 전이면 nullptr → 다음 호출에서 재시도)
+	if (UTexture2D* Fetched = UMTOnlineUtils::GetSteamAvatar(Target))
+	{
+		AvatarCache.Add(Target, Fetched);
+		return Fetched;
+	}
+	return nullptr;
 }
 
 AMTLobbyGameState* UMTLobbyHUDWidget::GetLobbyGS() const

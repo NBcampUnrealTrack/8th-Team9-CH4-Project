@@ -8,9 +8,11 @@
 #include "Game/MTGameplayTags.h"
 #include "Game/MTLog.h"
 #include "Player/MTPlayerState.h"
+#include "Player/MTPlayerController.h"
 #include "Engine/Engine.h"
 #include "Game/MTMatchGameMode.h"
 #include "Game/MTLobbyGameMode.h"
+#include "Game/MTLobbyGameState.h"
 #include "Net/UnrealNetwork.h"
 
 AMTPlayerCharacter::AMTPlayerCharacter()
@@ -76,6 +78,7 @@ void AMTPlayerCharacter::BeginPlay()
 
 	// 클라는 보통 여기서 적용됨. 호스트(seamless)는 아직 미possess라 NotifyControllerChanged에서 적용.
 	ApplyLocalInputMode();
+	UpdateLobbyVisibility();   // 로비 개인화 가시성 (매치선 무효)
 
 	if (MTLogEnabled())
 	{
@@ -170,6 +173,12 @@ void AMTPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 		EnhancedInputComponent->BindAction(AttractiveBeamAction, ETriggerEvent::Completed, this, &AMTPlayerCharacter::AttractiveBeamReleased);
 		EnhancedInputComponent->BindAction(MeowPunchAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::MeowPunch);
 
+		// 로비 준비 토글 (R) — 미할당 BP 대비 널가드
+		if (ReadyAction)
+		{
+			EnhancedInputComponent->BindAction(ReadyAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::ToggleReady);
+		}
+
 		// 슬롯 입력: 눌림/뗌 모두 GAS에 전달 (홀드형 스킬도 슬롯만으로 지원)
 		EnhancedInputComponent->BindAction(SkillAAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::OnSkillAPressed);
 		EnhancedInputComponent->BindAction(SkillAAction, ETriggerEvent::Completed, this, &AMTPlayerCharacter::OnSkillAReleased);
@@ -196,6 +205,24 @@ void AMTPlayerCharacter::NotifyControllerChanged()
 
 	// possession 직후 — 호스트(seamless travel)는 여기서 게임 입력모드 확정
 	ApplyLocalInputMode();
+	UpdateLobbyVisibility();   // possession 확정 후 내 폰 표시 복원
+}
+
+void AMTPlayerCharacter::UpdateLobbyVisibility()
+{
+	// 로비에서만: 내 폰만 보이고 남 폰은 숨김. 매치에선 전원 표시(무효).
+	UWorld* World = GetWorld();
+	if (!World || !World->GetGameState<AMTLobbyGameState>())
+	{
+		return;
+	}
+	const bool bMine = IsLocallyControlled();
+	SetActorHiddenInGame(!bMine);
+	// 서버는 펀치/판정 위해 충돌 유지. 순수 클라만 남 폰 충돌 해제(부딪힘 방지).
+	if (!HasAuthority())
+	{
+		SetActorEnableCollision(bMine);
+	}
 }
 
 void AMTPlayerCharacter::ApplyLocalInputMode()
@@ -293,6 +320,19 @@ void AMTPlayerCharacter::MeowPunch()
 
 	AbilitySystemComponent->TryActivateAbilitiesByTag(
 		FGameplayTagContainer(MTGameplayTags::Ability::TAG_Skill_Attack_MeowPunch), true);
+}
+
+void AMTPlayerCharacter::ToggleReady()
+{
+	// 로비에서만 — 로비 GameState가 있으면 로비 맵. 매치에선 무시.
+	if (!GetWorld() || !GetWorld()->GetGameState<AMTLobbyGameState>())
+	{
+		return;
+	}
+	if (AMTPlayerController* PC = Cast<AMTPlayerController>(GetController()))
+	{
+		PC->Server_ToggleReady();   // 0.5s 쿨다운·검증은 컨트롤러가 처리
+	}
 }
 
 void AMTPlayerCharacter::OnSkillAPressed()
@@ -471,6 +511,13 @@ void AMTPlayerCharacter::MulticastPlayDeathMontage_Implementation(UAnimMontage* 
 
 bool AMTPlayerCharacter::IsEnemyCat(const AActor* SourceActor, const AActor* TargetActor)
 {
+	// 로비에선 폰-폰 데미지 금지 (조형물 선택만 허용). 매치에선 정상 판정.
+	if (SourceActor && SourceActor->GetWorld() &&
+		SourceActor->GetWorld()->GetGameState<AMTLobbyGameState>())
+	{
+		return false;
+	}
+
 	const AMTPlayerCharacter* Src = Cast<AMTPlayerCharacter>(SourceActor);
 	const AMTPlayerCharacter* Tgt = Cast<AMTPlayerCharacter>(TargetActor);
 	if (!Src || !Tgt || Src == Tgt)
