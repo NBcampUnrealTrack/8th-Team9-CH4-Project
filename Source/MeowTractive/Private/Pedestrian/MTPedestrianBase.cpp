@@ -18,7 +18,11 @@
 #include "GameFramework/PlayerState.h"
 #include "GameFramework/Pawn.h"
 #include "Game/MTGameState.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "Net/UnrealNetwork.h"
+#include "UObject/ConstructorHelpers.h"
 
 // 행인 자신의 ASC에 Regen 또는 전역 상태 GameplayEffect를 적용한다.
 static void ApplySelfGE(UAbilitySystemComponent* ASC, TSubclassOf<UGameplayEffect> GE, AActor* Source)
@@ -69,6 +73,13 @@ AMTPedestrianBase::AMTPedestrianBase()
 	AttractiveBarWidget->SetRelativeLocation(FVector(0.f, 0.f, 200.f));
 	AttractiveBarWidget->SetWidgetSpace(EWidgetSpace::Screen);
 	AttractiveBarWidget->SetDrawSize(FVector2D(240.f, 32.f));
+
+	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> AttractedFXAsset(
+		TEXT("/Game/Niagara/NS_PedAttracted.NS_PedAttracted"));
+	if (AttractedFXAsset.Succeeded())
+	{
+		AttractedFX = AttractedFXAsset.Object;
+	}
 }
 
 // 행인의 매료 결과와 현재 선두 플레이어를 복제 속성으로 등록한다.
@@ -207,6 +218,12 @@ void AMTPedestrianBase::HandleAttractiveHit(APlayerState* Source, float Amount)
 	{
 		return;
 	}
+
+	if (AttractedBy == Source)
+	{
+		return;
+	}
+
 	// 매료 직후 15초 무적 중엔 무시 (3초 응시와 별개)
 	if (AbilitySystemComponent && AbilitySystemComponent->HasMatchingGameplayTag(InvulnerableTag))
 	{
@@ -289,6 +306,16 @@ void AMTPedestrianBase::BecomeAttracted(APlayerState* Winner)
 	// 15초 무적 (State.Invulnerable) — 3초 응시와 별개. 회복도 이 동안 정지.
 	ApplySelfGE(AbilitySystemComponent, InvulnerableGE, this);
 
+	if (PreviousOwner != Winner)
+	{
+		FLinearColor PlayerColor = FLinearColor::White;
+		if (const AMTPlayerState* MTPS = Cast<AMTPlayerState>(Winner))
+		{
+			PlayerColor = MTPS->GetTeamColor();
+		}
+		Multicast_PlayAttractedEffect(PlayerColor);
+	}
+
 	// 점수: 소유자가 바뀌면 기존 소유자 -1, 새 소유자 +1
 	if (AMTGameState* GS = GetWorld() ? GetWorld()->GetGameState<AMTGameState>() : nullptr)
 	{
@@ -305,6 +332,28 @@ void AMTPedestrianBase::BecomeAttracted(APlayerState* Winner)
 	BroadcastAttractiveChanged();
 	// StateTree/BP가 구독 → Attracted 상태로 전환(이동 정지, 3초).
 	OnAttracted.Broadcast(Winner);
+}
+
+void AMTPedestrianBase::Multicast_PlayAttractedEffect_Implementation(FLinearColor PlayerColor)
+{
+	if (!AttractedFX)
+	{
+		return;
+	}
+
+	UNiagaraComponent* AttractedFXComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+		AttractedFX,
+		GetRootComponent(),
+		NAME_None,
+		AttractedFXOffset,
+		FRotator::ZeroRotator,
+		EAttachLocation::KeepRelativeOffset,
+		true);
+
+	if (AttractedFXComponent)
+	{
+		AttractedFXComponent->SetVariableLinearColor(FName(TEXT("User.PlayerColor")), PlayerColor);
+	}
 }
 
 // StateTree의 매료 반응 시간이 끝나면 행인의 회전·정지 상태를 해제한다.
