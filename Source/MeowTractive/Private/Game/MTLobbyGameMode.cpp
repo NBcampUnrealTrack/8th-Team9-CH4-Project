@@ -5,6 +5,8 @@
 #include "Player/MTPlayerController.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/GameSession.h"
+#include "GameFramework/PlayerStart.h"
+#include "EngineUtils.h"
 
 AMTLobbyGameMode::AMTLobbyGameMode()
 {
@@ -28,6 +30,57 @@ void AMTLobbyGameMode::BeginPlay()
 			GS->SetRoomSettings(GI->GetRoomSettings());
 		}
 	}
+}
+
+void AMTLobbyGameMode::RespawnLobbyPawn(AController* C)
+{
+	if (!HasAuthority() || !C)
+	{
+		return;
+	}
+	// 기존 폰 제거 후 선택 종류로 재스폰 (같은/임의 PlayerStart)
+	if (APawn* Old = C->GetPawn())
+	{
+		C->UnPossess();
+		Old->Destroy();
+	}
+	RestartPlayer(C);   // GetDefaultPawnClassForController로 새 폰 결정
+}
+
+UClass* AMTLobbyGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
+{
+	// 로비에서 선택한 고양이를 그대로 조종 (인게임과 동일 폰) → 컨트롤 연습
+	if (InController)
+	{
+		if (const AMTPlayerState* MTPS = InController->GetPlayerState<AMTPlayerState>())
+		{
+			if (const TSubclassOf<APawn>* Found = CatPawnClasses.Find(MTPS->GetSelectedCat()))
+			{
+				if (*Found)
+				{
+					return *Found;
+				}
+			}
+		}
+	}
+	return Super::GetDefaultPawnClassForController_Implementation(InController);
+}
+
+AActor* AMTLobbyGameMode::ChoosePlayerStart_Implementation(AController* Player)
+{
+	// 슬롯별 PlayerStart("Slot%d") — 자기 조형물(OwnerSlot 동일) 앞에 스폰
+	if (const AMTPlayerState* MTPS = Player ? Player->GetPlayerState<AMTPlayerState>() : nullptr)
+	{
+		const FString Tag = FString::Printf(TEXT("Slot%d"), MTPS->GetPlayerSlot());
+		for (TActorIterator<APlayerStart> It(GetWorld()); It; ++It)
+		{
+			if (It->PlayerStartTag == FName(*Tag))
+			{
+				return *It;
+			}
+		}
+	}
+	return Super::ChoosePlayerStart_Implementation(Player);
 }
 
 void AMTLobbyGameMode::ApplyRoomSettings(AController* Requestor, FMTRoomSettings NewSettings)
@@ -129,32 +182,81 @@ void AMTLobbyGameMode::Logout(AController* Exiting)
 		}
 	}
 	Super::Logout(Exiting);
+
+	// 이탈로 인원/준비 조건이 깨지면 카운트다운 취소
+	NotifyReadyChanged();
 }
 
 bool AMTLobbyGameMode::CanStartMatch() const
 {
 	const AGameStateBase* GS = GameState;
-	if (!GS || GS->PlayerArray.Num() < 2)   // 호스트 혼자 시작 불가 (최소 2명)
+	if (!GS || GS->PlayerArray.Num() < 2)   // 최소 2명
 	{
 		return false;
 	}
+	// 3D 로비: 전원(호스트 포함) R키로 Ready → 자동 시작
 	for (const APlayerState* PS : GS->PlayerArray)
 	{
 		const AMTPlayerState* MTPS = Cast<AMTPlayerState>(PS);
-		if (!MTPS)
-		{
-			return false;
-		}
-		if (MTPS->IsHost())
-		{
-			continue;   // 호스트는 준비 불필요 (시작 권한 보유)
-		}
-		if (!MTPS->IsReady())
+		if (!MTPS || !MTPS->IsReady())
 		{
 			return false;
 		}
 	}
 	return true;
+}
+
+void AMTLobbyGameMode::NotifyReadyChanged()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	AMTLobbyGameState* GS = GetGameState<AMTLobbyGameState>();
+	if (!GS)
+	{
+		return;
+	}
+
+	if (CanStartMatch())
+	{
+		// 전원 준비 → 카운트다운 시작 (이미 돌고 있으면 유지)
+		if (!GetWorldTimerManager().IsTimerActive(CountdownTimer))
+		{
+			GS->SetStartCountdown(AutoStartSeconds);
+			GetWorldTimerManager().SetTimer(CountdownTimer, this, &AMTLobbyGameMode::TickCountdown, 1.f, true);
+		}
+	}
+	else
+	{
+		// 준비 해제/이탈 → 취소
+		GetWorldTimerManager().ClearTimer(CountdownTimer);
+		GS->SetStartCountdown(-1);
+	}
+}
+
+void AMTLobbyGameMode::TickCountdown()
+{
+	AMTLobbyGameState* GS = GetGameState<AMTLobbyGameState>();
+	if (!GS || !CanStartMatch())   // 카운트다운 중 이탈/해제 대비 재검증
+	{
+		GetWorldTimerManager().ClearTimer(CountdownTimer);
+		if (GS) { GS->SetStartCountdown(-1); }
+		return;
+	}
+
+	const int32 Remaining = GS->GetStartCountdown() - 1;
+	if (Remaining <= 0)
+	{
+		GetWorldTimerManager().ClearTimer(CountdownTimer);
+		GS->SetStartCountdown(0);   // "시작!" 표시용
+		TryStartMatch();
+	}
+	else
+	{
+		GS->SetStartCountdown(Remaining);
+	}
 }
 
 FString AMTLobbyGameMode::ResolveMatchMapPath() const

@@ -69,6 +69,9 @@ protected:
 
 	void MeowPunch();
 
+	// 로비에서만 R키 → 준비 토글 (매치에선 무시). 서버 RPC는 컨트롤러가 처리.
+	void ToggleReady();
+
 	// 종류별 스킬 슬롯: 입력은 슬롯 InputID만 GAS에 전달, 실제 어빌리티는 CatAbilities가 결정
 	void OnSkillAPressed();
 	void OnSkillAReleased();
@@ -77,6 +80,9 @@ protected:
 
 	// 스턴 중이면 스킬/이동 입력 무시
 	bool IsStunned() const;
+
+	// 로비에서만 개인화: 내 폰만 표시(파생 조형물은 소유 슬롯 기준으로 override). 매치에선 무효.
+	virtual void UpdateLobbyVisibility();
 
 	// 사망 애니메이션
 	UPROPERTY(EditDefaultsOnly, Category = "Die")
@@ -119,6 +125,10 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* SkillBAction;
+
+	// 로비 준비 토글 (R). 로비 전용 — 매치에선 핸들러가 무시
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* ReadyAction;
 
 #pragma endregion
 
@@ -164,6 +174,11 @@ public:
 	bool IsDead() const { return bIsDead; }
 
 	void Die(AController* KillerController = nullptr);
+
+	// 로비 등에서 마우스 커서/UI 입력 토글 (강퇴·메뉴 클릭용). 로컬 전용.
+	// bEnable=true: GameAndUI + 커서 표시 / false: GameOnly + 커서 숨김
+	UFUNCTION(BlueprintCallable, Category = "MT|Input")
+	void SetUICursorEnabled(bool bEnable);
 
 private:
 	// State.Stun 태그 변화 → 이동/입력 잠금 토글 (소유 클라 기준)

@@ -8,6 +8,22 @@ void AMTLobbyGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 	DOREPLIFETIME(AMTLobbyGameState, RoomGameMode);
 	DOREPLIFETIME(AMTLobbyGameState, RoomMap);
 	DOREPLIFETIME(AMTLobbyGameState, bHasPassword);
+	DOREPLIFETIME(AMTLobbyGameState, StartCountdown);
+}
+
+void AMTLobbyGameState::SetStartCountdown(int32 Seconds)
+{
+	if (!HasAuthority() || StartCountdown == Seconds)
+	{
+		return;
+	}
+	StartCountdown = Seconds;
+	OnStartCountdownChanged.Broadcast(StartCountdown);   // 리슨 호스트 UI 즉시 갱신
+}
+
+void AMTLobbyGameState::OnRep_Countdown()
+{
+	OnStartCountdownChanged.Broadcast(StartCountdown);
 }
 
 void AMTLobbyGameState::SetRoomSettings(const FMTRoomSettings& NewSettings)

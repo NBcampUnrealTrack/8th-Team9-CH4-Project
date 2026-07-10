@@ -1,9 +1,57 @@
 ﻿#include "Player/MTPlayerController.h"
 #include "Player/MTPlayerState.h"
 #include "UI/InGame/MTMatchGameResultWidget.h"
+#include "UI/PauseMenu/MTPauseMenuWidget.h"
 #include "Game/MTLobbyGameMode.h"
 #include "Game/MTMatchGameMode.h"
 #include "Game/MTGameInstance.h"
+#include "InputCoreTypes.h"
+
+void AMTPlayerController::SetupInputComponent()
+{
+	Super::SetupInputComponent();
+
+	// ESC → 일시정지 메뉴 토글 (로컬 PC에만 InputComponent 존재)
+	if (InputComponent)
+	{
+		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AMTPlayerController::TogglePauseMenu);
+	}
+}
+
+void AMTPlayerController::TogglePauseMenu()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+
+	// 열려 있으면 닫기 → 게임 입력 복원
+	if (PauseMenu)
+	{
+		PauseMenu->RemoveFromParent();
+		PauseMenu = nullptr;
+		SetInputMode(FInputModeGameOnly());
+		SetShowMouseCursor(false);
+		return;
+	}
+
+	// 닫혀 있으면 열기 → UIOnly로 이동 차단 + 커서
+	if (!PauseMenuClass)
+	{
+		return;
+	}
+	PauseMenu = CreateWidget<UMTPauseMenuWidget>(this, PauseMenuClass);
+	if (!PauseMenu)
+	{
+		return;
+	}
+	PauseMenu->AddToViewport(50);
+
+	FInputModeUIOnly Mode;
+	Mode.SetWidgetToFocus(PauseMenu->TakeWidget());   // 위젯이 ESC 키 수신
+	SetInputMode(Mode);
+	SetShowMouseCursor(true);
+}
 
 void AMTPlayerController::Server_SetSelectedCat_Implementation(EMTCatType NewCat)
 {
@@ -12,7 +60,17 @@ void AMTPlayerController::Server_SetSelectedCat_Implementation(EMTCatType NewCat
 	{
 		return;
 	}
+	if (MTPS->GetSelectedCat() == NewCat)
+	{
+		return;   // 동일 선택은 무시 (불필요한 재스폰 방지)
+	}
 	MTPS->SetSelectedCat(NewCat);
+
+	// 로비면 새 종류 폰으로 재스폰 (매치에선 GameMode가 null이라 자동 무시)
+	if (AMTLobbyGameMode* Lobby = GetWorld() ? GetWorld()->GetAuthGameMode<AMTLobbyGameMode>() : nullptr)
+	{
+		Lobby->RespawnLobbyPawn(this);
+	}
 }
 
 void AMTPlayerController::Server_ToggleReady_Implementation()
@@ -27,6 +85,12 @@ void AMTPlayerController::Server_ToggleReady_Implementation()
 	if (AMTPlayerState* MTPS = GetPlayerState<AMTPlayerState>())
 	{
 		MTPS->SetReady(!MTPS->IsReady());
+	}
+
+	// 전원 준비 시 자동 시작 판정
+	if (AMTLobbyGameMode* Lobby = GetWorld() ? GetWorld()->GetAuthGameMode<AMTLobbyGameMode>() : nullptr)
+	{
+		Lobby->NotifyReadyChanged();
 	}
 }
 
