@@ -70,8 +70,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Match Rules|Pedestrian")
 	FMTPedestrianGenerationConfig PedestrianGenerationConfig;
 
-    UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
+	UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
     int32 MaxNormalPedestrians = 20;
+
+	// MainStreet 기준 행인 NavMesh 랜덤 스폰 반경(cm).
+	UPROPERTY(EditDefaultsOnly, Category = "Match Rules|Pedestrian", meta = (ClampMin = "0.0"))
+	float PedestrianSpawnRadius = 2000.f;
 
 	TArray<class APlayerStart*> UsedStarts; // 플레이어 스타트 지점
 

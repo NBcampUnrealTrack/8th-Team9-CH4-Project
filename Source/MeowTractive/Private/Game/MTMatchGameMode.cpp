@@ -166,8 +166,8 @@ void AMTMatchGameMode::SpawnInitialPedestrians()
 
         FNavLocation RandomNavLocation;
         
-        // 대로 포인트 주변 15~20미터(1500.f~2000.f) 반경 안에서 내비 바닥 찾기
-        bool bProjectSuccess = NavSys->GetRandomReachablePointInRadius(PivotLocation, 2000.f, RandomNavLocation);
+		// 대로 포인트 주변 설정 반경 안에서 내비 바닥 찾기
+		bool bProjectSuccess = NavSys->GetRandomReachablePointInRadius(PivotLocation, PedestrianSpawnRadius, RandomNavLocation);
 
         FVector SpawnLocation = bProjectSuccess ? RandomNavLocation.Location : PivotLocation;
         SpawnLocation.Z += 50.f;
