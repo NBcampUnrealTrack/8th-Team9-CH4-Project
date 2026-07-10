@@ -12,7 +12,17 @@ void AMTPlayerController::Server_SetSelectedCat_Implementation(EMTCatType NewCat
 	{
 		return;
 	}
+	if (MTPS->GetSelectedCat() == NewCat)
+	{
+		return;   // 동일 선택은 무시 (불필요한 재스폰 방지)
+	}
 	MTPS->SetSelectedCat(NewCat);
+
+	// 로비면 새 종류 폰으로 재스폰 (매치에선 GameMode가 null이라 자동 무시)
+	if (AMTLobbyGameMode* Lobby = GetWorld() ? GetWorld()->GetAuthGameMode<AMTLobbyGameMode>() : nullptr)
+	{
+		Lobby->RespawnLobbyPawn(this);
+	}
 }
 
 void AMTPlayerController::Server_ToggleReady_Implementation()
@@ -27,6 +37,12 @@ void AMTPlayerController::Server_ToggleReady_Implementation()
 	if (AMTPlayerState* MTPS = GetPlayerState<AMTPlayerState>())
 	{
 		MTPS->SetReady(!MTPS->IsReady());
+	}
+
+	// 전원 준비 시 자동 시작 판정
+	if (AMTLobbyGameMode* Lobby = GetWorld() ? GetWorld()->GetAuthGameMode<AMTLobbyGameMode>() : nullptr)
+	{
+		Lobby->NotifyReadyChanged();
 	}
 }
 

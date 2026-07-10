@@ -10,6 +10,7 @@
 #include "Player/MTPlayerState.h"
 #include "Engine/Engine.h"
 #include "Game/MTMatchGameMode.h"
+#include "Game/MTLobbyGameMode.h"
 #include "Net/UnrealNetwork.h"
 
 AMTPlayerCharacter::AMTPlayerCharacter()
@@ -200,18 +201,43 @@ void AMTPlayerCharacter::NotifyControllerChanged()
 void AMTPlayerCharacter::ApplyLocalInputMode()
 {
 	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (PC && PC->IsLocalController())
+	if (!PC || !PC->IsLocalController())
+	{
+		return;
+	}
+
+	// 로비·매치 공통: 조작만 → GameOnly + 커서 숨김. (로비 액션도 전부 키 입력)
+	PC->SetInputMode(FInputModeGameOnly());
+	PC->SetShowMouseCursor(false);
+
+	if (MTLogEnabled())
+	{
+		const FString Msg = FString::Printf(TEXT("[MTPawn] ApplyLocalInputMode → GameOnly | PC=%s NetMode=%d Pawn=%s"),
+			*PC->GetName(), (int32)GetNetMode(), *GetName());
+		UE_LOG(LogMT, Log, TEXT("%s"), *Msg);
+		if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Magenta, Msg);
+	}
+}
+
+void AMTPlayerCharacter::SetUICursorEnabled(bool bEnable)
+{
+	APlayerController* PC = Cast<APlayerController>(GetController());
+	if (!PC || !PC->IsLocalController())
+	{
+		return;
+	}
+
+	if (bEnable)
+	{
+		FInputModeGameAndUI Mode;
+		Mode.SetLockMouseToViewportBehavior(EMouseLockMode::DoNotLock);
+		PC->SetInputMode(Mode);
+		PC->SetShowMouseCursor(true);
+	}
+	else
 	{
 		PC->SetInputMode(FInputModeGameOnly());
 		PC->SetShowMouseCursor(false);
-
-		if (MTLogEnabled())
-		{
-			const FString Msg = FString::Printf(TEXT("[MTPawn] ApplyLocalInputMode → GameOnly | PC=%s NetMode=%d Pawn=%s"),
-				*PC->GetName(), (int32)GetNetMode(), *GetName());
-			UE_LOG(LogMT, Log, TEXT("%s"), *Msg);
-			if (GEngine) GEngine->AddOnScreenDebugMessage(-1, 15.f, FColor::Magenta, Msg);
-		}
 	}
 }
 

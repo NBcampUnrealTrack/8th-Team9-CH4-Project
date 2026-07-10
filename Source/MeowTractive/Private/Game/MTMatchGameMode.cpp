@@ -200,6 +200,26 @@ void AMTMatchGameMode::AssignTeamColor(AController* C)
 	}
 }
 
+UClass* AMTMatchGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
+{
+	// 로비에서 운반된 선택 고양이로 폰 클래스 결정 (없으면 DefaultPawnClass)
+	if (InController)
+	{
+		if (const AMTPlayerState* MTPS = InController->GetPlayerState<AMTPlayerState>())
+		{
+			const EMTCatType Cat = MTPS->GetSelectedCat();
+			if (const TSubclassOf<APawn>* Found = CatPawnClasses.Find(Cat))
+			{
+				if (*Found)
+				{
+					return *Found;
+				}
+			}
+		}
+	}
+	return Super::GetDefaultPawnClassForController_Implementation(InController);
+}
+
 AActor* AMTMatchGameMode::ChoosePlayerStart_Implementation(AController* Player)
 {
 	// 플레이어 스타트

@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameMode.h"
 #include "Pedestrian/MTPedestrianAppearanceTypes.h"
+#include "Game/MTTypes.h"
 #include "MTMatchGameMode.generated.h"
 
 /** 인게임 매치 — bDelayedStart로 대기하다가 전원 로딩 완료 시 StartMatch. */
@@ -33,6 +34,13 @@ public:
 	// 슬롯별 팀색 (인덱스 = PlayerSlot). 빨·파·초·노 순
 	UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
 	TArray<FLinearColor> TeamColors;
+
+	// 선택 고양이별 폰 클래스 (BP_Fatty/Mackerel/Spotted). 없으면 DefaultPawnClass 폴백.
+	UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
+	TMap<EMTCatType, TSubclassOf<APawn>> CatPawnClasses;
+
+	// 선택 고양이에 따라 스폰 폰 클래스 결정
+	virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
 
 	// 플레이어 스타트 지점
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;

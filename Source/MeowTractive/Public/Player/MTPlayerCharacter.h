@@ -165,6 +165,11 @@ public:
 
 	void Die(AController* KillerController = nullptr);
 
+	// 로비 등에서 마우스 커서/UI 입력 토글 (강퇴·메뉴 클릭용). 로컬 전용.
+	// bEnable=true: GameAndUI + 커서 표시 / false: GameOnly + 커서 숨김
+	UFUNCTION(BlueprintCallable, Category = "MT|Input")
+	void SetUICursorEnabled(bool bEnable);
+
 private:
 	// State.Stun 태그 변화 → 이동/입력 잠금 토글 (소유 클라 기준)
 	void OnStunTagChanged(const FGameplayTag Tag, int32 NewCount);
