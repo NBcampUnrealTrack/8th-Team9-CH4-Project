@@ -174,6 +174,18 @@ void UMTGameInstance::JoinSessionByName(const FString& RoomName, const FString& 
 
 void UMTGameInstance::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString)
 {
+	// 조인 시도가 접속 전에 거부됨(예: 매치 진행 중 PreLogin 거부) — 메뉴에 그대로 있으니
+	// 서버가 보낸 사유(ErrorString)를 기존 참가 실패 다이얼로그로 표시.
+	if (FailureType == ENetworkFailure::PendingConnectionFailure)
+	{
+		const FString Reason = ErrorString.IsEmpty()
+			? TEXT("세션에 참여할 수 없습니다.")
+			: ErrorString;
+		MTScreen(FColor::Orange, FString::Printf(TEXT("[MTFlow] 참가 거부: %s"), *Reason));
+		OnJoinFailed.Broadcast(FText::FromString(Reason));
+		return;
+	}
+
 	// 호스트(리슨 서버)는 자기 세션 유지 — 튕김 복귀는 클라 전용
 	if (World && World->GetNetMode() != NM_Client)
 	{

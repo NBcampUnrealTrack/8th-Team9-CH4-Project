@@ -1,6 +1,7 @@
 ﻿#include "Game/MTMatchGameMode.h"
 #include "Game/MTGameState.h"
 #include "Game/MTLog.h"
+#include "Online/MTSessionSubsystem.h"
 #include "Player/MTPlayerState.h"
 #include "Player/MTPlayerController.h"
 #include "UI/InGame/MTPlayerHUD.h"
@@ -39,6 +40,20 @@ AMTMatchGameMode::AMTMatchGameMode()
 	};
 
 	PedestrianGenerationConfig = UMTPedestrianSpawnManager::MakeTestConfiguration();
+}
+
+void AMTMatchGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+
+	// 이미 상위에서 거부됐으면 그 사유 유지
+	if (!ErrorMessage.IsEmpty())
+	{
+		return;
+	}
+	// 매치 맵에 도달했다는 것 자체가 게임 시작 → 신규 접속 거부.
+	// (로비에서 함께 넘어온 플레이어는 seamless travel이라 이 경로를 안 탐)
+	ErrorMessage = TEXT("게임이 이미 시작되어 참여할 수 없습니다.");
 }
 
 void AMTMatchGameMode::PostLogin(APlayerController* NewPlayer)
@@ -327,6 +342,15 @@ void AMTMatchGameMode::HandleMatchHasStarted()
 {
 	Super::HandleMatchHasStarted();
 	UE_LOG(LogTemp, Log, TEXT("[MTMatch] 전원 로딩 완료 → StartMatch (InProgress)"));
+
+	// 게임 시작 → 세션을 검색·조인 불가로 (중도 참여 차단, 방 목록에서도 숨김)
+	if (UGameInstance* GI = GetGameInstance())
+	{
+		if (UMTSessionSubsystem* Sessions = GI->GetSubsystem<UMTSessionSubsystem>())
+		{
+			Sessions->SetSessionJoinable(false);
+		}
+	}
 
 	if (MTLogEnabled())
 	{

@@ -36,6 +36,9 @@ public:
 	// 로비 중 방 설정 변경 → 세션 광고 갱신 (호스트 전용)
 	void UpdateRoomSettings(const FMTRoomSettings& RoomSettings);
 
+	// 매치 시작/종료 시 참여 가능 여부 토글 (호스트 전용). false면 검색 숨김 + 조인 거부.
+	void SetSessionJoinable(bool bJoinable);
+
 	// 방 검색
 	UFUNCTION(BlueprintCallable, Category = "MT|Session")
 	void FindSessions(int32 MaxSearchResults, bool bIsLAN);

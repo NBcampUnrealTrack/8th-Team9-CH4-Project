@@ -18,6 +18,9 @@ public:
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void HandleSeamlessTravelPlayer(AController*& C) override;
 
+	// 매치 맵 진입 후 신규 접속 거부 (인게임 중도 참여 차단). 로비 동반 플레이어는 seamless라 안 거침.
+	virtual void PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
+
 	virtual void HandleMatchHasEnded() override;
 
 	// 세션 유지 + 전원 로비 맵으로 복귀 (호스트 권위 ServerTravel)

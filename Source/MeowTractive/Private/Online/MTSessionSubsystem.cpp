@@ -58,6 +58,17 @@ void UMTSessionSubsystem::UpdateRoomSettings(const FMTRoomSettings& RoomSettings
 	SessionInterface->UpdateSession(NAME_GameSession, *LastSessionSettings, true);
 }
 
+void UMTSessionSubsystem::SetSessionJoinable(bool bJoinable)
+{
+	if (!SessionInterface.IsValid() || !LastSessionSettings.IsValid())
+	{
+		return;
+	}
+	LastSessionSettings->bAllowJoinInProgress = bJoinable;
+	LastSessionSettings->bShouldAdvertise = bJoinable;   // 검색 목록 노출/숨김도 함께
+	SessionInterface->UpdateSession(NAME_GameSession, *LastSessionSettings, true);
+}
+
 void UMTSessionSubsystem::CreateSession(int32 NumPublicConnections, bool bIsLAN, const FMTRoomSettings& RoomSettings)
 {
 	const ULocalPlayer* LocalPlayer = GetGameInstance() ? GetGameInstance()->GetFirstGamePlayer() : nullptr;

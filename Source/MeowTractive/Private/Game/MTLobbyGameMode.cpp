@@ -1,6 +1,7 @@
 ﻿#include "Game/MTLobbyGameMode.h"
 #include "Game/MTLobbyGameState.h"
 #include "Game/MTGameInstance.h"
+#include "Online/MTSessionSubsystem.h"
 #include "Player/MTPlayerState.h"
 #include "Player/MTPlayerController.h"
 #include "GameFramework/GameStateBase.h"
@@ -30,6 +31,12 @@ void AMTLobbyGameMode::BeginPlay()
 			GS->SetRoomSettings(GI->GetRoomSettings());
 		}
 	}
+
+	// 로비(최초/매치 복귀)에선 다시 참여 가능하게 개방 (매치 시작 시 닫힌 것 복구)
+	if (UMTSessionSubsystem* Sessions = GetGameInstance() ? GetGameInstance()->GetSubsystem<UMTSessionSubsystem>() : nullptr)
+	{
+		Sessions->SetSessionJoinable(true);
+	}
 }
 
 void AMTLobbyGameMode::RespawnLobbyPawn(AController* C)
@@ -38,13 +45,25 @@ void AMTLobbyGameMode::RespawnLobbyPawn(AController* C)
 	{
 		return;
 	}
-	// 기존 폰 제거 후 선택 종류로 재스폰 (같은/임의 PlayerStart)
+	// 기존 폰 위치를 캡처 → 그 자리에 새 고양이 스폰 (선택 시 제자리 교체)
+	FTransform SpawnXform;
+	bool bHasXform = false;
 	if (APawn* Old = C->GetPawn())
 	{
+		SpawnXform = Old->GetActorTransform();
+		bHasXform = true;
 		C->UnPossess();
 		Old->Destroy();
 	}
-	RestartPlayer(C);   // GetDefaultPawnClassForController로 새 폰 결정
+
+	if (bHasXform)
+	{
+		RestartPlayerAtTransform(C, SpawnXform);   // 기존 위치에 GetDefaultPawnClassForController 폰
+	}
+	else
+	{
+		RestartPlayer(C);   // 폰이 없던 경우만 PlayerStart 폴백
+	}
 }
 
 UClass* AMTLobbyGameMode::GetDefaultPawnClassForController_Implementation(AController* InController)
