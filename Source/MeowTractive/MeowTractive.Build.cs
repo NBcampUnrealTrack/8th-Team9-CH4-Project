@@ -32,6 +32,7 @@ public class MeowTractive : ModuleRules
 			//StateTree (C++ 태스크용)
 			"StateTreeModule",
 			"GameplayStateTreeModule",
+			//이펙트용
 			"Niagara"
 		});
 

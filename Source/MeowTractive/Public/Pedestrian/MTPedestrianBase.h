@@ -12,6 +12,7 @@ class UMTPedestrianAttributeSet;
 class UMTAttractiveComponent;
 class UWidgetComponent;
 class UGameplayEffect;
+class UNiagaraSystem;
 class APlayerState;
 
 // 최고 매료 수치 변경 알림 (Current, Max). 클라 프로그레스바가 이벤트로 구독.
@@ -98,6 +99,12 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Attractive|GE")
 	TSubclassOf<UGameplayEffect> InvulnerableGE;    // 15s, grants State.Invulnerable
 
+	UPROPERTY(EditDefaultsOnly, Category = "Attractive|FX")
+	TObjectPtr<UNiagaraSystem> AttractedFX;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Attractive|FX")
+	FVector AttractedFXOffset = FVector(0.f, 0.f, 50.f);
+
 	// 매료 소유자 (복제). 기여도 테이블 전체가 아닌 결과만 동기화.
 	UPROPERTY(ReplicatedUsing = OnRep_Attracted)
 	TObjectPtr<APlayerState> AttractedBy;
@@ -133,6 +140,9 @@ private:
 	void BecomeAttracted(APlayerState* Winner);
 	void ResetAttractiveAmounts();
 	void UpdateLeadingPlayer();
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayAttractedEffect(FLinearColor PlayerColor);
 
 	void UpdateAttractiveBarVisibility();
 	FLinearColor GetLeaderColor() const;   // AttractedBy/LeadingPlayer의 팀 색

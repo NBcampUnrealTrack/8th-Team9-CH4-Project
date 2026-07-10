@@ -2,12 +2,17 @@
 
 #include "Pedestrian/MTPedestrianBase.h"
 #include "Game/MTGameplayTags.h"
+#include "Player/MTPlayerState.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
+#include "GameFramework/Character.h"
 #include "GameplayTagContainer.h"
 #include "Engine/World.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
+#include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
 
@@ -21,49 +26,23 @@ UGA_AttractiveBeam::UGA_AttractiveBeam()
 
 	// 기본공격: State.Casting 미부여(스킬을 막지 않음). 스킬 시전 중엔 발동만 차단 + 스킬이 이 어빌리티를 취소.
 	ActivationBlockedTags.AddTag(MTGameplayTags::State::TAG_State_Casting);
+	AttractiveBeamFX = TSoftObjectPtr<UNiagaraSystem>(
+		FSoftObjectPath(TEXT("/Game/Niagara/NS_AttractiveBeam.NS_AttractiveBeam")));
 }
 
+//빔 발사
 void UGA_AttractiveBeam::FireBeam()
 {
-	AActor* Avatar = GetAvatarActorFromActorInfo();
-	const APawn* Pawn = Cast<APawn>(Avatar);
-	APlayerController* PC = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
-	if (!PC)
+	FVector TraceStart;
+	FVector BeamEnd;
+	AMTPedestrianBase* Ped = nullptr;
+	bool bTraceHit = TraceBeam(TraceStart, BeamEnd, Ped);
+	UpdateAttractiveBeamHitFX(bTraceHit);
+	if (!bTraceHit)
 	{
 		return;
 	}
-
-	FVector CamLocation;
-	FRotator CamRotation;
-	PC->GetPlayerViewPoint(CamLocation, CamRotation);
-	const FVector Start = CamLocation;
-	const FVector TraceEnd = Start + (CamRotation.Vector() * TraceDistance);
-
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(Avatar);
-
-	// 빔 시각 끝점: 벽(가시성)에 막히면 거기까지
-	FVector BeamEnd = TraceEnd;
-	FHitResult WallHit;
-	if (GetWorld()->LineTraceSingleByChannel(WallHit, Start, TraceEnd, ECC_Visibility, Params))
-	{
-		BeamEnd = WallHit.ImpactPoint;
-	}
-
-	// 굵은 빔: 구체 스윕 단일 판정 — 경로상 '첫 폰'만 (관통 없음)
-	FHitResult PawnHit;
-	FCollisionObjectQueryParams ObjParams;
-	ObjParams.AddObjectTypesToQuery(ECC_Pawn);
-	const bool bPawnHit = GetWorld()->SweepSingleByObjectType(
-		PawnHit, Start, BeamEnd, FQuat::Identity, ObjParams, FCollisionShape::MakeSphere(BeamRadius), Params);
-
-	AMTPedestrianBase* Ped = nullptr;
-	if (bPawnHit)
-	{
-		// 폰에 맞으면 빔은 거기서 끝 (관통 X)
-		BeamEnd = PawnHit.ImpactPoint;
-		Ped = Cast<AMTPedestrianBase>(PawnHit.GetActor());
-	}
+	
 
 	const bool bHitPed = (Ped != nullptr);
 	if (bHitPed && HasAuthority(&CurrentActivationInfo))
@@ -73,12 +52,35 @@ void UGA_AttractiveBeam::FireBeam()
 
 	if (bDrawDebug)
 	{
-		DrawDebugLine(GetWorld(), Start, BeamEnd, bHitPed ? FColor::Red : FColor::Green, false, FireInterval, 0, 2.f);
+		DrawDebugLine(GetWorld(), TraceStart, BeamEnd, bHitPed ? FColor::Red : FColor::Green, false, FireInterval, 0, 2.f);
 		DrawDebugSphere(GetWorld(), BeamEnd, BeamRadius, 8, FColor::Yellow, false, FireInterval);
 	}
 
-	// VFX 훅 — BP가 Niagara 빔 끝점을 여기에 맞춤
-	OnBeamUpdate(Start, BeamEnd, bHitPed);
+	UpdateAttractiveBeamFX(GetAttractiveBeamFXStartLocation(), BeamEnd);
+	OnBeamUpdate(TraceStart, BeamEnd, bHitPed);
+}
+
+//이펙트만 업데이트
+void UGA_AttractiveBeam::UpdateBeamVisual()
+{
+	FVector TraceStart;
+	FVector BeamEnd;
+	AMTPedestrianBase* Ped = nullptr;
+	if (TraceBeam(TraceStart, BeamEnd, Ped))
+	{
+		const bool bHitPed = (Ped != nullptr);
+		UpdateAttractiveBeamFX(GetAttractiveBeamFXStartLocation(), BeamEnd);
+		OnBeamUpdate(TraceStart, BeamEnd, bHitPed);
+	}
+
+	if (bIsBeamVisualUpdateActive)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			BeamVisualTimerHandle = World->GetTimerManager().SetTimerForNextTick(
+				this, &UGA_AttractiveBeam::UpdateBeamVisual);
+		}
+	}
 }
 
 void UGA_AttractiveBeam::ActivateAbility(
@@ -95,10 +97,13 @@ void UGA_AttractiveBeam::ActivateAbility(
 		return;
 	}
 
+	StartAttractiveBeamFX();
 	OnBeamStart(); // VFX 시작 훅
 
 	// 첫 발 즉시
 	FireBeam();
+	bIsBeamVisualUpdateActive = true;
+	UpdateBeamVisual();
 
 	// 이후 FireInterval 간격으로 반복 (지속 빔)
 	if (UWorld* World = GetWorld())
@@ -116,11 +121,14 @@ void UGA_AttractiveBeam::EndAbility(
 	bool bReplicateEndAbility,
 	bool bWasCancelled)
 {
+	bIsBeamVisualUpdateActive = false;
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(BeamTimerHandle);
+		World->GetTimerManager().ClearTimer(BeamVisualTimerHandle);
 	}
 
+	StopAttractiveBeamFX();
 	OnBeamEnd(); // VFX 종료 훅
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
@@ -151,4 +159,217 @@ void UGA_AttractiveBeam::ApplyAttractiveDamage(AMTPedestrianBase* Target)
 		Spec.Data->SetSetByCallerMagnitude(DamageTag, BaseDamage);
 		SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
 	}
+}
+
+void UGA_AttractiveBeam::StartAttractiveBeamFX()
+{
+	if (!AttractiveBeamFX)
+	{
+		return;
+	}
+
+	if (ActiveAttractiveBeamFX)
+	{
+		if (UWorld* World = GetWorld())
+		{
+			World->GetTimerManager().ClearTimer(BeamFXCleanupTimerHandle);
+		}
+
+		bIsAttractiveBeamFXEnding = false;
+		ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.BeamEnding")), false);
+		ActiveAttractiveBeamFX->SetVariableFloat(FName(TEXT("User.BeamFadeOutTime")), BeamFXFadeOutTime);
+		ActiveAttractiveBeamFX->Activate(true);
+		ActiveAttractiveBeamFX->SetVariableLinearColor(FName(TEXT("User.PlayerColor")), GetAvatarPlayerColor());
+		return;
+	}
+
+	AActor* Avatar = GetAvatarActorFromActorInfo();
+	if (!Avatar)
+	{
+		return;
+	}
+
+	USceneComponent* AttachComponent = Avatar->GetRootComponent();
+	if (const ACharacter* Character = Cast<ACharacter>(Avatar))
+	{
+		if (Character->GetMesh())
+		{
+			AttachComponent = Character->GetMesh();
+		}
+	}
+
+	if (!AttachComponent)
+	{
+		return;
+	}
+
+	UNiagaraSystem* AttractiveBeamFXAsset = AttractiveBeamFX.LoadSynchronous();
+	if (!AttractiveBeamFXAsset)
+	{
+		return;
+	}
+
+	ActiveAttractiveBeamFX = UNiagaraFunctionLibrary::SpawnSystemAttached(
+		AttractiveBeamFXAsset,
+		AttachComponent,
+		AttractiveBeamSocketName,
+		FVector::ZeroVector,
+		FRotator::ZeroRotator,
+		EAttachLocation::SnapToTarget,
+		false);
+
+	if (ActiveAttractiveBeamFX)
+	{
+		bIsAttractiveBeamFXEnding = false;
+		ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.BeamEnding")), false);
+		ActiveAttractiveBeamFX->SetVariableFloat(FName(TEXT("User.BeamFadeOutTime")), BeamFXFadeOutTime);
+		ActiveAttractiveBeamFX->SetVariableLinearColor(FName(TEXT("User.PlayerColor")), GetAvatarPlayerColor());
+	}
+}
+
+//이펙트 관련 변수 업데이트
+void UGA_AttractiveBeam::UpdateAttractiveBeamFX(const FVector& Start, const FVector& End)
+{
+	if (!ActiveAttractiveBeamFX)
+	{
+		return;
+	}
+
+	ActiveAttractiveBeamFX->SetVariableVec3(FName(TEXT("User.AbsoluteBeamStart")), Start);
+	ActiveAttractiveBeamFX->SetVariableVec3(FName(TEXT("User.AbsoluteBeamEnd")), End);
+	ActiveAttractiveBeamFX->SetVariableLinearColor(FName(TEXT("User.PlayerColor")), GetAvatarPlayerColor());
+}
+
+//빔 적중 여부만 업데이트
+void UGA_AttractiveBeam::UpdateAttractiveBeamHitFX(const bool TraceHit)
+{
+	if (!ActiveAttractiveBeamFX)
+	{
+		return;
+	}
+
+	ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.TraceHit")), TraceHit);
+}
+
+
+
+void UGA_AttractiveBeam::StopAttractiveBeamFX()
+{
+	if (!ActiveAttractiveBeamFX || bIsAttractiveBeamFXEnding)
+	{
+		return;
+	}
+
+	bIsAttractiveBeamFXEnding = true;
+	ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.BeamEnding")), true);
+	ActiveAttractiveBeamFX->SetVariableFloat(FName(TEXT("User.BeamFadeOutTime")), BeamFXFadeOutTime);
+
+	if (BeamFXFadeOutTime <= 0.f)
+	{
+		FinishAttractiveBeamFX();
+		return;
+	}
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(BeamFXCleanupTimerHandle);
+		World->GetTimerManager().SetTimer(
+			BeamFXCleanupTimerHandle,
+			this,
+			&UGA_AttractiveBeam::FinishAttractiveBeamFX,
+			BeamFXFadeOutTime,
+			false);
+		return;
+	}
+
+	FinishAttractiveBeamFX();
+}
+
+void UGA_AttractiveBeam::FinishAttractiveBeamFX()
+{
+	if (!ActiveAttractiveBeamFX)
+	{
+		bIsAttractiveBeamFXEnding = false;
+		return;
+	}
+
+	ActiveAttractiveBeamFX->Deactivate();
+	ActiveAttractiveBeamFX->DestroyComponent();
+	ActiveAttractiveBeamFX = nullptr;
+	bIsAttractiveBeamFXEnding = false;
+}
+
+FVector UGA_AttractiveBeam::GetAttractiveBeamFXStartLocation() const
+{
+	AActor* Avatar = GetAvatarActorFromActorInfo();
+	if (!Avatar)
+	{
+		return FVector::ZeroVector;
+	}
+
+	if (const ACharacter* Character = Cast<ACharacter>(Avatar))
+	{
+		if (const USkeletalMeshComponent* Mesh = Character->GetMesh())
+		{
+			if (Mesh->DoesSocketExist(AttractiveBeamSocketName))
+			{
+				return Mesh->GetSocketLocation(AttractiveBeamSocketName);
+			}
+		}
+	}
+
+	return Avatar->GetActorLocation();
+}
+
+FLinearColor UGA_AttractiveBeam::GetAvatarPlayerColor() const
+{
+	const AActor* Avatar = GetAvatarActorFromActorInfo();
+	const APawn* Pawn = Cast<APawn>(Avatar);
+	const AMTPlayerState* MTPS = Pawn ? Pawn->GetPlayerState<AMTPlayerState>() : nullptr;
+	return MTPS ? MTPS->GetTeamColor() : FLinearColor::White;
+}
+
+bool UGA_AttractiveBeam::TraceBeam(FVector& OutTraceStart, FVector& OutBeamEnd, AMTPedestrianBase*& OutPedestrian) const
+{
+	OutTraceStart = FVector::ZeroVector;
+	OutBeamEnd = FVector::ZeroVector;
+	OutPedestrian = nullptr;
+
+	AActor* Avatar = GetAvatarActorFromActorInfo();
+	const APawn* Pawn = Cast<APawn>(Avatar);
+	APlayerController* PC = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
+	if (!PC || !GetWorld())
+	{
+		return false;
+	}
+
+	FVector CamLocation;
+	FRotator CamRotation;
+	PC->GetPlayerViewPoint(CamLocation, CamRotation);
+	OutTraceStart = CamLocation;
+	const FVector TraceEnd = OutTraceStart + (CamRotation.Vector() * TraceDistance);
+
+	FCollisionQueryParams Params;
+	Params.AddIgnoredActor(Avatar);
+
+	OutBeamEnd = TraceEnd;
+	FHitResult WallHit;
+	if (GetWorld()->LineTraceSingleByChannel(WallHit, OutTraceStart, TraceEnd, ECC_Visibility, Params))
+	{
+		OutBeamEnd = WallHit.ImpactPoint;
+	}
+
+	FHitResult PawnHit;
+	FCollisionObjectQueryParams ObjParams;
+	ObjParams.AddObjectTypesToQuery(ECC_Pawn);
+	const bool bPawnHit = GetWorld()->SweepSingleByObjectType(
+		PawnHit, OutTraceStart, OutBeamEnd, FQuat::Identity, ObjParams, FCollisionShape::MakeSphere(BeamRadius), Params);
+
+	if (bPawnHit)
+	{
+		OutBeamEnd = PawnHit.ImpactPoint;
+		OutPedestrian = Cast<AMTPedestrianBase>(PawnHit.GetActor());
+	}
+
+	return true;
 }
