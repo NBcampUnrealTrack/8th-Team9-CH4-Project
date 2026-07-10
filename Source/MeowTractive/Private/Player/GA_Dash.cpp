@@ -112,6 +112,17 @@ void UGA_Dash::ActivateAbility(const FGameplayAbilitySpecHandle Handle,
 		CachedASC = GetAbilitySystemComponentFromActorInfo();
 		EnsureRechargeTimerRunning();
 	}
+
+	//대쉬 이펙트 재생
+	FGameplayCueParameters Params;
+	Params.Location = Character->GetActorLocation();
+	Params.Normal = Direction;
+	Params.Instigator = Character;
+	Params.EffectCauser = Character;
+
+	LogASC->AddGameplayCue(
+		FGameplayTag::RequestGameplayTag(TEXT("GameplayCue.Cat.Dash")),
+		Params);
 }
 
 void UGA_Dash::OnDashFinished()
@@ -136,6 +147,10 @@ void UGA_Dash::EndAbility(
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
+
+	//대쉬 이펙트 제거
+	GetAbilitySystemComponentFromActorInfo()->RemoveGameplayCue(
+		FGameplayTag::RequestGameplayTag(TEXT("GameplayCue.Cat.Dash")));
 }
 
 void UGA_Dash::CheckDashHit()
