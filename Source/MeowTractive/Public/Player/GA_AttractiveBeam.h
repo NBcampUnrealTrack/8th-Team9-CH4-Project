@@ -46,7 +46,7 @@ protected:
 
 	// 빔 굵기 (cm) — 구체 스윕 반경
 	UPROPERTY(EditDefaultsOnly, Category = "AttractiveBeam", meta = (ClampMin = "0.0"))
-	float BeamRadius = 40.f;
+	float BeamRadius = 30.f;
 
 	// 행인에게 적용할 매료 데미지 GE
 	UPROPERTY(EditDefaultsOnly, Category = "AttractiveBeam")
@@ -65,7 +65,7 @@ protected:
 	float FireInterval = 0.5f;
 
 	UPROPERTY(EditDefaultsOnly, Category = "AttractiveBeam|FX")
-	TSoftObjectPtr<UNiagaraSystem> AttractiveBeamFX;
+	TObjectPtr<UNiagaraSystem> AttractiveBeamFX;
 
 	UPROPERTY(EditDefaultsOnly, Category = "AttractiveBeam|FX")
 	FName AttractiveBeamSocketName = TEXT("attractivebeam");

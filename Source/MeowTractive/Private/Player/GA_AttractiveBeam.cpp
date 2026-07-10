@@ -26,8 +26,6 @@ UGA_AttractiveBeam::UGA_AttractiveBeam()
 
 	// 기본공격: State.Casting 미부여(스킬을 막지 않음). 스킬 시전 중엔 발동만 차단 + 스킬이 이 어빌리티를 취소.
 	ActivationBlockedTags.AddTag(MTGameplayTags::State::TAG_State_Casting);
-	AttractiveBeamFX = TSoftObjectPtr<UNiagaraSystem>(
-		FSoftObjectPath(TEXT("/Game/Niagara/NS_AttractiveBeam.NS_AttractiveBeam")));
 }
 
 //빔 발사
@@ -203,7 +201,7 @@ void UGA_AttractiveBeam::StartAttractiveBeamFX()
 		return;
 	}
 
-	UNiagaraSystem* AttractiveBeamFXAsset = AttractiveBeamFX.LoadSynchronous();
+	UNiagaraSystem* AttractiveBeamFXAsset = AttractiveBeamFX.Get();
 	if (!AttractiveBeamFXAsset)
 	{
 		return;
