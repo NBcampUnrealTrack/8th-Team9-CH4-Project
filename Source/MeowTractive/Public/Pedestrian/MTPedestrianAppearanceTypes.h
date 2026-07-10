@@ -22,7 +22,7 @@ struct MEOWTRACTIVE_API FMTPedestrianMaterialSlotOption
 	FName SlotName;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Material")
-	TArray<TSoftObjectPtr<UMaterialInterface>> Materials;
+	TArray<TObjectPtr<UMaterialInterface>> Materials;
 };
 
 USTRUCT(BlueprintType)
@@ -31,7 +31,7 @@ struct MEOWTRACTIVE_API FMTPedestrianMeshOption
 	GENERATED_BODY()
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Mesh")
-	TSoftObjectPtr<USkeletalMesh> Mesh;
+	TObjectPtr<USkeletalMesh> Mesh;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Pedestrian|Material")
 	TArray<FMTPedestrianMaterialSlotOption> MaterialSlots;

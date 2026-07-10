@@ -13,7 +13,7 @@
 namespace
 {
 template <typename TObjectType>
-TObjectType* LoadRandomAsset(const TArray<TSoftObjectPtr<TObjectType>>& Assets, FRandomStream& RandomStream)
+TObjectType* SelectRandomAsset(const TArray<TObjectPtr<TObjectType>>& Assets, FRandomStream& RandomStream)
 {
 	if (Assets.IsEmpty())
 	{
@@ -24,7 +24,7 @@ TObjectType* LoadRandomAsset(const TArray<TSoftObjectPtr<TObjectType>>& Assets, 
 	for (int32 Offset = 0; Offset < Assets.Num(); ++Offset)
 	{
 		const int32 Index = (StartIndex + Offset) % Assets.Num();
-		if (TObjectType* Asset = Assets[Index].LoadSynchronous())
+		if (TObjectType* Asset = Assets[Index].Get())
 		{
 			return Asset;
 		}
@@ -78,7 +78,7 @@ bool SelectMeshOption(
 	for (int32 Offset = 0; Offset < Options.Num(); ++Offset)
 	{
 		const FMTPedestrianMeshOption& Option = Options[(StartIndex + Offset) % Options.Num()];
-		USkeletalMesh* LoadedMesh = Option.Mesh.LoadSynchronous();
+		USkeletalMesh* LoadedMesh = Option.Mesh.Get();
 		if (!LoadedMesh)
 		{
 			continue;
@@ -99,7 +99,7 @@ bool SelectMeshOption(
 				continue;
 			}
 
-			if (UMaterialInterface* Material = LoadRandomAsset(SlotOption.Materials, RandomStream))
+			if (UMaterialInterface* Material = SelectRandomAsset(SlotOption.Materials, RandomStream))
 			{
 				FMTPedestrianSelectedMaterial& Selected = OutMaterials.AddDefaulted_GetRef();
 				Selected.SlotName = ResolvedSlotName;
@@ -111,28 +111,34 @@ bool SelectMeshOption(
 	return false;
 }
 
-TSoftObjectPtr<USkeletalMesh> TestMesh(const TCHAR* RelativePath)
+USkeletalMesh* LoadTestMesh(const TCHAR* RelativePath)
 {
-	return TSoftObjectPtr<USkeletalMesh>(
-		FSoftObjectPath(FString::Printf(
-			TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/%s.%s"),
-			RelativePath,
-			*FString(RelativePath).RightChop(FString(RelativePath).Find(TEXT("/"), ESearchCase::CaseSensitive, ESearchDir::FromEnd) + 1))));
+	const FString RelativePathString(RelativePath);
+	const FString AssetName = RelativePathString.Mid(
+		RelativePathString.Find(TEXT("/"), ESearchCase::CaseSensitive, ESearchDir::FromEnd) + 1);
+	const FString AssetPath = FString::Printf(
+		TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/%s.%s"),
+		RelativePath,
+		*AssetName);
+	return LoadObject<USkeletalMesh>(nullptr, *AssetPath);
 }
 
-TSoftObjectPtr<UMaterialInterface> TestMaterial(const TCHAR* RelativePath)
+UMaterialInterface* LoadTestMaterial(const TCHAR* RelativePath)
 {
-	return TSoftObjectPtr<UMaterialInterface>(
-		FSoftObjectPath(FString::Printf(
-			TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/%s.%s"),
-			RelativePath,
-			*FString(RelativePath).RightChop(FString(RelativePath).Find(TEXT("/"), ESearchCase::CaseSensitive, ESearchDir::FromEnd) + 1))));
+	const FString RelativePathString(RelativePath);
+	const FString AssetName = RelativePathString.Mid(
+		RelativePathString.Find(TEXT("/"), ESearchCase::CaseSensitive, ESearchDir::FromEnd) + 1);
+	const FString AssetPath = FString::Printf(
+		TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/%s.%s"),
+		RelativePath,
+		*AssetName);
+	return LoadObject<UMaterialInterface>(nullptr, *AssetPath);
 }
 
 FMTPedestrianMeshOption TestMeshOption(const TCHAR* RelativePath)
 {
 	FMTPedestrianMeshOption Option;
-	Option.Mesh = TestMesh(RelativePath);
+	Option.Mesh = LoadTestMesh(RelativePath);
 	return Option;
 }
 
@@ -143,7 +149,7 @@ void AddTestMaterial(
 {
 	FMTPedestrianMaterialSlotOption& Slot = Option.MaterialSlots.AddDefaulted_GetRef();
 	Slot.SlotName = SlotName;
-	Slot.Materials.Add(TestMaterial(RelativeMaterialPath));
+	Slot.Materials.Add(LoadTestMaterial(RelativeMaterialPath));
 }
 }
 
@@ -368,17 +374,19 @@ bool FMTPedestrianMaterialSlotResolutionTest::RunTest(const FString& Parameters)
 		ResolveMaterialSlotName(Legs02, TEXT("M_Shoe02")),
 		FName(TEXT("M_Shoe02")));
 
-	TArray<TSoftObjectPtr<UMaterialInterface>> ShoeMaterials = {
-		TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(
-			TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/clothing/M_shoes01.M_shoes01"))),
-		TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(
-			TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/clothing/M_shoes03.M_shoes03")))
+	TArray<TObjectPtr<UMaterialInterface>> ShoeMaterials = {
+		LoadObject<UMaterialInterface>(
+			nullptr,
+			TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/clothing/M_shoes01.M_shoes01")),
+		LoadObject<UMaterialInterface>(
+			nullptr,
+			TEXT("/Game/Fab/Modular_Character_Male_Integrated_to_UE4_ALS/ModularCharacterMale/clothing/M_shoes03.M_shoes03"))
 	};
 	TSet<FName> SelectedMaterialNames;
 	for (int32 Seed = 0; Seed < 32; ++Seed)
 	{
 		FRandomStream RandomStream(Seed);
-		if (UMaterialInterface* Selected = LoadRandomAsset(ShoeMaterials, RandomStream))
+		if (UMaterialInterface* Selected = SelectRandomAsset(ShoeMaterials, RandomStream))
 		{
 			SelectedMaterialNames.Add(Selected->GetFName());
 		}
