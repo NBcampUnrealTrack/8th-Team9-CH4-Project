@@ -8,6 +8,8 @@
 
 class UMTSessionSubsystem;
 class UMTSessionData;
+class USoundMix;
+class USoundClass;
 
 // UI 피드백용 (BP 위젯이 구독). 트래블은 여기(Flow)서만 수행한다.
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnHostResult, bool, bSuccess);
@@ -15,6 +17,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnSearchResult, int32, NumFound);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnJoinResult, bool, bSuccess);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnJoinFailed, FText, Reason);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnSessionsFound, const TArray<UMTSessionData*>&, Sessions);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FMTOnConnectingStateChanged, bool, bConnecting);
 
 /** 온라인 플로 코디네이터: 세션 이벤트 구독 → 트래블 오케스트레이션. (위젯/서브시스템은 트래블 안 함) */
 UCLASS()
@@ -83,6 +86,14 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "MT|Flow")
 	FMTOnSessionsFound OnSessionsFound;
 
+	// 접속 플로(호스트/참가) 진행 상태 — 메뉴가 구독해 "접속 중" 창 표시 (중복 클릭 차단은 Flow가 수행)
+	UPROPERTY(BlueprintAssignable, Category = "MT|Flow")
+	FMTOnConnectingStateChanged OnConnectingStateChanged;
+
+	// 접속 진행 중 여부 (메뉴 재진입 시 초기 표시용)
+	UFUNCTION(BlueprintPure, Category = "MT|Flow")
+	bool IsConnecting() const { return bConnecting; }
+
 	// 호스트가 이동할 로비 맵 (BP 자식에서 지정 권장)
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Flow")
 	FString LobbyPath = TEXT("/Game/Main/Maps/Lobby");
@@ -90,6 +101,23 @@ public:
 	// 나가기 시 복귀할 메인메뉴 맵
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Flow")
 	FString MainMenuPath = TEXT("/Game/Main/Maps/MainMenu");
+
+	// 저장된 볼륨(UMTGameUserSettings)을 사운드 믹스에 반영 (맵 로드/설정 변경 시 호출)
+	UFUNCTION(BlueprintCallable, Category = "MT|Audio")
+	void ApplyAudioSettings();
+
+	// 볼륨 조절용 믹스/클래스 (BP_MTGameInstance에서 지정)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Audio")
+	TObjectPtr<USoundMix> VolumeMix;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Audio")
+	TObjectPtr<USoundClass> MasterSoundClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Audio")
+	TObjectPtr<USoundClass> BGMSoundClass;
+
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Audio")
+	TObjectPtr<USoundClass> SFXSoundClass;
 
 protected:
 	// 세션 콜백 → 트래블 수행
@@ -100,9 +128,21 @@ protected:
 	// 세션 연결 끊김(튕김/호스트 종료 등) — GEngine->OnNetworkFailure 구독. 메시지 저장 후 메인메뉴 복귀.
 	void HandleNetworkFailure(UWorld* World, class UNetDriver* NetDriver, ENetworkFailure::Type FailureType, const FString& ErrorString);
 
+	// 맵 로드 완료 = 접속 플로 종료 (성공/복귀 공통 캐치올)
+	void HandlePostLoadMap(UWorld* LoadedWorld);
+
 private:
+	// 가드 없는 실제 호스트 수행 (QuickStart 내부 경로 공용)
+	void HostGameInternal(FMTRoomSettings RoomSettings, int32 NumPublicConnections, bool bIsLAN);
+
+	// 접속 진행 상태 전환 + 변경 시 방송
+	void SetConnecting(bool bNewConnecting);
+
 	UPROPERTY()
 	TObjectPtr<UMTSessionSubsystem> SessionSubsystem;
+
+	// true 동안 호스트/참가/빠른시작 재요청 무시 (중복 클릭 버그 방지)
+	bool bConnecting = false;
 
 	// 검색 결과 캐시 — ListView가 참조를 잡기 전 GC되지 않도록 보관 (다음 검색 때 갱신)
 	UPROPERTY()
@@ -121,4 +161,5 @@ private:
 	bool bQuickStartLAN = false;
 
 	FDelegateHandle NetworkFailureHandle;
+	FDelegateHandle PostLoadMapHandle;
 };

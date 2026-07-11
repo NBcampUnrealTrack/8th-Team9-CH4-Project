@@ -26,6 +26,10 @@ class MEOWTRACTIVE_API UMTSessionSubsystem : public UGameInstanceSubsystem
 public:
 	UMTSessionSubsystem();
 
+	// 세션 인터페이스 획득 — 생성자에서 하면 CDO도 공유 참조를 영구 보유해
+	// Null OSS 종료 시 IsUnique ensure가 터진다 (CDO는 Deinitialize가 안 불림)
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
 	// 종료 시 세션 인터페이스 참조 해제 (Null OSS의 IsUnique ensure 방지)
 	virtual void Deinitialize() override;
 

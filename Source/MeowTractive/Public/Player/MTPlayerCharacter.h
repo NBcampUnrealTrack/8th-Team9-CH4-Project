@@ -180,6 +180,20 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MT|Input")
 	void SetUICursorEnabled(bool bEnable);
 
+	// 시전 중인 액티브 스킬(Skill.*) 전부 취소 — 메뉴/콘솔 열 때 호출.
+	// UIOnly 전환 시 뷰포트가 눌린 키의 release를 합성해 홀드형 스킬이 발사되는 것 방지.
+	UFUNCTION(BlueprintCallable, Category = "MT|Ability")
+	void CancelActiveSkills();
+
+	// 서버(GA_Dash): 대시 재충전 진행 기록 (EndServerTime=0이면 재충전 없음). HUD 표시용
+	void SetDashRechargeState(float EndServerTime, float Duration);
+
+	UFUNCTION(BlueprintPure, Category = "MT|UI")
+	float GetDashRechargeEndServerTime() const { return DashRechargeEndServerTime; }
+
+	UFUNCTION(BlueprintPure, Category = "MT|UI")
+	float GetDashRechargeDuration() const { return DashRechargeDuration; }
+
 private:
 	// State.Stun 태그 변화 → 이동/입력 잠금 토글 (소유 클라 기준)
 	void OnStunTagChanged(const FGameplayTag Tag, int32 NewCount);
@@ -197,6 +211,14 @@ private:
 
 	UPROPERTY(Transient, ReplicatedUsing = OnRep_IsDead)
 	bool bIsDead = false;
+
+	// 다음 대시 충전 완료 서버시각 (GetServerWorldTimeSeconds 기준, 0=재충전 없음)
+	UPROPERTY(Replicated)
+	float DashRechargeEndServerTime = 0.f;
+
+	// 충전 1회 재충전 시간 — HUD 진행률 계산용
+	UPROPERTY(Replicated)
+	float DashRechargeDuration = 0.f;
 
 	UFUNCTION()
 	void OnRep_IsDead();

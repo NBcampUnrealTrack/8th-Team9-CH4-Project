@@ -6,6 +6,7 @@
 #include "MTMenuWidget.generated.h"
 
 class UMTGameInstance;
+class UWidget;
 
 /** 메인메뉴 위젯: 표현 + 의도 전달만. 세션/트래블 로직은 UMTGameInstance(Flow)가 담당. */
 UCLASS()
@@ -32,7 +33,19 @@ protected:
 	// CommonUI: 입력 모드/커서를 활성화 트리로 관리 (raw SetInputMode 대신)
 	virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
 
+	virtual void NativeDestruct() override;
+
+	// 접속 진행 중 전체 클릭 차단 + "접속 중" 표시 (WBP의 같은 이름 위젯에 자동 바인딩)
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> ConnectingOverlay;
+
 private:
+	UFUNCTION()
+	void HandleConnectingStateChanged(bool bConnecting);
+
+	// 세션 생성/검색에 쓸 LAN 여부 — 콘솔 `MT.Local 1`이 MenuSetup 값보다 우선
+	bool UseLANForSession() const;
+
 	UPROPERTY()
 	TObjectPtr<UMTGameInstance> GameFlow;
 

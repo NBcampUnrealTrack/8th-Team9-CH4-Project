@@ -1,8 +1,17 @@
 ﻿#include "UI/MainMenu/MTMenuWidget.h"
 #include "Game/MTGameInstance.h"
 #include "Game/MTLog.h"
+#include "Components/Widget.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/Engine.h"
+#include "HAL/IConsoleManager.h"
+
+// 콘솔: `MT.Local 1` — 로컬 테스트용 LAN 강제 (0이면 MenuSetup 값 사용)
+static TAutoConsoleVariable<int32> CVarMTLocal(
+	TEXT("MT.Local"),
+	0,
+	TEXT("세션 생성/검색을 LAN으로 강제 (1=LAN, 0=MenuSetup 값)"),
+	ECVF_Default);
 
 // 로그 + 화면 동시 출력 (MT.Log 토글 검사)
 static void MTMenuScreen(const FColor& Color, const FString& Msg)
@@ -30,17 +39,45 @@ void UMTMenuWidget::MenuSetup(int32 NumPublicConnections, bool bIsLAN)
 	ActivateWidget();   // CommonUI가 GetDesiredInputConfig로 입력 모드/커서 관리
 
 	GameFlow = Cast<UMTGameInstance>(GetGameInstance());
+	if (GameFlow)
+	{
+		// 접속 진행 상태 → "접속 중" 오버레이 표시 (재진입 시 현재 상태 즉시 반영)
+		GameFlow->OnConnectingStateChanged.AddUniqueDynamic(this, &UMTMenuWidget::HandleConnectingStateChanged);
+		HandleConnectingStateChanged(GameFlow->IsConnecting());
+	}
 	MTMenuScreen(GameFlow ? FColor::Green : FColor::Red,
 		FString::Printf(TEXT("[MTMenu] MenuSetup 완료 (GameFlow 캐스팅=%d)"), GameFlow ? 1 : 0));
+}
+
+void UMTMenuWidget::NativeDestruct()
+{
+	if (GameFlow)
+	{
+		GameFlow->OnConnectingStateChanged.RemoveDynamic(this, &UMTMenuWidget::HandleConnectingStateChanged);
+	}
+	Super::NativeDestruct();
+}
+
+void UMTMenuWidget::HandleConnectingStateChanged(bool bConnecting)
+{
+	if (ConnectingOverlay)
+	{
+		ConnectingOverlay->SetVisibility(bConnecting ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+}
+
+bool UMTMenuWidget::UseLANForSession() const
+{
+	return bUseLAN || CVarMTLocal.GetValueOnGameThread() != 0;
 }
 
 void UMTMenuWidget::HostButtonClicked()
 {
 	// 빠른 시작: 참가 가능한 공개방 검색 → 있으면 참가, 없으면 기본 설정으로 방 생성
-	MTMenuScreen(FColor::Cyan, FString::Printf(TEXT("[MTMenu] QuickStart (GameFlow=%d)"), GameFlow ? 1 : 0));
+	MTMenuScreen(FColor::Cyan, FString::Printf(TEXT("[MTMenu] QuickStart (GameFlow=%d, LAN=%d)"), GameFlow ? 1 : 0, UseLANForSession() ? 1 : 0));
 	if (GameFlow)
 	{
-		GameFlow->QuickStart(NumConnections, bUseLAN);
+		GameFlow->QuickStart(NumConnections, UseLANForSession());
 	}
 	else
 	{
@@ -50,11 +87,11 @@ void UMTMenuWidget::HostButtonClicked()
 
 void UMTMenuWidget::HostWithSettings(FMTRoomSettings RoomSettings)
 {
-	MTMenuScreen(FColor::Cyan, FString::Printf(TEXT("[MTMenu] HostWithSettings '%s' (GameFlow=%d)"),
-		*RoomSettings.RoomName, GameFlow ? 1 : 0));
+	MTMenuScreen(FColor::Cyan, FString::Printf(TEXT("[MTMenu] HostWithSettings '%s' (GameFlow=%d, LAN=%d)"),
+		*RoomSettings.RoomName, GameFlow ? 1 : 0, UseLANForSession() ? 1 : 0));
 	if (GameFlow)
 	{
-		GameFlow->HostGame(RoomSettings, NumConnections, bUseLAN);
+		GameFlow->HostGame(RoomSettings, NumConnections, UseLANForSession());
 	}
 	else
 	{
@@ -64,10 +101,10 @@ void UMTMenuWidget::HostWithSettings(FMTRoomSettings RoomSettings)
 
 void UMTMenuWidget::JoinButtonClicked()
 {
-	MTMenuScreen(FColor::Cyan, FString::Printf(TEXT("[MTMenu] JoinButtonClicked (GameFlow=%d)"), GameFlow ? 1 : 0));
+	MTMenuScreen(FColor::Cyan, FString::Printf(TEXT("[MTMenu] JoinButtonClicked (GameFlow=%d, LAN=%d)"), GameFlow ? 1 : 0, UseLANForSession() ? 1 : 0));
 	if (GameFlow)
 	{
-		GameFlow->JoinGame(bUseLAN);
+		GameFlow->JoinGame(UseLANForSession());
 	}
 	else
 	{

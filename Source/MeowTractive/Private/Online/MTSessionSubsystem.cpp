@@ -13,8 +13,14 @@ UMTSessionSubsystem::UMTSessionSubsystem() : CreateSessionCompleteDelegate(FOnCr
 										   JoinSessionCompleteDelegate(FOnJoinSessionCompleteDelegate::CreateUObject(this, &UMTSessionSubsystem::HandleJoinSessionComplete)),
 	DestroySessionCompleteDelegate(FOnDestroySessionCompleteDelegate::CreateUObject(this, &UMTSessionSubsystem::HandleDestroySessionComplete))
 {
-	// 온라인 서브시스템에서 세션 인터페이스 가져오기
-	if(IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get())
+}
+
+void UMTSessionSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+
+	// 온라인 서브시스템에서 세션 인터페이스 가져오기 (생성자 금지 — CDO 참조 누수)
+	if (IOnlineSubsystem* Subsystem = IOnlineSubsystem::Get())
 	{
 		SessionInterface = Subsystem->GetSessionInterface();
 		if (SessionInterface.IsValid())

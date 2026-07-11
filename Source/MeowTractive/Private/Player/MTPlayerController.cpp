@@ -1,5 +1,6 @@
 ﻿#include "Player/MTPlayerController.h"
 #include "Player/MTPlayerState.h"
+#include "Player/MTPlayerCharacter.h"
 #include "UI/InGame/MTMatchGameResultWidget.h"
 #include "UI/PauseMenu/MTPauseMenuWidget.h"
 #include "Game/MTLobbyGameMode.h"
@@ -15,6 +16,8 @@ void AMTPlayerController::SetupInputComponent()
 	if (InputComponent)
 	{
 		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AMTPlayerController::TogglePauseMenu);
+		// PIE에선 에디터가 ESC를 'PIE 종료'로 가로챔 → 에디터 테스트용 보조 키
+		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &AMTPlayerController::TogglePauseMenu);
 	}
 }
 
@@ -45,6 +48,13 @@ void AMTPlayerController::TogglePauseMenu()
 	{
 		return;
 	}
+
+	// UIOnly 전환 시 눌린 키 release가 합성돼 홀드형 스킬이 발사되는 것 방지 — 시전 중 스킬 취소
+	if (AMTPlayerCharacter* Cat = Cast<AMTPlayerCharacter>(GetPawn()))
+	{
+		Cat->CancelActiveSkills();
+	}
+
 	PauseMenu->AddToViewport(50);
 
 	FInputModeUIOnly Mode;
