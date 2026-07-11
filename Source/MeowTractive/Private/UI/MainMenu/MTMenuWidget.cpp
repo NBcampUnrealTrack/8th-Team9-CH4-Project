@@ -1,6 +1,8 @@
 ﻿#include "UI/MainMenu/MTMenuWidget.h"
 #include "Game/MTGameInstance.h"
 #include "Game/MTLog.h"
+#include "UI/Settings/MTSettingsWidget.h"
+#include "CommonButtonBase.h"
 #include "Components/Widget.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/Engine.h"
@@ -49,13 +51,41 @@ void UMTMenuWidget::MenuSetup(int32 NumPublicConnections, bool bIsLAN)
 		FString::Printf(TEXT("[MTMenu] MenuSetup 완료 (GameFlow 캐스팅=%d)"), GameFlow ? 1 : 0));
 }
 
+void UMTMenuWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	if (Mt_MainSetting)
+	{
+		Mt_MainSetting->OnClicked().AddUObject(this, &UMTMenuWidget::OpenSettings);
+	}
+}
+
 void UMTMenuWidget::NativeDestruct()
 {
+	if (Mt_MainSetting)
+	{
+		Mt_MainSetting->OnClicked().RemoveAll(this);
+	}
 	if (GameFlow)
 	{
 		GameFlow->OnConnectingStateChanged.RemoveDynamic(this, &UMTMenuWidget::HandleConnectingStateChanged);
 	}
 	Super::NativeDestruct();
+}
+
+void UMTMenuWidget::OpenSettings()
+{
+	if (!SettingsWidgetClass)
+	{
+		MTMenuScreen(FColor::Yellow, TEXT("[MTMenu] SettingsWidgetClass 미지정 → 설정 열기 불가"));
+		return;
+	}
+	if (UMTSettingsWidget* Settings = CreateWidget<UMTSettingsWidget>(GetOwningPlayer(), SettingsWidgetClass))
+	{
+		Settings->AddToViewport(60);
+		Settings->SetUserFocus(GetOwningPlayer());   // ESC 닫기 수신
+	}
 }
 
 void UMTMenuWidget::HandleConnectingStateChanged(bool bConnecting)

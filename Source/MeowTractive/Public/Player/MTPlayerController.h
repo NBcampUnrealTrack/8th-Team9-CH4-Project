@@ -5,6 +5,8 @@
 #include "Game/MTTypes.h"
 #include "MTPlayerController.generated.h"
 
+class UInputAction;
+
 UCLASS()
 class MEOWTRACTIVE_API AMTPlayerController : public APlayerController
 {
@@ -42,12 +44,16 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
 	TSubclassOf<class UMTMatchGameResultWidget> ResultWidgetClass;
 
-	// ESC 일시정지 메뉴 토글 (열려 있으면 닫음). ESC 바인딩·위젯이 호출. 로컬 전용.
+	// ESC 일시정지 메뉴 토글 (열려 있으면 닫음). IA_Pause 바인딩·위젯이 호출. 로컬 전용.
 	UFUNCTION(BlueprintCallable, Category = "MT|UI")
 	void TogglePauseMenu();
 
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
 	TSubclassOf<class UMTPauseMenuWidget> PauseMenuClass;
+
+	// 일시정지 토글 입력 (IA_Pause — ESC/P는 IMC에서 매핑)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TObjectPtr<UInputAction> PauseAction;
 
 protected:
 	virtual void SetupInputComponent() override;

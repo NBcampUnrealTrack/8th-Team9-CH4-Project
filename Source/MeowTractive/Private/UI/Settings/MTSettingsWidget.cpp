@@ -1,4 +1,4 @@
-#include "UI/Settings/MTSettingsWidget.h"
+﻿#include "UI/Settings/MTSettingsWidget.h"
 #include "Game/MTGameInstance.h"
 #include "Game/MTGameUserSettings.h"
 #include "Components/Slider.h"
@@ -11,20 +11,23 @@
 #include "Components/HorizontalBoxSlot.h"
 #include "Components/TextBlock.h"
 #include "Blueprint/WidgetTree.h"
+#include "CommonAnimatedSwitcher.h"
+#include "CommonButtonBase.h"
 #include "EnhancedInputSubsystems.h"
+#include "InputMappingContext.h"
 #include "UserSettings/EnhancedInputUserSettings.h"
 #include "Kismet/KismetSystemLibrary.h"
 
 void UMTKeySelector::Init(FName InMappingName)
 {
 	MappingName = InMappingName;
-	OnKeySelected.AddDynamic(this, &UMTKeySelector::HandleKeySelected);
+	OnKeySelected.AddUniqueDynamic(this, &UMTKeySelector::HandleChordSelected);
 	SetAllowGamepadKeys(false);
 	SetAllowModifierKeys(false);
 	SetEscapeKeys({ EKeys::Escape });   // ESC = 선택 취소
 }
 
-void UMTKeySelector::HandleKeySelected(FInputChord Chord)
+void UMTKeySelector::HandleChordSelected(FInputChord Chord)
 {
 	if (Chord.Key.IsValid() && Chord.Key != EKeys::Escape)
 	{
@@ -50,6 +53,82 @@ void UMTSettingsWidget::NativeConstruct()
 	InitAudio();
 	InitGraphics();
 	InitKeyBindings();
+	InitTabs();
+}
+
+void UMTSettingsWidget::NativeDestruct()
+{
+	// CommonButtonBase는 non-dynamic 이벤트 → 수동 해제
+	if (AudioTabButton)
+	{
+		AudioTabButton->OnClicked().RemoveAll(this);
+	}
+	if (GraphicsTabButton)
+	{
+		GraphicsTabButton->OnClicked().RemoveAll(this);
+	}
+	if (KeyTabButton)
+	{
+		KeyTabButton->OnClicked().RemoveAll(this);
+	}
+	Super::NativeDestruct();
+}
+
+void UMTSettingsWidget::InitTabs()
+{
+	if (!TabSwitcher)
+	{
+		return;   // 탭 없는 레이아웃 (기존 3열) 그대로 동작
+	}
+
+	if (AudioTabButton)
+	{
+		AudioTabButton->OnClicked().AddUObject(this, &UMTSettingsWidget::HandleAudioTab);
+	}
+	if (GraphicsTabButton)
+	{
+		GraphicsTabButton->OnClicked().AddUObject(this, &UMTSettingsWidget::HandleGraphicsTab);
+	}
+	if (KeyTabButton)
+	{
+		KeyTabButton->OnClicked().AddUObject(this, &UMTSettingsWidget::HandleKeyTab);
+	}
+
+	ShowTab(0);   // 기본: 볼륨 탭
+}
+
+void UMTSettingsWidget::ShowTab(int32 Index)
+{
+	if (!TabSwitcher)
+	{
+		return;
+	}
+	TabSwitcher->SetActiveWidgetIndex(Index);
+
+	// 탭 버튼 선택 상태 동기화 (WBP에서 bToggleable=true면 Selected 스타일 표시)
+	UCommonButtonBase* Tabs[] = { AudioTabButton, GraphicsTabButton, KeyTabButton };
+	for (int32 i = 0; i < UE_ARRAY_COUNT(Tabs); ++i)
+	{
+		if (Tabs[i])
+		{
+			Tabs[i]->SetIsSelected(i == Index, /*bGiveClickFeedback=*/false);
+		}
+	}
+}
+
+void UMTSettingsWidget::HandleAudioTab()
+{
+	ShowTab(0);
+}
+
+void UMTSettingsWidget::HandleGraphicsTab()
+{
+	ShowTab(1);
+}
+
+void UMTSettingsWidget::HandleKeyTab()
+{
+	ShowTab(2);
 }
 
 FReply UMTSettingsWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
@@ -216,7 +295,12 @@ UEnhancedInputUserSettings* UMTSettingsWidget::GetInputUserSettings() const
 void UMTSettingsWidget::InitKeyBindings()
 {
 	UEnhancedInputUserSettings* Settings = GetInputUserSettings();
-	const UEnhancedPlayerMappableKeyProfile* Profile = Settings ? Settings->GetCurrentKeyProfile() : nullptr;
+	if (Settings && KeyRegistrationContext)
+	{
+		// 미등록이면 키 행이 비어 보임 — 멱등이라 중복 호출 무해
+		Settings->RegisterInputMappingContext(KeyRegistrationContext);
+	}
+	const UEnhancedPlayerMappableKeyProfile* Profile = Settings ? Settings->GetActiveKeyProfile() : nullptr;
 	if (!KeyListBox || !Profile)
 	{
 		return;   // bEnableUserSettings 꺼짐 등 — 키 섹션 비움
@@ -237,10 +321,45 @@ void UMTSettingsWidget::InitKeyBindings()
 			UHorizontalBox* RowBox = WidgetTree->ConstructWidget<UHorizontalBox>();
 			UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
 			Label->SetText(Mapping.GetDisplayName());
+			if (KeyRowFont.HasValidFont())
+			{
+				Label->SetFont(KeyRowFont);
+			}
+			Label->SetColorAndOpacity(FSlateColor(KeyRowLabelColor));
+
 			UMTKeySelector* Selector = WidgetTree->ConstructWidget<UMTKeySelector>();
 			Selector->Init(Row.Key);
 			Selector->SetSelectedKey(FInputChord(Mapping.GetCurrentKey()));
 			Selector->OnKeyRebind.BindUObject(this, &UMTSettingsWidget::HandleKeyRebind);
+
+			// 톤앤매너: 핑크 라운드 버튼 + 폰트
+			{
+				auto MakeRounded = [](const FLinearColor& Color)
+				{
+					FSlateBrush Brush;
+					Brush.DrawAs = ESlateBrushDrawType::RoundedBox;
+					Brush.TintColor = FSlateColor(Color);
+					Brush.OutlineSettings = FSlateBrushOutlineSettings(FVector4(12.f, 12.f, 12.f, 12.f));
+					Brush.OutlineSettings.RoundingType = ESlateBrushRoundingType::FixedRadius;
+					return Brush;
+				};
+				FButtonStyle BtnStyle;
+				BtnStyle.SetNormal(MakeRounded(KeySelectorColor));
+				BtnStyle.SetHovered(MakeRounded(KeySelectorColor * 1.15f));
+				BtnStyle.SetPressed(MakeRounded(KeySelectorColor * 0.8f));
+				Selector->SetButtonStyle(BtnStyle);
+
+				FTextBlockStyle KeyTextStyle;
+				if (KeyRowFont.HasValidFont())
+				{
+					KeyTextStyle.SetFont(KeyRowFont);
+				}
+				KeyTextStyle.SetColorAndOpacity(FSlateColor(FLinearColor(1.f, 0.96f, 0.92f, 1.f)));
+				Selector->SetTextStyle(KeyTextStyle);
+				Selector->SetMargin(FMargin(14.f, 6.f));
+				Selector->SetKeySelectionText(FText::FromString(TEXT("아무 키나 누르세요...")));
+				Selector->SetNoKeySpecifiedText(FText::FromString(TEXT("없음")));
+			}
 
 			if (UHorizontalBoxSlot* LabelSlot = RowBox->AddChildToHorizontalBox(Label))
 			{

@@ -2,6 +2,7 @@
 #include "Game/MTGameState.h"
 #include "Game/MTLog.h"
 #include "Online/MTSessionSubsystem.h"
+#include "Online/MTOnlineUtils.h"
 #include "Player/MTPlayerState.h"
 #include "Player/MTPlayerController.h"
 #include "UI/InGame/MTPlayerHUD.h"
@@ -61,6 +62,8 @@ void AMTMatchGameMode::PostLogin(APlayerController* NewPlayer)
     Super::PostLogin(NewPlayer);
     MarkLoaded(NewPlayer);
     AssignTeamColor(NewPlayer);     // 슬롯 기준 팀색 (직접 진입 시 폴백 포함)
+    // PIE 직행 등 로비를 안 거친 접속 — Null OSS면 "Player N" (seamless는 로비 이름 유지)
+    UMTOnlineUtils::ApplyFallbackPlayerName(NewPlayer ? NewPlayer->PlayerState : nullptr);
 
     if (MTLogEnabled())
     {

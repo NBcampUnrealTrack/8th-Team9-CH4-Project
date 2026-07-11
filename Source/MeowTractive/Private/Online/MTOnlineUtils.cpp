@@ -1,6 +1,11 @@
 #include "Online/MTOnlineUtils.h"
+#include "Player/MTPlayerState.h"
 #include "GameFramework/PlayerState.h"
+#include "GameFramework/GameStateBase.h"
+#include "OnlineSubsystem.h"
+#include "OnlineSubsystemNames.h"
 #include "Engine/Texture2D.h"
+#include "Engine/World.h"
 #include "TextureResource.h"
 #include "Game/MTLog.h"
 
@@ -13,6 +18,35 @@ THIRD_PARTY_INCLUDES_END
 FString UMTOnlineUtils::GetPersonaName(const APlayerState* PlayerState)
 {
 	return PlayerState ? PlayerState->GetPlayerName() : FString();
+}
+
+void UMTOnlineUtils::ApplyFallbackPlayerName(APlayerState* PlayerState)
+{
+	if (!PlayerState || !PlayerState->HasAuthority())
+	{
+		return;
+	}
+
+	// Steam OSS면 페르소나 이름이 이미 유효 — 그대로 사용
+	const IOnlineSubsystem* OSS = IOnlineSubsystem::Get();
+	if (OSS && OSS->GetSubsystemName() == STEAM_SUBSYSTEM)
+	{
+		return;
+	}
+
+	// 슬롯 우선, 미배정(PIE 직행 등)이면 접속 순서
+	int32 Number = INDEX_NONE;
+	if (const AMTPlayerState* MTPS = Cast<AMTPlayerState>(PlayerState))
+	{
+		Number = MTPS->GetPlayerSlot();
+	}
+	if (Number < 0)
+	{
+		const AGameStateBase* GS = PlayerState->GetWorld() ? PlayerState->GetWorld()->GetGameState() : nullptr;
+		Number = GS ? FMath::Max(0, GS->PlayerArray.IndexOfByKey(PlayerState)) : 0;
+	}
+
+	PlayerState->SetPlayerName(FString::Printf(TEXT("Player%d"), Number + 1));
 }
 
 UTexture2D* UMTOnlineUtils::GetSteamAvatar(const APlayerState* PlayerState)

@@ -39,7 +39,8 @@ void UMTPauseMenuWidget::HandleSettings()
 
 FReply UMTPauseMenuWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if (InKeyEvent.GetKey() == EKeys::Escape)
+	// UIOnly 동안 IA_Pause가 못 오므로 위젯이 직접 닫기 (ESC + PIE용 P — IMC 매핑과 동일 키)
+	if (InKeyEvent.GetKey() == EKeys::Escape || InKeyEvent.GetKey() == EKeys::P)
 	{
 		CloseMenu();
 		return FReply::Handled();

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
@@ -10,7 +10,10 @@ class UComboBoxString;
 class UCheckBox;
 class UButton;
 class UVerticalBox;
+class UCommonAnimatedSwitcher;
+class UCommonButtonBase;
 class UEnhancedInputUserSettings;
+class UInputMappingContext;
 
 // 키 셀렉터 → 설정 위젯으로 결과 전달 (어느 매핑인지 포함)
 DECLARE_DELEGATE_TwoParams(FMTOnKeyRebind, FName /*MappingName*/, FKey /*NewKey*/);
@@ -27,8 +30,10 @@ public:
 	FMTOnKeyRebind OnKeyRebind;
 
 private:
+	// OnKeySelected 구독 핸들러 — 유효 키만 OnKeyRebind로 전달
+	// (베이스 HandleKeySelected는 private virtual이라 오버라이드 대신 델리게이트 구독)
 	UFUNCTION()
-	void HandleKeySelected(FInputChord Chord);
+	void HandleChordSelected(FInputChord Chord);
 
 	FName MappingName;
 };
@@ -45,6 +50,22 @@ protected:
 
 	// ESC → 닫기 (일시정지 메뉴가 UIOnly라 위젯이 직접 처리)
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
+
+	virtual void NativeDestruct() override;
+
+	// --- 탭 (볼륨/그래픽/키) ---
+	// 페이지 스위처 — 자식 0=오디오, 1=그래픽, 2=키 순서 (없으면 탭 없이 기존 단일 레이아웃 유지)
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UCommonAnimatedSwitcher> TabSwitcher;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UCommonButtonBase> AudioTabButton;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UCommonButtonBase> GraphicsTabButton;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UCommonButtonBase> KeyTabButton;
 
 	// --- 오디오 (0~1) ---
 	UPROPERTY(meta = (BindWidgetOptional))
@@ -76,10 +97,36 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UVerticalBox> KeyListBox;
 
+	// 키 행 라벨/셀렉터 폰트 (WBP 디폴트에서 지정. 미지정 시 엔진 기본)
+	UPROPERTY(EditAnywhere, Category = "MT|UI")
+	FSlateFontInfo KeyRowFont;
+
+	// 키 행 라벨 색 (흰 패널 위 다크로즈)
+	UPROPERTY(EditAnywhere, Category = "MT|UI")
+	FLinearColor KeyRowLabelColor = FLinearColor(0.38f, 0.20f, 0.26f, 1.f);
+
+	// 키 셀렉터 버튼 색 (핑크)
+	UPROPERTY(EditAnywhere, Category = "MT|UI")
+	FLinearColor KeySelectorColor = FLinearColor(0.95f, 0.45f, 0.60f, 1.f);
+
+	// 키 목록 표시용 IMC 사전 등록 — 메인메뉴처럼 폰 possess 전이라 IMC 미등록인 상황 대비 (IMC_Default 지정)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TObjectPtr<UInputMappingContext> KeyRegistrationContext;
+
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UButton> CloseButton;
 
 private:
+	void InitTabs();
+
+	// 탭 전환 + 탭 버튼 선택 상태 동기화
+	void ShowTab(int32 Index);
+
+	// CommonButton OnClicked()는 무인자 이벤트 → 탭별 핸들러로 인덱스 지정
+	void HandleAudioTab();
+	void HandleGraphicsTab();
+	void HandleKeyTab();
+
 	void InitAudio();
 	void InitGraphics();
 	void InitKeyBindings();

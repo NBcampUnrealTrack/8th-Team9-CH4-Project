@@ -2,6 +2,7 @@
 #include "Game/MTLobbyGameState.h"
 #include "Game/MTGameInstance.h"
 #include "Online/MTSessionSubsystem.h"
+#include "Online/MTOnlineUtils.h"
 #include "Player/MTPlayerState.h"
 #include "Player/MTPlayerController.h"
 #include "GameFramework/GameStateBase.h"
@@ -188,6 +189,7 @@ void AMTLobbyGameMode::SetupLobbyPlayer(AController* C)
 	}
 
 	MTPS->SetHost(C->IsLocalController());   // 리슨 서버의 로컬 PC = 호스트
+	UMTOnlineUtils::ApplyFallbackPlayerName(MTPS);   // Null OSS면 "Player N" (슬롯 배정 후)
 	// 팀색은 매치 게임모드가 슬롯 기준으로 결정 (AMTMatchGameMode::AssignTeamColor)
 }
 

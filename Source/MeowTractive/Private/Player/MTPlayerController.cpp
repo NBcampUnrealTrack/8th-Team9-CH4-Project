@@ -6,18 +6,24 @@
 #include "Game/MTLobbyGameMode.h"
 #include "Game/MTMatchGameMode.h"
 #include "Game/MTGameInstance.h"
-#include "InputCoreTypes.h"
+#include "Game/MTLog.h"
+#include "EnhancedInputComponent.h"
 
 void AMTPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
-	// ESC → 일시정지 메뉴 토글 (로컬 PC에만 InputComponent 존재)
-	if (InputComponent)
+	// IA_Pause(ESC, PIE용 P) → 일시정지 메뉴 토글. 컨텍스트(IMC_Default)는 캐릭터가 등록.
+	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent))
 	{
-		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AMTPlayerController::TogglePauseMenu);
-		// PIE에선 에디터가 ESC를 'PIE 종료'로 가로챔 → 에디터 테스트용 보조 키
-		InputComponent->BindKey(EKeys::P, IE_Pressed, this, &AMTPlayerController::TogglePauseMenu);
+		if (PauseAction)
+		{
+			EIC->BindAction(PauseAction, ETriggerEvent::Started, this, &AMTPlayerController::TogglePauseMenu);
+		}
+		else
+		{
+			UE_CLOG(MTLogEnabled(), LogMT, Warning, TEXT("[MTPC] PauseAction 미지정 → 일시정지 입력 없음 (BP_MTPlayerController에서 IA_Pause 지정)"));
+		}
 	}
 }
 

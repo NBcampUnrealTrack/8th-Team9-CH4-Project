@@ -6,6 +6,8 @@
 #include "MTMenuWidget.generated.h"
 
 class UMTGameInstance;
+class UMTSettingsWidget;
+class UCommonButtonBase;
 class UWidget;
 
 /** 메인메뉴 위젯: 표현 + 의도 전달만. 세션/트래블 로직은 UMTGameInstance(Flow)가 담당. */
@@ -29,7 +31,21 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MT|Menu")
 	void JoinButtonClicked();
 
+	// 설정 화면 열기 ('설정' 버튼 → 일시정지 메뉴와 동일한 WBP_MTSettings)
+	UFUNCTION(BlueprintCallable, Category = "MT|Menu")
+	void OpenSettings();
+
 protected:
+	virtual void NativeConstruct() override;
+
+	// 메인 화면 '설정' 버튼 (WBP 이름 그대로 자동 바인딩 — 현재 BP 미배선이라 C++이 처리)
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UCommonButtonBase> Mt_MainSetting;
+
+	// 설정 화면 위젯 (WBP_MTSettings)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Menu")
+	TSubclassOf<UMTSettingsWidget> SettingsWidgetClass;
+
 	// CommonUI: 입력 모드/커서를 활성화 트리로 관리 (raw SetInputMode 대신)
 	virtual TOptional<FUIInputConfig> GetDesiredInputConfig() const override;
 
