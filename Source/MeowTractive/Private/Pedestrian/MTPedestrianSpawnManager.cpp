@@ -111,6 +111,7 @@ bool SelectMeshOption(
 	return false;
 }
 
+//테스트용 샘플 메시 하드 레퍼런스
 USkeletalMesh* LoadTestMesh(const TCHAR* RelativePath)
 {
 	const FString RelativePathString(RelativePath);
@@ -123,6 +124,7 @@ USkeletalMesh* LoadTestMesh(const TCHAR* RelativePath)
 	return LoadObject<USkeletalMesh>(nullptr, *AssetPath);
 }
 
+//테스트용 샘플 머티리얼 하드 레퍼런스
 UMaterialInterface* LoadTestMaterial(const TCHAR* RelativePath)
 {
 	const FString RelativePathString(RelativePath);
@@ -336,6 +338,7 @@ FMTPedestrianGenerationConfig UMTPedestrianSpawnManager::MakeTestConfiguration()
 	return Config;
 }
 
+//테스트용
 #if WITH_DEV_AUTOMATION_TESTS
 
 #include "Misc/AutomationTest.h"
