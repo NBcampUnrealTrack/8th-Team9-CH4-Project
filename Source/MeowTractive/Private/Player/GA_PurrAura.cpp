@@ -3,6 +3,7 @@
 #include "Player/MTPlayerCharacter.h"
 #include "Game/MTGameplayTags.h"
 #include "Abilities/Tasks/AbilityTask_WaitDelay.h"
+#include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameFramework/Character.h"
@@ -35,6 +36,15 @@ void UGA_PurrAura::ActivateAbility(
 	{
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
+	}
+
+	// 시전 애니메이션 (BP별 몽타주). LocalPredicted → 소유 클라 예측 재생 + 타 클라 복제. 채널 종료/취소 시 자동 정지.
+	if (CastMontage)
+	{
+		UAbilityTask_PlayMontageAndWait* MontageTask =
+			UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
+				this, NAME_None, CastMontage, 1.f, NAME_None, /*bStopWhenAbilityEnds=*/true);
+		MontageTask->ReadyForActivation();
 	}
 
 	if (bRootSelf)

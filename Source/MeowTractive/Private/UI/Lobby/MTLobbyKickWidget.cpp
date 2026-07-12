@@ -27,6 +27,15 @@ void UMTKickEntryWidget::NativeOnListItemObjectSet(UObject* ListItemObject)
 		NameText->SetText(FText::FromString(
 			TargetPlayer.IsValid() ? TargetPlayer->GetPlayerName() : TEXT("???")));
 	}
+
+	// 강퇴 버튼은 호스트에게만 (목록 자체는 전원 표시. 리스트엔 호스트가 제외돼 자기 강퇴 걱정 없음)
+	if (KickButton)
+	{
+		const AMTPlayerState* LocalPS = GetOwningPlayer()
+			? GetOwningPlayer()->GetPlayerState<AMTPlayerState>() : nullptr;
+		const bool bLocalHost = LocalPS && LocalPS->IsHost();
+		KickButton->SetVisibility(bLocalHost ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
 }
 
 void UMTKickEntryWidget::HandleKick()
