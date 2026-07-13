@@ -1,5 +1,7 @@
 ﻿#include "Game/MTGameInstance.h"
 #include "Game/MTLog.h"
+#include "Game/MTGameUserSettings.h"
+#include "Kismet/GameplayStatics.h"
 #include "Online/MTSessionSubsystem.h"
 #include "Online/MTSessionData.h"
 #include "GameFramework/PlayerController.h"
@@ -38,6 +40,9 @@ void UMTGameInstance::Init()
 	{
 		NetworkFailureHandle = GEngine->OnNetworkFailure().AddUObject(this, &UMTGameInstance::HandleNetworkFailure);
 	}
+
+	// 트래블 완료(로비 진입/메뉴 복귀) 시 접속 상태 해제
+	PostLoadMapHandle = FCoreUObjectDelegates::PostLoadMapWithWorld.AddUObject(this, &UMTGameInstance::HandlePostLoadMap);
 }
 
 void UMTGameInstance::Shutdown()
@@ -53,10 +58,25 @@ void UMTGameInstance::Shutdown()
 		GEngine->OnNetworkFailure().Remove(NetworkFailureHandle);
 		NetworkFailureHandle.Reset();
 	}
+	if (PostLoadMapHandle.IsValid())
+	{
+		FCoreUObjectDelegates::PostLoadMapWithWorld.Remove(PostLoadMapHandle);
+		PostLoadMapHandle.Reset();
+	}
 	Super::Shutdown();
 }
 
 void UMTGameInstance::HostGame(FMTRoomSettings RoomSettings, int32 NumPublicConnections, bool bIsLAN)
+{
+	if (bConnecting)
+	{
+		MTScreen(FColor::Yellow, TEXT("[MTHost] 이미 접속 진행 중 → 호스트 요청 무시"));
+		return;
+	}
+	HostGameInternal(RoomSettings, NumPublicConnections, bIsLAN);
+}
+
+void UMTGameInstance::HostGameInternal(FMTRoomSettings RoomSettings, int32 NumPublicConnections, bool bIsLAN)
 {
 	// 방이름 미입력 → 호스트 닉네임
 	if (RoomSettings.RoomName.TrimStartAndEnd().IsEmpty())
@@ -72,12 +92,52 @@ void UMTGameInstance::HostGame(FMTRoomSettings RoomSettings, int32 NumPublicConn
 
 	if (SessionSubsystem)
 	{
+		SetConnecting(true);
 		SessionSubsystem->CreateSession(NumPublicConnections, bIsLAN, RoomSettings);
 	}
 	else
 	{
 		MTScreen(FColor::Red, TEXT("[MTHost] SessionSubsystem null → 방생성 불가"));
 	}
+}
+
+void UMTGameInstance::SetConnecting(bool bNewConnecting)
+{
+	if (bConnecting == bNewConnecting)
+	{
+		return;
+	}
+	bConnecting = bNewConnecting;
+	OnConnectingStateChanged.Broadcast(bConnecting);
+}
+
+void UMTGameInstance::HandlePostLoadMap(UWorld* LoadedWorld)
+{
+	SetConnecting(false);
+	ApplyAudioSettings();   // 맵 전환마다 저장 볼륨 재적용 (믹스 모디파이어는 월드 단위)
+}
+
+void UMTGameInstance::ApplyAudioSettings()
+{
+	UWorld* World = GetWorld();
+	const UMTGameUserSettings* Settings = UMTGameUserSettings::GetMTSettings();
+	if (!World || !Settings || !VolumeMix)
+	{
+		return;
+	}
+
+	auto ApplyClassVolume = [&](USoundClass* SoundClass, float Volume)
+	{
+		if (SoundClass)
+		{
+			UGameplayStatics::SetSoundMixClassOverride(World, VolumeMix, SoundClass, Volume, 1.f, 0.f, true);
+		}
+	};
+	ApplyClassVolume(MasterSoundClass, Settings->GetMasterVolume());
+	ApplyClassVolume(BGMSoundClass, Settings->GetBGMVolume());
+	ApplyClassVolume(SFXSoundClass, Settings->GetSFXVolume());
+
+	UGameplayStatics::PushSoundMixModifier(World, VolumeMix);
 }
 
 void UMTGameInstance::ApplyRoomSettings(const FMTRoomSettings& NewSettings)
@@ -101,6 +161,10 @@ void UMTGameInstance::SetPendingDisconnectMessage(const FText& Message)
 
 void UMTGameInstance::JoinGame(bool bIsLAN)
 {
+	if (bConnecting)
+	{
+		return;
+	}
 	if (SessionSubsystem)
 	{
 		SessionSubsystem->FindSessions(50, bIsLAN);
@@ -113,6 +177,12 @@ void UMTGameInstance::QuickStart(int32 NumPublicConnections, bool bIsLAN)
 	{
 		return;
 	}
+	if (bConnecting)
+	{
+		MTScreen(FColor::Yellow, TEXT("[MTQuick] 이미 접속 진행 중 → 빠른 시작 무시"));
+		return;
+	}
+	SetConnecting(true);
 	// 검색 완료 콜백(HandleFindSessions)에서 참가/생성 분기
 	bQuickStartPending = true;
 	QuickStartConnections = NumPublicConnections;
@@ -124,6 +194,7 @@ void UMTGameInstance::QuickStart(int32 NumPublicConnections, bool bIsLAN)
 
 void UMTGameInstance::LeaveGame()
 {
+	SetConnecting(false);
 	if (SessionSubsystem)
 	{
 		SessionSubsystem->DestroySession();   // 세션 정리 (비동기, fire-and-forget)
@@ -141,6 +212,11 @@ void UMTGameInstance::JoinSessionData(UMTSessionData* Data, const FString& Passw
 	{
 		return;
 	}
+	if (bConnecting)
+	{
+		MTScreen(FColor::Yellow, TEXT("[MTFlow] 이미 접속 진행 중 → 참가 요청 무시"));
+		return;
+	}
 
 	// 간이 비밀번호 검증 (초대 수락 경로는 서브시스템 직행이라 검증 없음)
 	if (Data->bHasPassword && !Password.Equals(Data->AdvertisedPassword))
@@ -149,11 +225,16 @@ void UMTGameInstance::JoinSessionData(UMTSessionData* Data, const FString& Passw
 		return;
 	}
 
+	SetConnecting(true);
 	SessionSubsystem->JoinSession(Data->Result);
 }
 
 void UMTGameInstance::JoinSessionByName(const FString& RoomName, const FString& Password)
 {
+	if (bConnecting)
+	{
+		return;
+	}
 	const FString Trimmed = RoomName.TrimStartAndEnd();
 	if (Trimmed.IsEmpty())
 	{
@@ -178,6 +259,7 @@ void UMTGameInstance::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver,
 	// 서버가 보낸 사유(ErrorString)를 기존 참가 실패 다이얼로그로 표시.
 	if (FailureType == ENetworkFailure::PendingConnectionFailure)
 	{
+		SetConnecting(false);
 		const FString Reason = ErrorString.IsEmpty()
 			? TEXT("세션에 참여할 수 없습니다.")
 			: ErrorString;
@@ -239,17 +321,23 @@ void UMTGameInstance::HandleCreateSession(bool bWasSuccessful)
 
 	if (!bWasSuccessful)
 	{
+		SetConnecting(false);
 		MTScreen(FColor::Red, TEXT("[MTHost] 세션 생성 실패 → 트래블 안 함"));
 		return;
 	}
 	if (!GetWorld())
 	{
+		SetConnecting(false);
 		MTScreen(FColor::Red, TEXT("[MTHost] World null → 트래블 불가"));
 		return;
 	}
 
 	const FString TravelURL = LobbyPath + TEXT("?listen");
 	const bool bTraveling = GetWorld()->ServerTravel(TravelURL);
+	if (!bTraveling)
+	{
+		SetConnecting(false);
+	}
 	MTScreen(bTraveling ? FColor::Green : FColor::Red,
 		FString::Printf(TEXT("[MTHost] ServerTravel(\"%s\") → %s"),
 			*TravelURL, bTraveling ? TEXT("시작됨") : TEXT("거부됨 (경로/맵 존재 확인!)")));
@@ -321,7 +409,7 @@ void UMTGameInstance::HandleFindSessions(const TArray<FOnlineSessionSearchResult
 		}
 
 		MTScreen(FColor::Yellow, TEXT("[MTQuick] 참가 가능한 방 없음 → 기본 설정으로 방 생성"));
-		HostGame(FMTRoomSettings(), QuickStartConnections, bQuickStartLAN);
+		HostGameInternal(FMTRoomSettings(), QuickStartConnections, bQuickStartLAN);   // 접속 진행 중이므로 가드 우회
 		return;
 	}
 
@@ -335,6 +423,10 @@ void UMTGameInstance::HandleJoinSession(EOnJoinSessionCompleteResult::Type Resul
 	const bool bOk = (Result == EOnJoinSessionCompleteResult::Success)
 		&& SessionSubsystem && SessionSubsystem->GetResolvedConnectString(Address);
 
+	if (!bOk)
+	{
+		SetConnecting(false);
+	}
 	OnJoinResult.Broadcast(bOk);
 	if (bOk)
 	{

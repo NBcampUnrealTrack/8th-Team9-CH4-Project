@@ -4,6 +4,7 @@
 #include "Player/MTPlayerAttributeSet.h"
 #include "Pedestrian/MTPedestrianBase.h"
 #include "Game/MTGameplayTags.h"
+#include "Game/MTLog.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
 #include "GameFramework/PlayerController.h"

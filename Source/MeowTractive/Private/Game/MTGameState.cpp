@@ -93,6 +93,27 @@ void AMTGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
 {
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(AMTGameState, PlayerScores);
+    DOREPLIFETIME(AMTGameState, MatchRemainingTime);
+}
+
+void AMTGameState::SetMatchRemainingTime(int32 NewSeconds)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	NewSeconds = FMath::Max(0, NewSeconds);
+	if (MatchRemainingTime == NewSeconds)
+	{
+		return;
+	}
+	MatchRemainingTime = NewSeconds;
+	OnRep_MatchRemainingTime();   // 리슨 호스트 UI 즉시 갱신
+}
+
+void AMTGameState::OnRep_MatchRemainingTime()
+{
+	OnMatchTimeUpdated.Broadcast(MatchRemainingTime);
 }
 
 void AMTGameState::AddAttractedCount(APlayerState* TargetPlayerState)
@@ -144,8 +165,8 @@ void AMTGameState::OnRep_PlayerScores()
     // UI 갱신 필요하면 여기서
 	OnPlayerScoresUpdated.Broadcast();
 
-	// ------- 플레이어 순위 화면 표시 -------
-	if (GEngine)
+	// ------- 플레이어 순위 화면 표시 (디버그 — HUD가 순위 표시하므로 MT.Log 게이트) -------
+	if (MTLogEnabled() && GEngine)
     {
         TArray<FPlayerScore> Sorted = GetSortedPlayerScores();
         for (int32 i = 0; i < Sorted.Num(); ++i)

@@ -1,20 +1,29 @@
 ﻿#include "Player/MTPlayerController.h"
 #include "Player/MTPlayerState.h"
+#include "Player/MTPlayerCharacter.h"
 #include "UI/InGame/MTMatchGameResultWidget.h"
 #include "UI/PauseMenu/MTPauseMenuWidget.h"
 #include "Game/MTLobbyGameMode.h"
 #include "Game/MTMatchGameMode.h"
 #include "Game/MTGameInstance.h"
-#include "InputCoreTypes.h"
+#include "Game/MTLog.h"
+#include "EnhancedInputComponent.h"
 
 void AMTPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
-	// ESC → 일시정지 메뉴 토글 (로컬 PC에만 InputComponent 존재)
-	if (InputComponent)
+	// IA_Pause(ESC, PIE용 P) → 일시정지 메뉴 토글. 컨텍스트(IMC_Default)는 캐릭터가 등록.
+	if (UEnhancedInputComponent* EIC = Cast<UEnhancedInputComponent>(InputComponent))
 	{
-		InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &AMTPlayerController::TogglePauseMenu);
+		if (PauseAction)
+		{
+			EIC->BindAction(PauseAction, ETriggerEvent::Started, this, &AMTPlayerController::TogglePauseMenu);
+		}
+		else
+		{
+			UE_CLOG(MTLogEnabled(), LogMT, Warning, TEXT("[MTPC] PauseAction 미지정 → 일시정지 입력 없음 (BP_MTPlayerController에서 IA_Pause 지정)"));
+		}
 	}
 }
 
@@ -45,6 +54,13 @@ void AMTPlayerController::TogglePauseMenu()
 	{
 		return;
 	}
+
+	// UIOnly 전환 시 눌린 키 release가 합성돼 홀드형 스킬이 발사되는 것 방지 — 시전 중 스킬 취소
+	if (AMTPlayerCharacter* Cat = Cast<AMTPlayerCharacter>(GetPawn()))
+	{
+		Cat->CancelActiveSkills();
+	}
+
 	PauseMenu->AddToViewport(50);
 
 	FInputModeUIOnly Mode;

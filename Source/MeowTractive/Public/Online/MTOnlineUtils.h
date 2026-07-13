@@ -22,4 +22,8 @@ public:
 	// 아바타가 아직 로드 안 됐으면 첫 호출에서 nullptr → 잠시 후 재호출하면 반환됨.
 	UFUNCTION(BlueprintCallable, Category = "MT|Online")
 	static UTexture2D* GetSteamAvatar(const APlayerState* PlayerState);
+
+	// Steam 페르소나를 못 쓰는 환경(Null OSS/LAN)이면 머신명 대신 슬롯 기반 "Player N"으로 교체.
+	// 서버 전용 — PlayerName 복제로 모든 UI에 자동 반영. 게임모드가 접속/슬롯 배정 후 호출.
+	static void ApplyFallbackPlayerName(APlayerState* PlayerState);
 };

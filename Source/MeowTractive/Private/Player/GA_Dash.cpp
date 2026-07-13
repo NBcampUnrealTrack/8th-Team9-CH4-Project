@@ -10,6 +10,7 @@
 #include "GameFramework/Character.h"
 #include "Engine/OverlapResult.h"
 #include "Engine/World.h"
+#include "GameFramework/GameStateBase.h"
 #include "Engine/Engine.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
@@ -319,6 +320,11 @@ void UGA_Dash::OnRechargeTick()
 	{
 		ArmRechargeTimer(ASC, World);
 	}
+	else if (AMTPlayerCharacter* Cat = Cast<AMTPlayerCharacter>(ASC->GetAvatarActor()))
+	{
+		// 완충 → HUD 재충전 표시 종료
+		Cat->SetDashRechargeState(0.f, 0.f);
+	}
 }
 
 void UGA_Dash::ArmRechargeTimer(UAbilitySystemComponent* ASC, UWorld* World)
@@ -334,4 +340,13 @@ void UGA_Dash::ArmRechargeTimer(UAbilitySystemComponent* ASC, UWorld* World)
 			}
 		});
 	World->GetTimerManager().SetTimer(RechargeTimerHandle, Delegate, RechargeInterval, /*bLoop=*/false);
+
+	// HUD 재충전 표시용 — 완료 서버시각 기록 (소유 클라로 복제)
+	if (AMTPlayerCharacter* Cat = Cast<AMTPlayerCharacter>(ASC->GetAvatarActor()))
+	{
+		if (const AGameStateBase* GS = World->GetGameState())
+		{
+			Cat->SetDashRechargeState(GS->GetServerWorldTimeSeconds() + RechargeInterval, RechargeInterval);
+		}
+	}
 }

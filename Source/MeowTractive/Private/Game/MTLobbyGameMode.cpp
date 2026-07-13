@@ -2,6 +2,7 @@
 #include "Game/MTLobbyGameState.h"
 #include "Game/MTGameInstance.h"
 #include "Online/MTSessionSubsystem.h"
+#include "Online/MTOnlineUtils.h"
 #include "Player/MTPlayerState.h"
 #include "Player/MTPlayerController.h"
 #include "GameFramework/GameStateBase.h"
@@ -16,7 +17,9 @@ AMTLobbyGameMode::AMTLobbyGameMode()
 	PlayerStateClass = AMTPlayerState::StaticClass();
 	PlayerControllerClass = AMTPlayerController::StaticClass();
 
-	MatchMapPaths.Add(EMTRoomMap::Insadong, TEXT("/Game/Map/Map_Insa/Prototype_Insadong"));
+	// 네이티브 CDO 기본값은 쿠커가 소프트 참조로 추적 못 함 — BP_LobbyMode에서 덮어쓰고 MapsToCook 유지
+	FallbackMatchMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Map/Map_Insa/Prototype_Insadong.Prototype_Insadong")));
+	MatchMaps.Add(EMTRoomMap::Insadong, FallbackMatchMap);
 }
 
 void AMTLobbyGameMode::BeginPlay()
@@ -188,6 +191,7 @@ void AMTLobbyGameMode::SetupLobbyPlayer(AController* C)
 	}
 
 	MTPS->SetHost(C->IsLocalController());   // 리슨 서버의 로컬 PC = 호스트
+	UMTOnlineUtils::ApplyFallbackPlayerName(MTPS);   // Null OSS면 "Player N" (슬롯 배정 후)
 	// 팀색은 매치 게임모드가 슬롯 기준으로 결정 (AMTMatchGameMode::AssignTeamColor)
 }
 
@@ -283,20 +287,27 @@ FString AMTLobbyGameMode::ResolveMatchMapPath() const
 	const AMTLobbyGameState* GS = GetGameState<AMTLobbyGameState>();
 	const EMTRoomMap Selected = GS ? GS->GetRoomMap() : EMTRoomMap::Insadong;
 
+	TSoftObjectPtr<UWorld> Map;
 	if (Selected == EMTRoomMap::Random)
 	{
-		TArray<FString> Candidates;
-		MatchMapPaths.GenerateValueArray(Candidates);
+		TArray<TSoftObjectPtr<UWorld>> Candidates;
+		MatchMaps.GenerateValueArray(Candidates);
 		if (Candidates.Num() > 0)
 		{
-			return Candidates[FMath::RandRange(0, Candidates.Num() - 1)];
+			Map = Candidates[FMath::RandRange(0, Candidates.Num() - 1)];
 		}
 	}
-	else if (const FString* Found = MatchMapPaths.Find(Selected))
+	else if (const TSoftObjectPtr<UWorld>* Found = MatchMaps.Find(Selected))
 	{
-		return *Found;
+		Map = *Found;
 	}
-	return NextMapPath;   // 폴백
+
+	if (Map.IsNull())
+	{
+		Map = FallbackMatchMap;   // 폴백
+	}
+	// ServerTravel은 패키지 경로 문자열을 받는다
+	return Map.ToSoftObjectPath().GetLongPackageName();
 }
 
 void AMTLobbyGameMode::TryStartMatch()
@@ -305,8 +316,13 @@ void AMTLobbyGameMode::TryStartMatch()
 	{
 		return;
 	}
+	const FString MapPath = ResolveMatchMapPath();
+	if (!ensureMsgf(!MapPath.IsEmpty(), TEXT("매치 맵 미지정 — MatchMaps/FallbackMatchMap 확인")))
+	{
+		return;
+	}
 	// 방 설정의 맵으로 리슨 서버 전환
-	GetWorld()->ServerTravel(ResolveMatchMapPath() + TEXT("?listen"));
+	GetWorld()->ServerTravel(MapPath + TEXT("?listen"));
 }
 
 int32 AMTLobbyGameMode::AcquireSlot()

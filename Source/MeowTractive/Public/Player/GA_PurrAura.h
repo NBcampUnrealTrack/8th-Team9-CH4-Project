@@ -1,10 +1,11 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "Player/MTGameplayAbility.h"
 #include "GA_PurrAura.generated.h"
 
 class UGameplayEffect;
+class UAnimMontage;
 
 /**
  * 뚱냥이 골골 오라 채널링 공용 클래스 — BP 두 개로 변형 구성.
@@ -32,6 +33,10 @@ protected:
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		bool bReplicateEndAbility, bool bWasCancelled) override;
+
+	// 시전 애니메이션 (BP 변형별 지정: 드러눕기/골골). 채널 종료·취소 시 자동 정지.
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Purr")
+	TObjectPtr<UAnimMontage> CastMontage;
 
 	// 오라 반경 (cm)
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Purr", meta = (ClampMin = "0.0"))

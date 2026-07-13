@@ -51,13 +51,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Lobby")
 	int32 MaxPlayers = 4;
 
-	// 매치 맵 폴백 (맵 선택 테이블에 없을 때)
+	// 매치 맵 폴백 (맵 선택 테이블에 없을 때). 쿠킹 추적되게 BP에서 지정 권장.
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Lobby")
-	FString NextMapPath = TEXT("/Game/Map/Map_Insa/Prototype_Insadong");
+	TSoftObjectPtr<UWorld> FallbackMatchMap;
 
-	// 맵 선택 → 실제 맵 경로 (Random 제외. 새 맵은 여기에 추가)
+	// 맵 선택 → 실제 맵 (Random 제외. 새 맵은 여기에 추가)
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Lobby")
-	TMap<EMTRoomMap, FString> MatchMapPaths;
+	TMap<EMTRoomMap, TSoftObjectPtr<UWorld>> MatchMaps;
 
 private:
 	// 슬롯 배정/재사용 + 팀색 설정 (PostLogin·SeamlessTravel 공통)

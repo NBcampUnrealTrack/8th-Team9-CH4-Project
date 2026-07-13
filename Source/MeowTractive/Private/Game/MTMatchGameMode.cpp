@@ -2,6 +2,7 @@
 #include "Game/MTGameState.h"
 #include "Game/MTLog.h"
 #include "Online/MTSessionSubsystem.h"
+#include "Online/MTOnlineUtils.h"
 #include "Player/MTPlayerState.h"
 #include "Player/MTPlayerController.h"
 #include "UI/InGame/MTPlayerHUD.h"
@@ -61,6 +62,8 @@ void AMTMatchGameMode::PostLogin(APlayerController* NewPlayer)
     Super::PostLogin(NewPlayer);
     MarkLoaded(NewPlayer);
     AssignTeamColor(NewPlayer);     // 슬롯 기준 팀색 (직접 진입 시 폴백 포함)
+    // PIE 직행 등 로비를 안 거친 접속 — Null OSS면 "Player N" (seamless는 로비 이름 유지)
+    UMTOnlineUtils::ApplyFallbackPlayerName(NewPlayer ? NewPlayer->PlayerState : nullptr);
 
     if (MTLogEnabled())
     {
@@ -129,9 +132,11 @@ void AMTMatchGameMode::UpdateMatchTimer()
 {
     RemainingTime--;
 
-    // 화면 가림 방지로 임시 주석 (남은 시간 디버그 표시)
-    GEngine->AddOnScreenDebugMessage(-1, 1.f, FColor::White,
-        FString::Printf(TEXT("남은 시간: %d"), RemainingTime));
+    // 남은 시간 복제 → 클라 HUD 표시
+    if (AMTGameState* GS = GetGameState<AMTGameState>())
+    {
+        GS->SetMatchRemainingTime(RemainingTime);
+    }
 
     if (RemainingTime <= 0)
     {
@@ -362,11 +367,11 @@ void AMTMatchGameMode::HandleMatchHasStarted()
 
 	// 1. 매치 타이머 초기화 및 시작
     RemainingTime = MatchDuration;
-    
-    // AMTGameState가 있다면 현재 남은 시간을 클라이언트들에게 동기화
+
+    // 시작 시점 남은 시간을 클라이언트에 동기화
     if (AMTGameState* GS = GetGameState<AMTGameState>())
     {
-        // GS->SetRemainingTime(RemainingTime); // GameState에 구현 필요
+        GS->SetMatchRemainingTime(RemainingTime);
     }
 
     GetWorldTimerManager().SetTimer(MatchTimerHandle, this, &AMTMatchGameMode::UpdateMatchTimer, 1.0f, true);

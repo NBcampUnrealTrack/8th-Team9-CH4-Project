@@ -1,6 +1,7 @@
 #include "UI/PauseMenu/MTPauseMenuWidget.h"
 #include "Player/MTPlayerController.h"
 #include "Game/MTGameInstance.h"
+#include "UI/Settings/MTSettingsWidget.h"
 #include "Components/Button.h"
 
 void UMTPauseMenuWidget::NativeConstruct()
@@ -17,11 +18,29 @@ void UMTPauseMenuWidget::NativeConstruct()
 	{
 		LeaveButton->OnClicked.AddDynamic(this, &UMTPauseMenuWidget::HandleLeave);
 	}
+	if (SettingsButton)
+	{
+		SettingsButton->OnClicked.AddDynamic(this, &UMTPauseMenuWidget::HandleSettings);
+	}
+}
+
+void UMTPauseMenuWidget::HandleSettings()
+{
+	if (!SettingsWidgetClass)
+	{
+		return;
+	}
+	if (UMTSettingsWidget* Settings = CreateWidget<UMTSettingsWidget>(GetOwningPlayer(), SettingsWidgetClass))
+	{
+		Settings->AddToViewport(60);   // 일시정지 메뉴(50) 위
+		Settings->SetUserFocus(GetOwningPlayer());   // ESC 닫기 수신
+	}
 }
 
 FReply UMTPauseMenuWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)
 {
-	if (InKeyEvent.GetKey() == EKeys::Escape)
+	// UIOnly 동안 IA_Pause가 못 오므로 위젯이 직접 닫기 (ESC + PIE용 P — IMC 매핑과 동일 키)
+	if (InKeyEvent.GetKey() == EKeys::Escape || InKeyEvent.GetKey() == EKeys::P)
 	{
 		CloseMenu();
 		return FReply::Handled();

@@ -11,12 +11,22 @@
  * 공용 Cooldown GE(Duration=SetByCaller Data.Cooldown, 정적 태그 없음) 하나를 여러 스킬이 공유하고,
  * 스킬별 쿨다운 태그(CooldownTags)는 런타임에 동적 부여한다.
  */
+class UTexture2D;
+
 UCLASS(Abstract)
 class MEOWTRACTIVE_API UMTGameplayAbility : public UGameplayAbility
 {
 	GENERATED_BODY()
 
+public:
+	// HUD 스킬 슬롯 아이콘 (미지정 시 슬롯 위젯의 DefaultIcon 사용)
+	UTexture2D* GetAbilityIcon() const { return AbilityIcon; }
+
 protected:
+	// 스킬 아이콘 (BP 파생에서 지정)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TObjectPtr<UTexture2D> AbilityIcon;
+
 	// 쿨다운 지속 (s). 0이면 쿨다운 없음.
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Cooldown", meta = (ClampMin = "0.0"))
 	float CooldownDuration = 0.f;

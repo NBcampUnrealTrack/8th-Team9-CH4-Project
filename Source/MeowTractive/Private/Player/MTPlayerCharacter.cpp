@@ -104,6 +104,28 @@ void AMTPlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& O
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AMTPlayerCharacter, bIsDead);
+	DOREPLIFETIME(AMTPlayerCharacter, DashRechargeEndServerTime);
+	DOREPLIFETIME(AMTPlayerCharacter, DashRechargeDuration);
+}
+
+void AMTPlayerCharacter::CancelActiveSkills()
+{
+	if (AbilitySystemComponent)
+	{
+		// 액티브 스킬만 취소 (패시브는 Skill.* 에셋 태그가 없어 영향 없음)
+		FGameplayTagContainer SkillTags(FGameplayTag::RequestGameplayTag(TEXT("Skill")));
+		AbilitySystemComponent->CancelAbilities(&SkillTags);
+	}
+}
+
+void AMTPlayerCharacter::SetDashRechargeState(float EndServerTime, float Duration)
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+	DashRechargeEndServerTime = EndServerTime;
+	DashRechargeDuration = Duration;
 }
 
 void AMTPlayerCharacter::PossessedBy(AController* NewController)
@@ -199,7 +221,10 @@ void AMTPlayerCharacter::NotifyControllerChanged()
 	{
 		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = ULocalPlayer::GetSubsystem<UEnhancedInputLocalPlayerSubsystem>(PlayerController->GetLocalPlayer()))
 		{
-			Subsystem->AddMappingContext(DefaultMappingContext, 0);
+			// bNotifyUserSettings: 저장된 키 재바인딩(EnhancedInputUserSettings) 적용
+			FModifyContextOptions Options;
+			Options.bNotifyUserSettings = true;
+			Subsystem->AddMappingContext(DefaultMappingContext, 0, Options);
 		}
 	}
 

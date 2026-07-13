@@ -6,6 +6,7 @@
 #include "MTGameState.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerScoresUpdated);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchTimeUpdated, int32, RemainingSeconds);
 
 class UMTItemData;
 
@@ -49,6 +50,16 @@ public:
 	UPROPERTY(BlueprintAssignable)
     FOnPlayerScoresUpdated OnPlayerScoresUpdated;
 
+	// 매치 남은 시간 변경 (HUD가 구독)
+	UPROPERTY(BlueprintAssignable)
+	FOnMatchTimeUpdated OnMatchTimeUpdated;
+
+	// 서버: MatchGameMode가 1초마다 호출 → 복제 + 방송
+	void SetMatchRemainingTime(int32 NewSeconds);
+
+	UFUNCTION(BlueprintPure)
+	int32 GetMatchRemainingTime() const { return MatchRemainingTime; }
+
     // 내림차순 정렬된 랭킹 반환
     UFUNCTION(BlueprintPure)
     TArray<FPlayerScore> GetSortedPlayerScores() const;
@@ -59,6 +70,13 @@ protected:
 
     UFUNCTION()
     void OnRep_PlayerScores();
+
+	// 매치 남은 시간 (초). 서버가 갱신, 클라는 OnRep으로 수신
+	UPROPERTY(ReplicatedUsing = OnRep_MatchRemainingTime)
+	int32 MatchRemainingTime = 0;
+
+	UFUNCTION()
+	void OnRep_MatchRemainingTime();
 
 	// 게임에 존재하는 모든 아이템 데이터. BP_MTGameState 디테일 창에서 채워 넣기.
 	UPROPERTY(EditDefaultsOnly, Category = "Item")
