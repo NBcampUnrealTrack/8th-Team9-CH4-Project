@@ -93,10 +93,15 @@ private:
 
 	void StartAttractiveBeamFX();
 	void UpdateAttractiveBeamFX(const FVector& Start, const FVector& End);
-	void UpdateAttractiveBeamHitFX(const bool TraceHit);
+	void UpdateAttractiveBeamHitFX(bool bHitActor);
 	void StopAttractiveBeamFX();
 	void FinishAttractiveBeamFX();
 	FVector GetAttractiveBeamFXStartLocation() const;
 	FLinearColor GetAvatarPlayerColor() const;
-	bool TraceBeam(FVector& OutTraceStart, FVector& OutBeamEnd, AMTPedestrianBase*& OutPedestrian) const;
+	bool TraceBeam(
+		FVector& OutTraceStart,
+		FVector& OutBeamEnd,
+		AMTPedestrianBase*& OutPedestrian,
+		bool& bOutHitActor,
+		bool& bOutHitWorld) const;
 };

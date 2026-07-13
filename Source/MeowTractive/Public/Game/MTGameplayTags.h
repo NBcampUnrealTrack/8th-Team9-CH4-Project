@@ -52,6 +52,7 @@ namespace MTGameplayTags
 	namespace GameplayCue
 	{
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_GameplayCue_Cat_Hit); // 고양이 피격 연출
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_GameplayCue_Cat_Punch); // 고양이 기본공격 연출
 	}
 
 	// --- 행인 상태 ---

@@ -1,4 +1,4 @@
-#include "Player/GA_MeowPunch.h"
+﻿#include "Player/GA_MeowPunch.h"
 
 #include "Player/MTPlayerCharacter.h"
 #include "Player/MTLobbySelectable.h"
@@ -102,6 +102,17 @@ void UGA_MeowPunch::PerformHit()
 	if (bDrawDebug)
 	{
 		DrawDebugSphere(GetWorld(), Center, Radius, 16, FColor::Red, false, 1.f);
+	}
+
+	// 기본공격 GameplayCue 실행
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+	{
+		FGameplayCueParameters CueParams;
+		CueParams.Location = Avatar ? Avatar->GetActorLocation() + Avatar->GetActorForwardVector() * ForwardOffset : FVector::ZeroVector;
+		CueParams.Normal = Avatar ? Avatar->GetActorForwardVector() : FVector::ForwardVector;
+		CueParams.Instigator = Avatar;
+		CueParams.EffectCauser = Avatar;
+		ASC->ExecuteGameplayCue(MTGameplayTags::GameplayCue::TAG_GameplayCue_Cat_Punch, CueParams);
 	}
 
 	// 판정/데미지 적용은 서버 권위
