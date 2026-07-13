@@ -232,11 +232,14 @@ void UMTSessionSubsystem::HandleFindSessionsComplete(bool bWasSuccessful)
 
 	if (LastSessionSearch.IsValid())
 	{
+		TSet<FString> SeenIds;   // LAN 비콘 재질의로 같은 세션이 중복 응답됨 → ID로 1개만
 		for(const FOnlineSessionSearchResult& Result : LastSessionSearch->SearchResults)
 		{
 			FString FoundMatchType;
-			if (Result.Session.SessionSettings.Get(FName("MatchType"), FoundMatchType) && FoundMatchType == MatchType)
+			if (Result.Session.SessionSettings.Get(FName("MatchType"), FoundMatchType) && FoundMatchType == MatchType
+				&& !SeenIds.Contains(Result.GetSessionIdStr()))
 			{
+				SeenIds.Add(Result.GetSessionIdStr());
 				Filtered.Add(Result);
 			}
 		}

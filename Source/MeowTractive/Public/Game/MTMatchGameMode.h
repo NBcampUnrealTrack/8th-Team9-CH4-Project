@@ -23,12 +23,8 @@ public:
 
 	virtual void HandleMatchHasEnded() override;
 
-	// 세션 유지 + 전원 로비 맵으로 복귀 (호스트 권위 ServerTravel)
+	// 세션 유지 + 전원 로비 맵으로 복귀 (호스트 권위 ServerTravel). 대상 맵은 UMTGameInstance::LobbyMap 단일 출처.
 	void ReturnToLobby();
-
-	// 복귀 대상 로비 맵
-	UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
-	FString LobbyMapPath = TEXT("/Game/Main/Maps/Lobby");
 
 	// 결과 화면 자동 복귀 타임아웃(초). 이 시간 동안 버튼 미입력 시 자동으로 로비 복귀.
 	UPROPERTY(EditDefaultsOnly, Category = "Match Rules")

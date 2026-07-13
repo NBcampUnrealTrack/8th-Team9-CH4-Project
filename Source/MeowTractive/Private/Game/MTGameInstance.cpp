@@ -202,7 +202,7 @@ void UMTGameInstance::LeaveGame()
 	// 서버/클라 공통: 메인메뉴로 복귀(연결 해제)
 	if (APlayerController* PC = GetFirstLocalPlayerController())
 	{
-		PC->ClientTravel(MainMenuPath, TRAVEL_Absolute);
+		PC->ClientTravel(GetMainMenuMapPath(), TRAVEL_Absolute);
 	}
 }
 
@@ -297,7 +297,7 @@ void UMTGameInstance::HandleNetworkFailure(UWorld* World, UNetDriver* NetDriver,
 	// 메인메뉴로 복귀
 	if (APlayerController* PC = GetFirstLocalPlayerController())
 	{
-		PC->ClientTravel(MainMenuPath, TRAVEL_Absolute);
+		PC->ClientTravel(GetMainMenuMapPath(), TRAVEL_Absolute);
 	}
 }
 
@@ -316,6 +316,7 @@ void UMTGameInstance::HandleCreateSession(bool bWasSuccessful)
 {
 	OnHostResult.Broadcast(bWasSuccessful);
 
+	const FString LobbyPath = GetLobbyMapPath();
 	MTScreen(FColor::Cyan, FString::Printf(TEXT("[MTHost] CreateSession 완료: Success=%d, World=%d, LobbyPath=%s"),
 		bWasSuccessful ? 1 : 0, GetWorld() ? 1 : 0, *LobbyPath));
 
@@ -463,6 +464,8 @@ void UMTGameInstance::HandleJoinSession(EOnJoinSessionCompleteResult::Type Resul
 void UMTGameInstance::MTHostInfo()
 {
 	// 경로의 맵 패키지가 실제로 존재하는지까지 검사 → "로비로 안 감" 1차 진단
+	const FString LobbyPath = GetLobbyMapPath();
+	const FString MainMenuPath = GetMainMenuMapPath();
 	const bool bLobbyExists = FPackageName::DoesPackageExist(LobbyPath);
 	const bool bMenuExists = FPackageName::DoesPackageExist(MainMenuPath);
 
@@ -473,6 +476,6 @@ void UMTGameInstance::MTHostInfo()
 
 	if (!bLobbyExists)
 	{
-		MTScreen(FColor::Red, TEXT("[MTHostInfo] 로비 맵을 못 찾음! LobbyPath 경로가 틀렸습니다."), true);
+		MTScreen(FColor::Red, TEXT("[MTHostInfo] 로비 맵을 못 찾음! LobbyMap 지정이 틀렸습니다."), true);
 	}
 }

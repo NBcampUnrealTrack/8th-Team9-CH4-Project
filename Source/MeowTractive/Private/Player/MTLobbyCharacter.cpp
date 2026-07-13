@@ -29,8 +29,9 @@ void AMTLobbyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 
 void AMTLobbyCharacter::BeginPlay()
 {
-	Super::BeginPlay();   // 가상 UpdateLobbyVisibility() 1회 호출됨
+	Super::BeginPlay();
 
+	UpdateLobbyVisibility();
 	// 로컬 슬롯·OwnerSlot 복제가 늦을 수 있어 주기적으로 재평가 (로비 HUD 폴링과 동일한 방식)
 	if (UWorld* World = GetWorld())
 	{

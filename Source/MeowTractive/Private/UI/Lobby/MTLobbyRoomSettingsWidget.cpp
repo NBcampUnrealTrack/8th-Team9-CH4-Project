@@ -36,8 +36,10 @@ void UMTLobbyRoomSettingsWidget::NativeConstruct()
 	}
 	if (MapCombo)
 	{
+		// 순서는 EMTRoomMap 인덱스와 일치해야 함 (선택 인덱스 → enum 캐스팅)
 		MapCombo->ClearOptions();
 		MapCombo->AddOption(TEXT("인사동"));
+		MapCombo->AddOption(TEXT("공원"));
 		MapCombo->AddOption(TEXT("랜덤"));
 		MapCombo->SetSelectedIndex((int32)Current.Map);
 	}

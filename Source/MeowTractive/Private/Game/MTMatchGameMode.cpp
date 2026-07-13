@@ -1,4 +1,5 @@
 ﻿#include "Game/MTMatchGameMode.h"
+#include "Game/MTGameInstance.h"
 #include "Game/MTGameState.h"
 #include "Game/MTLog.h"
 #include "Online/MTSessionSubsystem.h"
@@ -124,8 +125,14 @@ void AMTMatchGameMode::ReturnToLobby()
 	{
 		return;
 	}
+	const UMTGameInstance* GI = Cast<UMTGameInstance>(GetGameInstance());
+	const FString LobbyPath = GI ? GI->GetLobbyMapPath() : FString();
+	if (!ensureMsgf(!LobbyPath.IsEmpty(), TEXT("로비 맵 미지정 — UMTGameInstance::LobbyMap 확인")))
+	{
+		return;
+	}
 	GetWorldTimerManager().ClearTimer(LobbyTimer);   // 자동/버튼 중복 트래블 방지
-	GetWorld()->ServerTravel(LobbyMapPath + TEXT("?listen"));
+	GetWorld()->ServerTravel(LobbyPath + TEXT("?listen"));
 }
 
 void AMTMatchGameMode::UpdateMatchTimer()

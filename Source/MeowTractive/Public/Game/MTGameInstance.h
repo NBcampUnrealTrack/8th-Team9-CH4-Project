@@ -94,13 +94,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "MT|Flow")
 	bool IsConnecting() const { return bConnecting; }
 
-	// 호스트가 이동할 로비 맵 (BP 자식에서 지정 권장)
+	// 호스트가 이동할 로비 맵 (쿠커가 소프트 참조로 추적하게 BP 자식에서 지정)
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Flow")
-	FString LobbyPath = TEXT("/Game/Main/Maps/Lobby");
+	TSoftObjectPtr<UWorld> LobbyMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Main/Maps/Lobby.Lobby")));
 
 	// 나가기 시 복귀할 메인메뉴 맵
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Flow")
-	FString MainMenuPath = TEXT("/Game/Main/Maps/MainMenu");
+	TSoftObjectPtr<UWorld> MainMenuMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Main/Maps/MainMenu.MainMenu")));
+
+	// 트래블용 패키지 경로 (매치→로비 복귀 시 AMTMatchGameMode도 사용)
+	FString GetLobbyMapPath() const { return LobbyMap.ToSoftObjectPath().GetLongPackageName(); }
+	FString GetMainMenuMapPath() const { return MainMenuMap.ToSoftObjectPath().GetLongPackageName(); }
 
 	// 저장된 볼륨(UMTGameUserSettings)을 사운드 믹스에 반영 (맵 로드/설정 변경 시 호출)
 	UFUNCTION(BlueprintCallable, Category = "MT|Audio")

@@ -96,7 +96,8 @@ FText UMTLobbyHUDWidget::GetRoomSummaryText() const
 		GS->GetRoomGameMode() == EMTRoomGameMode::Team ? TEXT("팀전") :
 		GS->GetRoomGameMode() == EMTRoomGameMode::CatFight ? TEXT("고양이 전투") : TEXT("개인전");
 	const TCHAR* MapStr =
-		GS->GetRoomMap() == EMTRoomMap::Random ? TEXT("랜덤") : TEXT("인사동");
+		GS->GetRoomMap() == EMTRoomMap::Random ? TEXT("랜덤") :
+		GS->GetRoomMap() == EMTRoomMap::Park ? TEXT("공원") : TEXT("인사동");
 
 	return FText::FromString(FString::Printf(TEXT("%s  |  %s  |  %s"),
 		*GS->GetRoomName(), ModeStr, MapStr));
