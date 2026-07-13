@@ -39,6 +39,7 @@ namespace MTGameplayTags
 	namespace GameplayCue
 	{
 		UE_DEFINE_GAMEPLAY_TAG(TAG_GameplayCue_Cat_Hit, "GameplayCue.Cat.Hit");
+		UE_DEFINE_GAMEPLAY_TAG(TAG_GameplayCue_Cat_Punch, "GameplayCue.Cat.Punch");
 	}
 
 	namespace Pedestrian

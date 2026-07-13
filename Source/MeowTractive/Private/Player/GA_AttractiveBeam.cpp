@@ -9,6 +9,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Character.h"
 #include "GameplayTagContainer.h"
+#include "EngineUtils.h"
 #include "Engine/World.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
@@ -34,9 +35,11 @@ void UGA_AttractiveBeam::FireBeam()
 	FVector TraceStart;
 	FVector BeamEnd;
 	AMTPedestrianBase* Ped = nullptr;
-	bool bTraceHit = TraceBeam(TraceStart, BeamEnd, Ped);
-	UpdateAttractiveBeamHitFX(bTraceHit);
-	if (!bTraceHit)
+	bool bHitActor = false;
+	bool bHitWorld = false;
+	const bool bTraceValid = TraceBeam(TraceStart, BeamEnd, Ped, bHitActor, bHitWorld);
+	UpdateAttractiveBeamHitFX(bTraceValid && (bHitActor || bHitWorld));
+	if (!bTraceValid)
 	{
 		return;
 	}
@@ -54,7 +57,7 @@ void UGA_AttractiveBeam::FireBeam()
 		DrawDebugSphere(GetWorld(), BeamEnd, BeamRadius, 8, FColor::Yellow, false, FireInterval);
 	}
 
-	UpdateAttractiveBeamFX(GetAttractiveBeamFXStartLocation(), BeamEnd);
+	UpdateAttractiveBeamFX(TraceStart, BeamEnd);
 	OnBeamUpdate(TraceStart, BeamEnd, bHitPed);
 }
 
@@ -64,10 +67,14 @@ void UGA_AttractiveBeam::UpdateBeamVisual()
 	FVector TraceStart;
 	FVector BeamEnd;
 	AMTPedestrianBase* Ped = nullptr;
-	if (TraceBeam(TraceStart, BeamEnd, Ped))
+	bool bHitActor = false;
+	bool bHitWorld = false;
+	const bool bTraceValid = TraceBeam(TraceStart, BeamEnd, Ped, bHitActor, bHitWorld);
+	UpdateAttractiveBeamHitFX(bTraceValid && (bHitActor || bHitWorld));
+	if (bTraceValid)
 	{
 		const bool bHitPed = (Ped != nullptr);
-		UpdateAttractiveBeamFX(GetAttractiveBeamFXStartLocation(), BeamEnd);
+		UpdateAttractiveBeamFX(TraceStart, BeamEnd);
 		OnBeamUpdate(TraceStart, BeamEnd, bHitPed);
 	}
 
@@ -239,14 +246,14 @@ void UGA_AttractiveBeam::UpdateAttractiveBeamFX(const FVector& Start, const FVec
 }
 
 //빔 적중 여부만 업데이트
-void UGA_AttractiveBeam::UpdateAttractiveBeamHitFX(const bool TraceHit)
+void UGA_AttractiveBeam::UpdateAttractiveBeamHitFX(bool bHitActor)
 {
 	if (!ActiveAttractiveBeamFX)
 	{
 		return;
 	}
-
-	ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.TraceHit")), TraceHit);
+	UE_LOG(LogTemp, Warning, TEXT("Update Trace %d"), bHitActor);
+	ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.TraceHit")), bHitActor);
 }
 
 
@@ -327,16 +334,24 @@ FLinearColor UGA_AttractiveBeam::GetAvatarPlayerColor() const
 	return MTPS ? MTPS->GetTeamColor() : FLinearColor::White;
 }
 
-bool UGA_AttractiveBeam::TraceBeam(FVector& OutTraceStart, FVector& OutBeamEnd, AMTPedestrianBase*& OutPedestrian) const
+bool UGA_AttractiveBeam::TraceBeam(
+	FVector& OutTraceStart,
+	FVector& OutBeamEnd,
+	AMTPedestrianBase*& OutPedestrian,
+	bool& bOutHitActor,
+	bool& bOutHitWorld) const
 {
 	OutTraceStart = FVector::ZeroVector;
 	OutBeamEnd = FVector::ZeroVector;
 	OutPedestrian = nullptr;
+	bOutHitActor = false;
+	bOutHitWorld = false;
 
 	AActor* Avatar = GetAvatarActorFromActorInfo();
 	const APawn* Pawn = Cast<APawn>(Avatar);
 	APlayerController* PC = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
-	if (!PC || !GetWorld())
+	UWorld* World = GetWorld();
+	if (!PC || !World)
 	{
 		return false;
 	}
@@ -344,29 +359,61 @@ bool UGA_AttractiveBeam::TraceBeam(FVector& OutTraceStart, FVector& OutBeamEnd, 
 	FVector CamLocation;
 	FRotator CamRotation;
 	PC->GetPlayerViewPoint(CamLocation, CamRotation);
-	OutTraceStart = CamLocation;
-	const FVector TraceEnd = OutTraceStart + (CamRotation.Vector() * TraceDistance);
+	const FVector AimDirection = CamRotation.Vector();
+	const FVector CameraTraceEnd = CamLocation + (AimDirection * TraceDistance);
+	OutTraceStart = GetAttractiveBeamFXStartLocation();
 
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(Avatar);
-
-	OutBeamEnd = TraceEnd;
-	FHitResult WallHit;
-	if (GetWorld()->LineTraceSingleByChannel(WallHit, OutTraceStart, TraceEnd, ECC_Visibility, Params))
+	FCollisionQueryParams CameraTraceParams;
+	CameraTraceParams.AddIgnoredActor(Avatar);
+	for (TActorIterator<APawn> It(World); It; ++It)
 	{
-		OutBeamEnd = WallHit.ImpactPoint;
+		CameraTraceParams.AddIgnoredActor(*It);
 	}
 
+	FVector CameraTarget = CameraTraceEnd;
+	FHitResult WallHit;
+	if (World->LineTraceSingleByChannel(WallHit, CamLocation, CameraTraceEnd, ECC_Visibility, CameraTraceParams))
+	{
+		CameraTarget = WallHit.ImpactPoint;
+	}
+
+	// 카메라 뒤 장애물은 플레이어 시작 빔을 막지 않는다.
+	OutBeamEnd = FVector::DotProduct(CameraTarget - OutTraceStart, AimDirection) > 0.f
+		? CameraTarget
+		: OutTraceStart + (AimDirection * TraceDistance);
+
+	FHitResult WorldHit;
+	bOutHitWorld = World->LineTraceSingleByChannel(
+		WorldHit,
+		OutTraceStart,
+		OutBeamEnd,
+		ECC_Visibility,
+		CameraTraceParams);
+	if (bOutHitWorld)
+	{
+		OutBeamEnd = WorldHit.ImpactPoint;
+	}
+
+	FCollisionQueryParams PawnTraceParams;
+	PawnTraceParams.AddIgnoredActor(Avatar);
 	FHitResult PawnHit;
 	FCollisionObjectQueryParams ObjParams;
 	ObjParams.AddObjectTypesToQuery(ECC_Pawn);
-	const bool bPawnHit = GetWorld()->SweepSingleByObjectType(
-		PawnHit, OutTraceStart, OutBeamEnd, FQuat::Identity, ObjParams, FCollisionShape::MakeSphere(BeamRadius), Params);
+	const bool bPawnHit = World->SweepSingleByObjectType(
+		PawnHit,
+		OutTraceStart,
+		OutBeamEnd,
+		FQuat::Identity,
+		ObjParams,
+		FCollisionShape::MakeSphere(BeamRadius),
+		PawnTraceParams);
 
-	if (bPawnHit)
+	AActor* HitActor = PawnHit.GetActor();
+	bOutHitActor = bPawnHit && IsValid(HitActor);
+	if (bOutHitActor)
 	{
 		OutBeamEnd = PawnHit.ImpactPoint;
-		OutPedestrian = Cast<AMTPedestrianBase>(PawnHit.GetActor());
+		OutPedestrian = Cast<AMTPedestrianBase>(HitActor);
 	}
 
 	return true;
