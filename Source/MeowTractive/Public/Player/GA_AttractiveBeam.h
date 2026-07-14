@@ -87,6 +87,14 @@ protected:
 	UFUNCTION(BlueprintImplementableEvent, Category = "AttractiveBeam")
 	void OnBeamUpdate(const FVector& Start, const FVector& End, bool bHit);
 
+	// 루프 재생용 사운드 (Looping 옵션 켜진 애셋)
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	USoundBase* BeamLoopSound; 
+
+	// 런타임에 생성되는 오디오 컴포넌트
+	UPROPERTY()
+	UAudioComponent* BeamAudioComponent; 
+
 private:
 	// 소스(고양이) ASC로 GE 적용 → 행인 기여도가 올바르게 기록됨
 	void ApplyAttractiveDamage(AMTPedestrianBase* Target);
