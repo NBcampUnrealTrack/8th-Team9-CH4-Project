@@ -32,6 +32,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Lobby")
 	TMap<EMTCatType, TSubclassOf<APawn>> CatPawnClasses;
 
+	// 슬롯별 팀색 (인덱스 = PlayerSlot). 빨·파·초·노 순 — CopyProperties로 매치까지 운반됨
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Lobby")
+	TArray<FLinearColor> TeamColors;
+
 	// 선택 고양이에 따라 로비 조종 폰 결정
 	virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
 

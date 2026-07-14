@@ -136,11 +136,12 @@ void UMTSessionSubsystem::FindSessions(int32 MaxSearchResults, bool bIsLAN)
 	LastSessionSearch->bIsLanQuery = bIsLAN;
 	LastSessionSearch->MaxSearchResults = MaxSearchResults;
 
-	// 로컬로 만나지 않으면 Steam presence로 검색
+	// 로컬이 아니면 Steam 로비 검색 (UE5.8: SEARCH_PRESENCE가 아닌 SEARCH_LOBBIES로 분기)
 	if (!bIsLAN)
 	{
-		// SEARCH_PRESENCE 동일 키를 직접 사용
-		LastSessionSearch->QuerySettings.Set(FName(TEXT("PRESENCESEARCH")), true, EOnlineComparisonOp::Equals);
+		LastSessionSearch->QuerySettings.Set(SEARCH_LOBBIES, true, EOnlineComparisonOp::Equals);
+		// AppId 480 공유 로비 오염 대비: MatchType을 스팀 서버측 필터로 전달
+		LastSessionSearch->QuerySettings.Set(FName("MatchType"), MatchType, EOnlineComparisonOp::Equals);
 	}
 
 	// 세션 검색 시도 및 검색이 시작되지 않으면 델리게이트 해제 및 실패 브로드캐스트

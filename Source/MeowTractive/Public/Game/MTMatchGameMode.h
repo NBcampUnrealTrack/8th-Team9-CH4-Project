@@ -30,7 +30,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
 	float ResultScreenDuration = 60.f;
 
-	// 슬롯별 팀색 (인덱스 = PlayerSlot). 빨·파·초·노 순
+	// 슬롯별 팀색 — 로비 미경유(PIE 직행) 폴백용. 정식 배정은 AMTLobbyGameMode::TeamColors (동일 팔레트 유지)
 	UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
 	TArray<FLinearColor> TeamColors;
 
@@ -94,7 +94,7 @@ private:
 	// 컨트롤러의 MTPlayerState를 로딩 완료로 표시
 	void MarkLoaded(AController* C);
 
-	// 슬롯 기준 팀색 부여. 로비를 안 거쳐 슬롯이 없으면(PIE 직접 진입) 진입 순서로 폴백.
+	// 팀색 폴백 — 로비에서 배정돼 운반된 색은 유지, 로비 미경유(PIE 직접 진입)만 진입 순서로 배정.
 	void AssignTeamColor(AController* C);
 
 	int32 NextColorSlot = 0;   // 슬롯 미배정 시 폴백 인덱스

@@ -4,6 +4,8 @@
 #include "UI/Settings/MTSettingsWidget.h"
 #include "CommonButtonBase.h"
 #include "Components/Widget.h"
+#include "Components/TextBlock.h"
+#include "TimerManager.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/Engine.h"
 #include "HAL/IConsoleManager.h"
@@ -71,6 +73,10 @@ void UMTMenuWidget::NativeDestruct()
 	{
 		GameFlow->OnConnectingStateChanged.RemoveDynamic(this, &UMTMenuWidget::HandleConnectingStateChanged);
 	}
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(ConnectingDotsTimer);
+	}
 	Super::NativeDestruct();
 }
 
@@ -93,6 +99,41 @@ void UMTMenuWidget::HandleConnectingStateChanged(bool bConnecting)
 	if (ConnectingOverlay)
 	{
 		ConnectingOverlay->SetVisibility(bConnecting ? ESlateVisibility::Visible : ESlateVisibility::Collapsed);
+	}
+
+	// 표시 중에만 점 애니메이션 (. → .. → ... 반복)
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	if (bConnecting && ConnectingText)
+	{
+		// WBP 원문을 기본 문구로 사용 (끝의 점/말줄임표는 애니메이션이 대신 그림)
+		if (ConnectingBaseText.IsEmpty())
+		{
+			ConnectingBaseText = ConnectingText->GetText().ToString();
+			while (ConnectingBaseText.EndsWith(TEXT(".")) || ConnectingBaseText.EndsWith(TEXT("…")))
+			{
+				ConnectingBaseText.LeftChopInline(1);
+			}
+		}
+		ConnectingDotCount = -1;   // 첫 표시가 점 0개("접속 중")부터 시작
+		TickConnectingDots();
+		World->GetTimerManager().SetTimer(ConnectingDotsTimer, this, &UMTMenuWidget::TickConnectingDots, 0.4f, true);
+	}
+	else
+	{
+		World->GetTimerManager().ClearTimer(ConnectingDotsTimer);
+	}
+}
+
+void UMTMenuWidget::TickConnectingDots()
+{
+	if (ConnectingText)
+	{
+		ConnectingDotCount = (ConnectingDotCount + 1) % 4;   // 0 → 1 → 2 → 3 반복
+		ConnectingText->SetText(FText::FromString(ConnectingBaseText + FString::ChrN(ConnectingDotCount, TEXT('.'))));
 	}
 }
 

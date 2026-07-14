@@ -5,6 +5,7 @@
 #include "Online/MTOnlineUtils.h"
 #include "Player/MTPlayerState.h"
 #include "Player/MTPlayerController.h"
+#include "UI/Lobby/MTLobbyHUD.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/GameSession.h"
 #include "GameFramework/PlayerStart.h"
@@ -16,10 +17,19 @@ AMTLobbyGameMode::AMTLobbyGameMode()
 	GameStateClass = AMTLobbyGameState::StaticClass();
 	PlayerStateClass = AMTPlayerState::StaticClass();
 	PlayerControllerClass = AMTPlayerController::StaticClass();
+	HUDClass = AMTLobbyHUD::StaticClass();   // 도착 직후 로딩 오버레이
 
 	// 네이티브 CDO 기본값은 쿠커가 소프트 참조로 추적 못 함 — BP_LobbyMode에서 덮어쓰고 MapsToCook 유지
 	FallbackMatchMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Map/Map_Insa/Prototype_Insadong.Prototype_Insadong")));
 	MatchMaps.Add(EMTRoomMap::Insadong, FallbackMatchMap);
+
+	// 슬롯별 팀색 (빨·파·초·노) — AMTMatchGameMode 폴백 팔레트와 동일하게 유지
+	TeamColors = {
+		FLinearColor(1.f, 0.2f, 0.2f),
+		FLinearColor(0.2f, 0.4f, 1.f),
+		FLinearColor(0.2f, 0.8f, 0.2f),
+		FLinearColor(1.f, 0.8f, 0.f),
+	};
 }
 
 void AMTLobbyGameMode::BeginPlay()
@@ -190,9 +200,15 @@ void AMTLobbyGameMode::SetupLobbyPlayer(AController* C)
 		MTPS->SetPlayerSlot(AcquireSlot());
 	}
 
+	// 팀색은 로비에서 슬롯 기준으로 확정 → CopyProperties로 매치까지 운반
+	const int32 Slot = MTPS->GetPlayerSlot();
+	if (TeamColors.IsValidIndex(Slot))
+	{
+		MTPS->SetTeamColor(TeamColors[Slot]);
+	}
+
 	MTPS->SetHost(C->IsLocalController());   // 리슨 서버의 로컬 PC = 호스트
 	UMTOnlineUtils::ApplyFallbackPlayerName(MTPS);   // Null OSS면 "Player N" (슬롯 배정 후)
-	// 팀색은 매치 게임모드가 슬롯 기준으로 결정 (AMTMatchGameMode::AssignTeamColor)
 }
 
 void AMTLobbyGameMode::Logout(AController* Exiting)
