@@ -41,7 +41,7 @@ AMTMatchGameMode::AMTMatchGameMode()
 		FLinearColor(1.f, 0.8f, 0.f),
 	};
 
-	PedestrianGenerationConfig = UMTPedestrianSpawnManager::MakeTestConfiguration();
+	//PedestrianGenerationConfig = UMTPedestrianSpawnManager::MakeTestConfiguration();
 }
 
 void AMTMatchGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
@@ -186,11 +186,12 @@ void AMTMatchGameMode::SpawnInitialPedestrians()
 
         FRotator SpawnRotation = FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f);
 		const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
-		UMTPedestrianSpawnManager::SpawnPedestrian(
-			this,
-			NormalPedestrianClass,
-			SpawnTransform,
-			PedestrianGenerationConfig);
+		//UMTPedestrianSpawnManager::SpawnPedestrian(
+		//	this,
+		//	NormalPedestrianClass,
+		//	SpawnTransform,
+		//	PedestrianGenerationConfig);
+		GetWorld()->SpawnActor<AActor>(NormalPedestrianClass, SpawnLocation, SpawnRotation);
     }
 }
 
