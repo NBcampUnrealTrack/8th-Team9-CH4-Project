@@ -16,6 +16,8 @@
 #include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
+#include "Kismet/GameplayStatics.h"
+#include "Components/AudioComponent.h"
 
 UGA_AttractiveBeam::UGA_AttractiveBeam()
 {
@@ -43,7 +45,7 @@ void UGA_AttractiveBeam::FireBeam()
 	{
 		return;
 	}
-	
+
 
 	const bool bHitPed = (Ped != nullptr);
 	if (bHitPed && HasAuthority(&CurrentActivationInfo))
@@ -104,6 +106,16 @@ void UGA_AttractiveBeam::ActivateAbility(
 
 	StartAttractiveBeamFX();
 	OnBeamStart(); // VFX 시작 훅
+	if (BeamLoopSound)
+	{
+		AActor* Avatar = GetAvatarActorFromActorInfo();
+		if (Avatar)
+		{
+			BeamAudioComponent = UGameplayStatics::SpawnSoundAttached(
+				BeamLoopSound, Avatar->GetRootComponent(),
+				NAME_None, FVector::ZeroVector, EAttachLocation::SnapToTarget, true);
+		}
+	}
 
 	// 첫 발 즉시
 	FireBeam();
@@ -135,6 +147,11 @@ void UGA_AttractiveBeam::EndAbility(
 
 	StopAttractiveBeamFX();
 	OnBeamEnd(); // VFX 종료 훅
+	if (BeamAudioComponent)
+	{
+		BeamAudioComponent->Stop();
+		BeamAudioComponent = nullptr;
+	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
 }
