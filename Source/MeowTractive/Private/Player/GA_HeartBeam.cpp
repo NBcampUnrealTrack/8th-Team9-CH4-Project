@@ -2,6 +2,7 @@
 
 #include "Player/MTPlayerCharacter.h"
 #include "Player/MTPlayerAttributeSet.h"
+#include "Player/MTPlayerState.h"
 #include "Pedestrian/MTPedestrianBase.h"
 #include "Game/MTGameplayTags.h"
 #include "Game/MTLog.h"
@@ -278,6 +279,7 @@ void UGA_HeartBeam::StartHeartBeamFX()
 	ActiveHeartBeamFX->SetVariableBool(FName(TEXT("User.BeamEnding")), false);
 	ActiveHeartBeamFX->SetVariableFloat(FName(TEXT("User.BeamFadeInTime")), BeamFXFadeInTime);
 	ActiveHeartBeamFX->SetVariableFloat(FName(TEXT("User.BeamFadeOutTime")), BeamFXFadeOutTime);
+	ActiveHeartBeamFX->SetVariableLinearColor(FName(TEXT("User.PlayerColor")), GetAvatarPlayerColor());
 
 	if (BeamFXFadeInTime <= 0.f)
 	{
@@ -362,6 +364,14 @@ FVector UGA_HeartBeam::GetHeartBeamFXStartLocation() const
 		}
 	}
 	return Avatar ? Avatar->GetActorLocation() : FVector::ZeroVector;
+}
+
+FLinearColor UGA_HeartBeam::GetAvatarPlayerColor() const
+{
+	const AActor* Avatar = GetAvatarActorFromActorInfo();
+	const APawn* Pawn = Cast<APawn>(Avatar);
+	const AMTPlayerState* MTPlayerState = Pawn ? Pawn->GetPlayerState<AMTPlayerState>() : nullptr;
+	return MTPlayerState ? MTPlayerState->GetTeamColor() : FLinearColor::White;
 }
 
 //조준점 산정, 플레이어와 카메라 사이에 있는 장애물은 무시. 추후 GA_AttractiveBeam 조준과 함께 라이브러리 분리 필요.

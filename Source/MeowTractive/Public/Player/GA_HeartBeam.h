@@ -103,6 +103,7 @@ private:
 	void StopHeartBeamFX();
 	void FinishHeartBeamFX();
 	FVector GetHeartBeamFXStartLocation() const;
+	FLinearColor GetAvatarPlayerColor() const;
 	bool TraceBeam(FVector& OutTraceStart, FVector& OutBeamEnd, bool& bOutHitWorld) const;
 
 	float GetEffectiveRange() const;
