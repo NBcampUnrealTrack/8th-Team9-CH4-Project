@@ -36,6 +36,10 @@
 			"Enabled": true
 		},
 		{
+			"Name": "SocketSubsystemSteamIP",
+			"Enabled": true
+		},
+		{
 			"Name": "StateTree",
 			"Enabled": true
 		},
