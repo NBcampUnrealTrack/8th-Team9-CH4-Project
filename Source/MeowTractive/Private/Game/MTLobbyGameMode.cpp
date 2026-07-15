@@ -17,7 +17,7 @@ AMTLobbyGameMode::AMTLobbyGameMode()
 	GameStateClass = AMTLobbyGameState::StaticClass();
 	PlayerStateClass = AMTPlayerState::StaticClass();
 	PlayerControllerClass = AMTPlayerController::StaticClass();
-	HUDClass = AMTLobbyHUD::StaticClass();   // 도착 직후 로딩 오버레이
+	HUDClass = AMTLobbyHUD::StaticClass();   // 도착 직후 검은 화면 → 페이드인 (BP HUD_Lobby가 오버라이드)
 
 	// 네이티브 CDO 기본값은 쿠커가 소프트 참조로 추적 못 함 — BP_LobbyMode에서 덮어쓰고 MapsToCook 유지
 	FallbackMatchMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Map/Map_Insa/Prototype_Insadong.Prototype_Insadong")));

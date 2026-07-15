@@ -1,6 +1,7 @@
 #include "UI/MTLoadingOverlayHUD.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/GameViewportClient.h"
+#include "TimerManager.h"
 #include "Styling/CoreStyle.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Text/STextBlock.h"
@@ -37,7 +38,7 @@ void AMTLoadingOverlayHUD::ShowLoadingOverlay()
 			.HAlign(HAlign_Center)
 			.VAlign(VAlign_Center)
 			[
-				SNew(STextBlock)
+				SAssignNew(FallbackTextBlock, STextBlock)
 				.Text(FallbackLoadingText)
 				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 24))
 			];
@@ -45,8 +46,55 @@ void AMTLoadingOverlayHUD::ShowLoadingOverlay()
 	}
 }
 
+void AMTLoadingOverlayHUD::SetFallbackOverlayText(const FText& NewText)
+{
+	if (FallbackTextBlock.IsValid())
+	{
+		FallbackTextBlock->SetText(NewText);
+	}
+}
+
+void AMTLoadingOverlayHUD::FadeOutLoadingOverlay(float Duration)
+{
+	if ((!LoadingWidget && !LoadingSlateWidget.IsValid()) ||
+		GetWorldTimerManager().IsTimerActive(FadeTimer))
+	{
+		return;   // 표시 중 아님 또는 이미 페이드 중
+	}
+	if (Duration <= 0.f)
+	{
+		RemoveLoadingOverlay();
+		return;
+	}
+	FadeElapsed = 0.f;
+	FadeDuration = Duration;
+	GetWorldTimerManager().SetTimer(FadeTimer, this, &AMTLoadingOverlayHUD::TickFade, 0.02f, true);
+}
+
+void AMTLoadingOverlayHUD::TickFade()
+{
+	FadeElapsed += 0.02f;
+	const float Opacity = FMath::Clamp(1.f - FadeElapsed / FadeDuration, 0.f, 1.f);
+
+	if (LoadingWidget)
+	{
+		LoadingWidget->SetRenderOpacity(Opacity);
+	}
+	if (LoadingSlateWidget.IsValid())
+	{
+		LoadingSlateWidget->SetRenderOpacity(Opacity);
+	}
+
+	if (Opacity <= 0.f)
+	{
+		RemoveLoadingOverlay();
+	}
+}
+
 void AMTLoadingOverlayHUD::RemoveLoadingOverlay()
 {
+	GetWorldTimerManager().ClearTimer(FadeTimer);
+
 	if (LoadingWidget)
 	{
 		LoadingWidget->RemoveFromParent();
@@ -59,5 +107,6 @@ void AMTLoadingOverlayHUD::RemoveLoadingOverlay()
 			Viewport->RemoveViewportWidgetContent(LoadingSlateWidget.ToSharedRef());
 		}
 		LoadingSlateWidget.Reset();
+		FallbackTextBlock.Reset();
 	}
 }

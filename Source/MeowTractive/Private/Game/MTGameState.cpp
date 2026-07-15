@@ -52,6 +52,14 @@ void AMTGameState::RemovePlayerState(APlayerState* PlayerState)
         return;
     }
 
+	// 랭킹에서도 제거 — seamless travel 시 옛 PlayerState가 파괴되며 유령 항목(인원 2배)으로 남는 것 방지
+	const int32 NumRemoved = PlayerScores.RemoveAll(
+		[PlayerState](const FPlayerScore& Item) { return Item.PlayerState == PlayerState; });
+	if (NumRemoved > 0)
+	{
+		OnRep_PlayerScores();
+	}
+
     for (TActorIterator<AMTPedestrianBase> It(GetWorld()); It; ++It)
     {
         if (UMTAttractiveComponent* AttractiveComponent = It->GetAttractiveComponent())
@@ -100,6 +108,7 @@ void AMTGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLife
     Super::GetLifetimeReplicatedProps(OutLifetimeProps);
     DOREPLIFETIME(AMTGameState, PlayerScores);
     DOREPLIFETIME(AMTGameState, MatchRemainingTime);
+    DOREPLIFETIME(AMTGameState, MatchStartCountdown);
 }
 
 void AMTGameState::SetMatchRemainingTime(int32 NewSeconds)
@@ -120,6 +129,21 @@ void AMTGameState::SetMatchRemainingTime(int32 NewSeconds)
 void AMTGameState::OnRep_MatchRemainingTime()
 {
 	OnMatchTimeUpdated.Broadcast(MatchRemainingTime);
+}
+
+void AMTGameState::SetMatchStartCountdown(int32 NewValue)
+{
+	if (!HasAuthority() || MatchStartCountdown == NewValue)
+	{
+		return;
+	}
+	MatchStartCountdown = NewValue;
+	OnRep_MatchStartCountdown();   // 리슨 호스트 UI 즉시 갱신
+}
+
+void AMTGameState::OnRep_MatchStartCountdown()
+{
+	OnMatchStartCountdownChanged.Broadcast(MatchStartCountdown);
 }
 
 void AMTGameState::AddAttractedCount(APlayerState* TargetPlayerState)

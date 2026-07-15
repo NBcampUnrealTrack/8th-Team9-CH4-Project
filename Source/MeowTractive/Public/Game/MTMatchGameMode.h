@@ -50,9 +50,13 @@ public:
 	float GetRespawnDelay() const { return RespawnDelay; }
 
 protected:
-	// 전원 로딩 완료 + 이동 중 플레이어 없음 → true 시 StartMatch
+	// 전원 로딩 완료 → 시작 카운트다운(3·2·1) 경과 후 true 시 StartMatch
 	virtual bool ReadyToStartMatch_Implementation() override;
 	virtual void HandleMatchHasStarted() override;
+
+	// 전원 로딩 완료 후 매치 시작까지 카운트다운(초) — GameState로 복제돼 HUD가 표시
+	UPROPERTY(EditDefaultsOnly, Category = "Match Rules", meta = (ClampMin = "0"))
+	int32 StartCountdownSeconds = 3;
 
 #pragma region Rule
 
@@ -98,4 +102,11 @@ private:
 	void AssignTeamColor(AController* C);
 
 	int32 NextColorSlot = 0;   // 슬롯 미배정 시 폴백 인덱스
+
+	// 시작 카운트다운 1초 감소 — 0 도달 시 ReadyToStartMatch가 true
+	void TickStartCountdown();
+
+	FTimerHandle StartCountdownTimer;
+	bool bStartCountdownRunning = false;
+	bool bStartCountdownFinished = false;
 };

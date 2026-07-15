@@ -59,11 +59,21 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FMTOnMatchStateChanged OnMatchStateChanged;
 
+	// 매치 시작 카운트다운 변경 (3→2→1→0=시작. HUD가 구독)
+	UPROPERTY(BlueprintAssignable)
+	FOnMatchTimeUpdated OnMatchStartCountdownChanged;
+
 	// 서버: MatchGameMode가 1초마다 호출 → 복제 + 방송
 	void SetMatchRemainingTime(int32 NewSeconds);
 
 	UFUNCTION(BlueprintPure)
 	int32 GetMatchRemainingTime() const { return MatchRemainingTime; }
+
+	// 서버: 전원 로딩 완료 후 MatchGameMode가 갱신 (-1 = 비활성)
+	void SetMatchStartCountdown(int32 NewValue);
+
+	UFUNCTION(BlueprintPure)
+	int32 GetMatchStartCountdown() const { return MatchStartCountdown; }
 
     // 내림차순 정렬된 랭킹 반환
     UFUNCTION(BlueprintPure)
@@ -84,6 +94,13 @@ protected:
 
 	UFUNCTION()
 	void OnRep_MatchRemainingTime();
+
+	// 매치 시작 카운트다운 (3→2→1→0=시작, -1=비활성)
+	UPROPERTY(ReplicatedUsing = OnRep_MatchStartCountdown)
+	int32 MatchStartCountdown = -1;
+
+	UFUNCTION()
+	void OnRep_MatchStartCountdown();
 
 	// 게임에 존재하는 모든 아이템 데이터. BP_MTGameState 디테일 창에서 채워 넣기.
 	UPROPERTY(EditDefaultsOnly, Category = "Item")

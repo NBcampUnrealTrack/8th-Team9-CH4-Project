@@ -3,7 +3,7 @@
 
 AMTLobbyHUD::AMTLobbyHUD()
 {
-	FallbackLoadingText = NSLOCTEXT("MT", "LobbyLoading", "로비로 이동 중...");
+	FallbackLoadingText = FText::GetEmpty();   // 로비는 문구 없이 검은 화면만
 }
 
 void AMTLobbyHUD::BeginPlay()
@@ -27,9 +27,9 @@ void AMTLobbyHUD::TryReveal()
 	const APlayerController* PC = GetOwningPlayerController();
 	const bool bPawnReady = PC && PC->GetPawn() != nullptr;
 
-	if ((bPawnReady && Elapsed >= MinDisplayTime) || Elapsed >= MaxDisplayTime)
+	if (bPawnReady || Elapsed >= MaxDisplayTime)
 	{
 		GetWorldTimerManager().ClearTimer(RevealTimer);
-		RemoveLoadingOverlay();
+		FadeOutLoadingOverlay(RevealFadeDuration);   // 대기 없이 바로 페이드인
 	}
 }

@@ -350,7 +350,45 @@ bool AMTMatchGameMode::ReadyToStartMatch_Implementation()
 			return false;
 		}
 	}
-	return true;
+
+	// 전원 로딩 완료 → 시작 카운트다운(3·2·1) 경과 후 StartMatch
+	if (bStartCountdownFinished)
+	{
+		return true;
+	}
+	if (!bStartCountdownRunning)
+	{
+		bStartCountdownRunning = true;
+		if (StartCountdownSeconds <= 0)
+		{
+			bStartCountdownFinished = true;   // 카운트다운 미사용 → 즉시 시작
+			return true;
+		}
+		if (AMTGameState* MTGS = GetGameState<AMTGameState>())
+		{
+			MTGS->SetMatchStartCountdown(StartCountdownSeconds);
+		}
+		GetWorldTimerManager().SetTimer(StartCountdownTimer, this, &AMTMatchGameMode::TickStartCountdown, 1.f, true);
+	}
+	return false;
+}
+
+void AMTMatchGameMode::TickStartCountdown()
+{
+	AMTGameState* MTGS = GetGameState<AMTGameState>();
+	if (!MTGS)
+	{
+		return;
+	}
+
+	const int32 Next = MTGS->GetMatchStartCountdown() - 1;
+	MTGS->SetMatchStartCountdown(Next);   // 0 = HUD "시작!" 표시
+
+	if (Next <= 0)
+	{
+		GetWorldTimerManager().ClearTimer(StartCountdownTimer);
+		bStartCountdownFinished = true;   // 다음 틱 ReadyToStartMatch → StartMatch
+	}
 }
 
 void AMTMatchGameMode::HandleMatchHasStarted()
