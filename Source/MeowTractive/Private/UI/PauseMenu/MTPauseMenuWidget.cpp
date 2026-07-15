@@ -2,7 +2,7 @@
 #include "Player/MTPlayerController.h"
 #include "Game/MTGameInstance.h"
 #include "UI/Settings/MTSettingsWidget.h"
-#include "Components/Button.h"
+#include "CommonButtonBase.h"
 
 void UMTPauseMenuWidget::NativeConstruct()
 {
@@ -12,16 +12,34 @@ void UMTPauseMenuWidget::NativeConstruct()
 
 	if (ResumeButton)
 	{
-		ResumeButton->OnClicked.AddDynamic(this, &UMTPauseMenuWidget::HandleResume);
+		ResumeButton->OnClicked().AddUObject(this, &UMTPauseMenuWidget::HandleResume);
 	}
 	if (LeaveButton)
 	{
-		LeaveButton->OnClicked.AddDynamic(this, &UMTPauseMenuWidget::HandleLeave);
+		LeaveButton->OnClicked().AddUObject(this, &UMTPauseMenuWidget::HandleLeave);
 	}
 	if (SettingsButton)
 	{
-		SettingsButton->OnClicked.AddDynamic(this, &UMTPauseMenuWidget::HandleSettings);
+		SettingsButton->OnClicked().AddUObject(this, &UMTPauseMenuWidget::HandleSettings);
 	}
+}
+
+void UMTPauseMenuWidget::NativeDestruct()
+{
+	// CommonButtonBase는 non-dynamic 이벤트 → 수동 해제
+	if (ResumeButton)
+	{
+		ResumeButton->OnClicked().RemoveAll(this);
+	}
+	if (LeaveButton)
+	{
+		LeaveButton->OnClicked().RemoveAll(this);
+	}
+	if (SettingsButton)
+	{
+		SettingsButton->OnClicked().RemoveAll(this);
+	}
+	Super::NativeDestruct();
 }
 
 void UMTPauseMenuWidget::HandleSettings()
