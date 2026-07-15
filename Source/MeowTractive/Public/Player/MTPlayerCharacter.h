@@ -66,7 +66,15 @@ protected:
 
 	virtual void Jump() override;
 
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	USoundBase* JumpSound;
+
 	void StopJump();
+
+	virtual void Landed(const FHitResult& Hit) override;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	USoundBase* LandingSound;
 
 	void UpdateMovementEffects();
 
