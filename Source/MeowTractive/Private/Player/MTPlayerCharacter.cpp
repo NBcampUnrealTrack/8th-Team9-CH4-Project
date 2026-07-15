@@ -16,6 +16,7 @@
 #include "Game/MTLobbyGameState.h"
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
 AMTPlayerCharacter::AMTPlayerCharacter()
@@ -476,6 +477,16 @@ void AMTPlayerCharacter::StopJump()
 	}
 }
 
+void AMTPlayerCharacter::Landed(const FHitResult& Hit)
+{
+	Super::Landed(Hit);
+
+	if (LandingSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, LandingSound, GetActorLocation());
+	}
+}
+
 //VFX 재생을 위한 점프 오버라이드
 void AMTPlayerCharacter::Jump()
 {
@@ -485,6 +496,11 @@ void AMTPlayerCharacter::Jump()
 	}
 
 	Super::Jump();
+
+	if (JumpSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, JumpSound, GetActorLocation());
+	}
 
 	if (JumpNiagaraSystem)
 	{
