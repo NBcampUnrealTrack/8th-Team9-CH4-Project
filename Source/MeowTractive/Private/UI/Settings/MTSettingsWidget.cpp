@@ -2,6 +2,7 @@
 #include "Game/MTGameInstance.h"
 #include "Game/MTGameUserSettings.h"
 #include "Components/Slider.h"
+#include "Components/ProgressBar.h"
 #include "Components/ComboBoxString.h"
 #include "Components/CheckBox.h"
 #include "Components/VerticalBox.h"
@@ -215,6 +216,20 @@ void UMTSettingsWidget::InitAudio()
 		SFXSlider->SetValue(Settings->GetSFXVolume());
 		SFXSlider->OnValueChanged.AddDynamic(this, &UMTSettingsWidget::HandleSFXChanged);
 	}
+
+	// 저장된 볼륨으로 채움 바 초기 상태 맞춤 (이후엔 슬라이더 콜백이 갱신)
+	if (PB_MasterSlider)
+	{
+		PB_MasterSlider->SetPercent(Settings->GetMasterVolume());
+	}
+	if (PB_BGMSlider)
+	{
+		PB_BGMSlider->SetPercent(Settings->GetBGMVolume());
+	}
+	if (PB_SFXSlider)
+	{
+		PB_SFXSlider->SetPercent(Settings->GetSFXVolume());
+	}
 }
 
 void UMTSettingsWidget::HandleMasterChanged(float Value)
@@ -222,6 +237,10 @@ void UMTSettingsWidget::HandleMasterChanged(float Value)
 	if (UMTGameUserSettings* Settings = UMTGameUserSettings::GetMTSettings())
 	{
 		Settings->SetMasterVolume(Value);
+	}
+	if (PB_MasterSlider)
+	{
+		PB_MasterSlider->SetPercent(Value);
 	}
 	ApplyVolume();
 }
@@ -232,6 +251,10 @@ void UMTSettingsWidget::HandleBGMChanged(float Value)
 	{
 		Settings->SetBGMVolume(Value);
 	}
+	if (PB_BGMSlider)
+	{
+		PB_BGMSlider->SetPercent(Value);
+	}
 	ApplyVolume();
 }
 
@@ -240,6 +263,10 @@ void UMTSettingsWidget::HandleSFXChanged(float Value)
 	if (UMTGameUserSettings* Settings = UMTGameUserSettings::GetMTSettings())
 	{
 		Settings->SetSFXVolume(Value);
+	}
+	if (PB_SFXSlider)
+	{
+		PB_SFXSlider->SetPercent(Value);
 	}
 	ApplyVolume();
 }
