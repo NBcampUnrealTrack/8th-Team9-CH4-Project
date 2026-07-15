@@ -4,7 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "MTPauseMenuWidget.generated.h"
 
-class UButton;
+class UCommonButtonBase;
 class UMTSettingsWidget;
 
 /** ESC 일시정지 메뉴 — 표현/버튼만. 열기/닫기·입력모드는 AMTPlayerController가 관리. */
@@ -19,15 +19,17 @@ protected:
 	// UIOnly라 PC ESC가 안 오므로 위젯이 직접 닫기 처리
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
-	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UButton> ResumeButton;
+	virtual void NativeDestruct() override;
 
 	UPROPERTY(meta = (BindWidget))
-	TObjectPtr<UButton> LeaveButton;
+	TObjectPtr<UCommonButtonBase> ResumeButton;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UCommonButtonBase> LeaveButton;
 
 	// 설정 열기 (WBP에 SettingsButton 추가 시 자동 바인딩)
 	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UButton> SettingsButton;
+	TObjectPtr<UCommonButtonBase> SettingsButton;
 
 	// 설정 화면 위젯 (WBP_MTSettings)
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
