@@ -23,6 +23,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI", meta = (ClampMin = "0.0"))
 	float RevealFadeDuration = 1.f;
 
+	UMTPlayerWidget* GetPlayerWidget() const { return PlayerWidget; }
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;

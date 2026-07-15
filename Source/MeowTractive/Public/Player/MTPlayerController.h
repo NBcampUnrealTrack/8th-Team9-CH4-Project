@@ -55,6 +55,9 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
 	TObjectPtr<UInputAction> PauseAction;
 
+	UFUNCTION(Client, Reliable)
+	void ClientShowHitMarker();
+
 protected:
 	virtual void SetupInputComponent() override;
 

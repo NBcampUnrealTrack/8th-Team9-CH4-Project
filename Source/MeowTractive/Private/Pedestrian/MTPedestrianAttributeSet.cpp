@@ -5,6 +5,7 @@
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerState.h"
+#include "Player/MTPlayerController.h"
 
 UMTPedestrianAttributeSet::UMTPedestrianAttributeSet()
 {
@@ -46,10 +47,15 @@ void UMTPedestrianAttributeSet::PostGameplayEffectExecute(const FGameplayEffectM
 		if (SourcePS)
 		{
 			Ped->HandleAttractiveHit(SourcePS, Amount);
+
+			// 매료빔을 쏜 본인 화면에만 히트마커 표시
+			if (AMTPlayerController* AttackerPC = Cast<AMTPlayerController>(SourcePS->GetOwner()))
+			{
+				AttackerPC->ClientShowHitMarker();
+			}
 		}
 		else
 		{
-			// 기존 GE_AttractiveRegen은 행인 자신이 원본 Instigator다.
 			Ped->HandleAttractiveRegen(Amount);
 		}
 	}

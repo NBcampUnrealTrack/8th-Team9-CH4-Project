@@ -8,6 +8,7 @@
 class UTextBlock;
 class UProgressBar;
 class UVerticalBox;
+class UImage;
 class UMTSkillSlotWidget;
 class AMTGameState;
 class AMTPlayerCharacter;
@@ -19,6 +20,11 @@ UCLASS()
 class MEOWTRACTIVE_API UMTPlayerWidget : public UUserWidget
 {
 	GENERATED_BODY()
+
+public:
+	// 매료빔이 행인에 닿을 때마다 호출 — 지속 피격 중엔 유지, 끊기면 자동 숨김
+	UFUNCTION(BlueprintCallable)
+	void ShowHitMarker();
 
 protected:
 	virtual void NativeConstruct() override;
@@ -65,6 +71,10 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UMTSkillSlotWidget> SkillBSlot;
 
+	// 중앙: 히트마커 (매료빔 피격 시 표시, 기본 Collapsed)
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UImage> HitMarker;
+
 private:
 	// GameState/폰은 위젯 생성 시점에 없을 수 있음 → 틱에서 준비되는 대로 바인딩 (리스폰 재바인딩 포함)
 	void TryBindGameState();
@@ -77,17 +87,21 @@ private:
 	UFUNCTION()
 	void HandleMatchTimeUpdated(int32 RemainingSeconds);
 
+	UFUNCTION()
+	void HideHitMarker();
+
 	void HandleHpChanged(const FOnAttributeChangeData& Data);
 	void RefreshRanking();
 	void RefreshAttractedCount();
 	void RefreshHp();
-
-	// 매치가 부여한 내 TeamColor를 스킬 슬롯 강조색으로 전달
 	void RefreshAccentColor();
+
 
 	TWeakObjectPtr<AMTGameState> BoundGameState;
 	TWeakObjectPtr<AMTPlayerCharacter> BoundCharacter;
 	TWeakObjectPtr<UAbilitySystemComponent> BoundASC;
 	FDelegateHandle HpChangedHandle;
 	FDelegateHandle MaxHpChangedHandle;
+	FTimerHandle HitMarkerHideTimerHandle;
+
 };

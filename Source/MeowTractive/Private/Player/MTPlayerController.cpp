@@ -8,6 +8,8 @@
 #include "Game/MTGameInstance.h"
 #include "Game/MTLog.h"
 #include "EnhancedInputComponent.h"
+#include "UI/InGame/MTPlayerHUD.h"
+#include "UI/InGame/MTPlayerWidget.h"
 
 void AMTPlayerController::SetupInputComponent()
 {
@@ -23,6 +25,17 @@ void AMTPlayerController::SetupInputComponent()
 		else
 		{
 			UE_CLOG(MTLogEnabled(), LogMT, Warning, TEXT("[MTPC] PauseAction 미지정 → 일시정지 입력 없음 (BP_MTPlayerController에서 IA_Pause 지정)"));
+		}
+	}
+}
+
+void AMTPlayerController::ClientShowHitMarker_Implementation()
+{
+	if (AMTPlayerHUD* MTHUD = GetHUD<AMTPlayerHUD>())
+	{
+		if (UMTPlayerWidget* Widget = MTHUD->GetPlayerWidget())
+		{
+			Widget->ShowHitMarker();
 		}
 	}
 }

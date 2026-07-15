@@ -10,6 +10,7 @@
 #include "Components/ProgressBar.h"
 #include "Components/VerticalBox.h"
 #include "Blueprint/WidgetTree.h"
+#include "Components/Image.h"
 #include "GameFramework/PlayerState.h"
 
 void UMTPlayerWidget::NativeConstruct()
@@ -27,6 +28,12 @@ void UMTPlayerWidget::NativeDestruct()
 		GS->OnMatchTimeUpdated.RemoveDynamic(this, &UMTPlayerWidget::HandleMatchTimeUpdated);
 	}
 	UnbindCharacter();
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(HitMarkerHideTimerHandle);
+	}
+
 	Super::NativeDestruct();
 }
 
@@ -148,6 +155,33 @@ void UMTPlayerWidget::HandleMatchTimeUpdated(int32 RemainingSeconds)
 	{
 		TimeText->SetText(FText::FromString(
 			FString::Printf(TEXT("%d:%02d"), RemainingSeconds / 60, RemainingSeconds % 60)));
+	}
+}
+
+void UMTPlayerWidget::ShowHitMarker()
+{
+	if (!HitMarker)
+	{
+		return;
+	}
+
+	HitMarker->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+	// 매 호출마다 숨김 타이머 리셋 → 빔이 계속 닿는 동안은 계속 보임
+	GetWorld()->GetTimerManager().SetTimer(
+		HitMarkerHideTimerHandle,
+		this,
+		&UMTPlayerWidget::HideHitMarker,
+		0.15f,
+		false
+	);
+}
+
+void UMTPlayerWidget::HideHitMarker()
+{
+	if (HitMarker)
+	{
+		HitMarker->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }
 
