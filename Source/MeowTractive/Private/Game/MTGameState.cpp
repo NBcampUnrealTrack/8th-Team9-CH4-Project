@@ -8,6 +8,12 @@
 #include "Item/MTItemData.h"
 #include "Pedestrian/MTPedestrianBase.h"
 
+void AMTGameState::OnRep_MatchState()
+{
+	Super::OnRep_MatchState();
+	OnMatchStateChanged.Broadcast();
+}
+
 void AMTGameState::AddPlayerState(APlayerState* PlayerState)
 {
     Super::AddPlayerState(PlayerState);

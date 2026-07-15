@@ -48,6 +48,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "AttractiveBeam", meta = (ClampMin = "0.0"))
 	float BeamRadius = 30.f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "AttractiveBeam", meta = (ClampMin = "0.0"))
+	float CameraPlayerDepthTolerance = 10.f;
+
 	// 행인에게 적용할 매료 데미지 GE
 	UPROPERTY(EditDefaultsOnly, Category = "AttractiveBeam")
 	TSubclassOf<UGameplayEffect> AttractiveDamageGE;

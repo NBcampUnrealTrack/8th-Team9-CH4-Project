@@ -7,6 +7,7 @@
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnPlayerScoresUpdated);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnMatchTimeUpdated, int32, RemainingSeconds);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMTOnMatchStateChanged);
 
 class UMTItemData;
 
@@ -54,6 +55,10 @@ public:
 	UPROPERTY(BlueprintAssignable)
 	FOnMatchTimeUpdated OnMatchTimeUpdated;
 
+	// 매치 상태(MatchState) 변경 — 서버·클라 공통 발동 (HUD 로딩 오버레이 등이 구독)
+	UPROPERTY(BlueprintAssignable)
+	FMTOnMatchStateChanged OnMatchStateChanged;
+
 	// 서버: MatchGameMode가 1초마다 호출 → 복제 + 방송
 	void SetMatchRemainingTime(int32 NewSeconds);
 
@@ -65,6 +70,8 @@ public:
     TArray<FPlayerScore> GetSortedPlayerScores() const;
 
 protected:
+	virtual void OnRep_MatchState() override;
+
     UPROPERTY(ReplicatedUsing = OnRep_PlayerScores)
     TArray<FPlayerScore> PlayerScores;
 

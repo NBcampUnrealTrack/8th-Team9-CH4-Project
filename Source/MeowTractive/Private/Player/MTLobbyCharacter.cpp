@@ -3,6 +3,7 @@
 #include "Player/MTPlayerController.h"
 #include "Player/MTPlayerState.h"
 #include "Game/MTLobbyGameMode.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "Components/WidgetComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
@@ -30,6 +31,13 @@ void AMTLobbyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 void AMTLobbyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// 정적 조형물: 이동·중력 시뮬 정지 — 클라에서 충돌 꺼진 사이 중력으로 바닥 아래로 가라앉는 것 방지
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->DisableMovement();
+		Move->SetComponentTickEnabled(false);
+	}
 
 	UpdateLobbyVisibility();
 	// 로컬 슬롯·OwnerSlot 복제가 늦을 수 있어 주기적으로 재평가 (로비 HUD 폴링과 동일한 방식)

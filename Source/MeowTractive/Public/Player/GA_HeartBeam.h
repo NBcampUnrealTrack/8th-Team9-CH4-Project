@@ -5,6 +5,8 @@
 #include "GA_HeartBeam.generated.h"
 
 class UGameplayEffect;
+class UNiagaraComponent;
+class UNiagaraSystem;
 
 /** 하트광선: 5초간 카메라 전방 일자 빔(구체 스윕). 경로상 행인=매료, 적 고양이=데미지 (둘 다 초당 10). 적용 서버 권위. */
 UCLASS()
@@ -40,6 +42,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam", meta = (ClampMin = "0.0"))
 	float BeamRadius = 60.f;
 
+	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam", meta = (ClampMin = "0.0"))
+	float CameraPlayerDepthTolerance = 10.f;
+
 	// 판정/틱 간격 (s)
 	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam", meta = (ClampMin = "0.01"))
 	float FireInterval = 0.1f;
@@ -63,6 +68,21 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam")
 	bool bDrawDebug = true;
 
+	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam|FX")
+	TObjectPtr<UNiagaraSystem> HeartBeamFX;
+
+	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam|FX")
+	FName HeartBeamSocketName = TEXT("heartbeam");
+
+	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam|FX", meta = (ClampMin = "0.0"))
+	float BeamFXFadeInTime = 0.2f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam|FX", meta = (ClampMin = "0.0"))
+	float BeamFXFadeOutTime = 0.35f;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UNiagaraComponent> ActiveHeartBeamFX;
+
 	// VFX 훅 (BP에서 Niagara 빔 제어)
 	UFUNCTION(BlueprintImplementableEvent, Category = "HeartBeam")
 	void OnBeamStart();
@@ -75,10 +95,24 @@ protected:
 
 private:
 	void FireBeam();
+	void UpdateBeamVisual();
 	void OnDurationElapsed();
+	void StartHeartBeamFX();
+	void FinishHeartBeamFadeIn();
+	void UpdateHeartBeamFX(const FVector& Start, const FVector& End);
+	void StopHeartBeamFX();
+	void FinishHeartBeamFX();
+	FVector GetHeartBeamFXStartLocation() const;
+	FLinearColor GetAvatarPlayerColor() const;
+	bool TraceBeam(FVector& OutTraceStart, FVector& OutBeamEnd, bool& bOutHitWorld) const;
 
 	float GetEffectiveRange() const;
 
 	FTimerHandle BeamTimerHandle;
 	FTimerHandle DurationTimerHandle;
+	FTimerHandle BeamVisualTimerHandle;
+	FTimerHandle BeamFXFadeInTimerHandle;
+	FTimerHandle BeamFXCleanupTimerHandle;
+	bool bIsBeamVisualUpdateActive = false;
+	bool bIsHeartBeamFXEnding = false;
 };

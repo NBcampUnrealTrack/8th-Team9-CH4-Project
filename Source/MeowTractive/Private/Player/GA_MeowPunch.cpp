@@ -48,9 +48,11 @@ void UGA_MeowPunch::ActivateAbility(
 
 	// 시전할 때마다 번갈아 재생 (2개면 A→B→A→B...)
 	UAnimMontage* Montage = nullptr;
+	ActiveMontageIndex = INDEX_NONE;
 	if (PunchMontages.Num() > 0)
 	{
-		Montage = PunchMontages[MontageIndex % PunchMontages.Num()];
+		ActiveMontageIndex = MontageIndex % PunchMontages.Num();
+		Montage = PunchMontages[ActiveMontageIndex];
 		MontageIndex = (MontageIndex + 1) % PunchMontages.Num();
 	}
 
@@ -112,6 +114,7 @@ void UGA_MeowPunch::PerformHit()
 		CueParams.Normal = Avatar ? Avatar->GetActorForwardVector() : FVector::ForwardVector;
 		CueParams.Instigator = Avatar;
 		CueParams.EffectCauser = Avatar;
+		CueParams.RawMagnitude = static_cast<float>(ActiveMontageIndex);
 		ASC->ExecuteGameplayCue(MTGameplayTags::GameplayCue::TAG_GameplayCue_Cat_Punch, CueParams);
 	}
 

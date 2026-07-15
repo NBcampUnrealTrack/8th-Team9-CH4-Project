@@ -78,4 +78,7 @@ private:
 
 	// 번갈아 재생용 인덱스 (InstancedPerActor라 시전 간 유지)
 	int32 MontageIndex = 0;
+
+	// 현재 공격에서 선택된 몽타주 인덱스. GameplayCue RawMagnitude로 전달.
+	int32 ActiveMontageIndex = INDEX_NONE;
 };

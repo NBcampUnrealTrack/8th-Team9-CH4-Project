@@ -41,7 +41,7 @@ AMTMatchGameMode::AMTMatchGameMode()
 		FLinearColor(1.f, 0.8f, 0.f),
 	};
 
-	PedestrianGenerationConfig = UMTPedestrianSpawnManager::MakeTestConfiguration();
+	//PedestrianGenerationConfig = UMTPedestrianSpawnManager::MakeTestConfiguration();
 }
 
 void AMTMatchGameMode::PreLogin(const FString& Options, const FString& Address, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
@@ -186,11 +186,12 @@ void AMTMatchGameMode::SpawnInitialPedestrians()
 
         FRotator SpawnRotation = FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f);
 		const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
-		UMTPedestrianSpawnManager::SpawnPedestrian(
-			this,
-			NormalPedestrianClass,
-			SpawnTransform,
-			PedestrianGenerationConfig);
+		//UMTPedestrianSpawnManager::SpawnPedestrian(
+		//	this,
+		//	NormalPedestrianClass,
+		//	SpawnTransform,
+		//	PedestrianGenerationConfig);
+		GetWorld()->SpawnActor<AActor>(NormalPedestrianClass, SpawnLocation, SpawnRotation);
     }
 }
 
@@ -213,14 +214,16 @@ void AMTMatchGameMode::AssignTeamColor(AController* C)
 		return;
 	}
 
-	// 로비를 거치면 슬롯이 운반됨. 매치맵 직접 진입(PIE 등)이면 슬롯이 없으니 진입 순서로 폴백.
+	// 정식 배정은 로비(AMTLobbyGameMode)가 슬롯과 함께 수행 → CopyProperties로 운반됨.
+	// 슬롯이 유효하면 색도 이미 실려 온 것 — 로비 미경유 직접 진입(PIE 등)만 진입 순서로 폴백.
 	int32 Slot = MTPS->GetPlayerSlot();
-	if (!TeamColors.IsValidIndex(Slot))
+	if (TeamColors.IsValidIndex(Slot))
 	{
-		Slot = NextColorSlot++;
-		MTPS->SetPlayerSlot(Slot);   // 폴백 슬롯도 기록 (결과/표시 일관성)
+		return;
 	}
 
+	Slot = NextColorSlot++;
+	MTPS->SetPlayerSlot(Slot);   // 폴백 슬롯도 기록 (결과/표시 일관성)
 	if (TeamColors.IsValidIndex(Slot))
 	{
 		MTPS->SetTeamColor(TeamColors[Slot]);

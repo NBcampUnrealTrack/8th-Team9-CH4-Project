@@ -3,6 +3,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "Camera/CameraComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Game/MTGameplayTags.h"
@@ -13,6 +14,8 @@
 #include "Game/MTMatchGameMode.h"
 #include "Game/MTLobbyGameMode.h"
 #include "Game/MTLobbyGameState.h"
+#include "NiagaraComponent.h"
+#include "NiagaraFunctionLibrary.h"
 #include "Net/UnrealNetwork.h"
 
 AMTPlayerCharacter::AMTPlayerCharacter()
@@ -98,6 +101,7 @@ void AMTPlayerCharacter::BeginPlay()
 void AMTPlayerCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+	UpdateMovementEffects();
 }
 
 void AMTPlayerCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -470,6 +474,106 @@ void AMTPlayerCharacter::StopJump()
 		Vel.Z *= 0.4f;
 		GetCharacterMovement()->Velocity = Vel;
 	}
+}
+
+//VFX 재생을 위한 점프 오버라이드
+void AMTPlayerCharacter::Jump()
+{
+	if (IsStunned() || bIsDead || !CanJump())
+	{
+		return;
+	}
+
+	Super::Jump();
+
+	if (JumpNiagaraSystem)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			GetWorld(),
+			JumpNiagaraSystem,
+			GetMovementEffectLocation(),
+			FRotator::ZeroRotator,
+			FVector::OneVector,
+			true,
+			true,
+			ENCPoolMethod::AutoRelease,
+			true);
+	}
+}
+
+//걷기 이펙트 시작
+UNiagaraComponent* AMTPlayerCharacter::SpawnWalkNiagara()
+{
+	if (IsValid(ActiveWalkNiagaraComponent))
+	{
+		return ActiveWalkNiagaraComponent;
+	}
+
+	if (!WalkNiagaraSystem)
+	{
+		return nullptr;
+	}
+
+	const UCapsuleComponent* Capsule = GetCapsuleComponent();
+	const float CapsuleHalfHeight = Capsule ? Capsule->GetScaledCapsuleHalfHeight() : 0.f;
+	const FVector RelativeFootLocation = FVector(0.f, 0.f, -CapsuleHalfHeight) + MovementEffectOffset;
+
+	ActiveWalkNiagaraComponent = UNiagaraFunctionLibrary::SpawnSystemAttached(
+		WalkNiagaraSystem,
+		GetRootComponent(),
+		NAME_None,
+		RelativeFootLocation,
+		FRotator::ZeroRotator,
+		EAttachLocation::KeepRelativeOffset,
+		false,
+		true,
+		ENCPoolMethod::None,
+		true);
+
+	if (ActiveWalkNiagaraComponent)
+	{
+		ActiveWalkNiagaraComponent->SetVariableVec3(WalkDirectionParameterName, FVector::ZeroVector);
+		ActiveWalkNiagaraComponent->SetVariableBool(WalkSpawnParameterName, false);
+	}
+
+	return ActiveWalkNiagaraComponent;
+}
+
+//걷기 이펙트 중단
+void AMTPlayerCharacter::StopWalkNiagara()
+{
+	if (IsValid(ActiveWalkNiagaraComponent))
+	{
+		ActiveWalkNiagaraComponent->SetVariableBool(WalkSpawnParameterName, false);
+	}
+}
+
+//걷기 이펙트 파라미터 업데이트
+void AMTPlayerCharacter::UpdateMovementEffects()
+{
+	const UCharacterMovementComponent* Movement = GetCharacterMovement();
+	const bool bShouldPlayWalkEffect = Movement
+		&& !bIsDead
+		&& !bStunned
+		&& Movement->IsMovingOnGround()
+		&& GetVelocity().SizeSquared2D() > FMath::Square(10.f);
+
+	if (UNiagaraComponent* WalkFX = SpawnWalkNiagara())
+	{
+		const FVector MovementDirection = bShouldPlayWalkEffect
+			? GetVelocity().GetSafeNormal2D()
+			: FVector::ZeroVector;
+		WalkFX->SetVariableVec3(WalkDirectionParameterName, MovementDirection);
+		WalkFX->SetVariableBool(WalkSpawnParameterName, bShouldPlayWalkEffect);
+	}
+}
+
+//걷기/점프 이펙트용 스폰 위치 계산. 캡슐 기준 하단부 확인해서 반환.
+FVector AMTPlayerCharacter::GetMovementEffectLocation() const
+{
+	const UCapsuleComponent* Capsule = GetCapsuleComponent();
+	const float CapsuleHalfHeight = Capsule ? Capsule->GetScaledCapsuleHalfHeight() : 0.f;
+	return GetActorLocation() - FVector(0.f, 0.f, CapsuleHalfHeight) + MovementEffectOffset;
 }
 
 void AMTPlayerCharacter::AttractiveBeam()

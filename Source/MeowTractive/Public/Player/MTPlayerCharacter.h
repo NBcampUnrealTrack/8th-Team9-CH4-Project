@@ -12,6 +12,8 @@ class USpringArmComponent;
 class UCameraComponent;
 class UInputMappingContext;
 class UInputAction;
+class UNiagaraComponent;
+class UNiagaraSystem;
 struct FInputActionValue;
 
 // 어빌리티 입력 슬롯 (FGameplayAbilitySpec.InputID). 고양이별로 다른 스킬이 같은 슬롯에 매핑됨.
@@ -62,7 +64,31 @@ protected:
 
 	void Dash();
 
+	virtual void Jump() override;
+
 	void StopJump();
+
+	void UpdateMovementEffects();
+
+	FVector GetMovementEffectLocation() const;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects|Movement", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> JumpNiagaraSystem;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects|Movement", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> WalkNiagaraSystem;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects|Movement", meta = (AllowPrivateAccess = "true"))
+	FVector MovementEffectOffset = FVector::ZeroVector;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects|Movement", meta = (AllowPrivateAccess = "true"))
+	FName WalkDirectionParameterName = TEXT("User.Direction");
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects|Movement", meta = (AllowPrivateAccess = "true"))
+	FName WalkSpawnParameterName = TEXT("User.ShouldSpawn");
+
+	UPROPERTY(Transient)
+	TObjectPtr<UNiagaraComponent> ActiveWalkNiagaraComponent;
 
 	void AttractiveBeam();
 	void AttractiveBeamReleased();
@@ -184,6 +210,12 @@ public:
 	// UIOnly 전환 시 뷰포트가 눌린 키의 release를 합성해 홀드형 스킬이 발사되는 것 방지.
 	UFUNCTION(BlueprintCallable, Category = "MT|Ability")
 	void CancelActiveSkills();
+
+	UFUNCTION(BlueprintCallable, Category = "MT|Effects|Movement")
+	UNiagaraComponent* SpawnWalkNiagara();
+
+	UFUNCTION(BlueprintCallable, Category = "MT|Effects|Movement")
+	void StopWalkNiagara();
 
 	// 서버(GA_Dash): 대시 재충전 진행 기록 (EndServerTime=0이면 재충전 없음). HUD 표시용
 	void SetDashRechargeState(float EndServerTime, float Duration);

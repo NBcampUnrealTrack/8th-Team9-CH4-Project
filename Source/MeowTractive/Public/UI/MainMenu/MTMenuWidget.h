@@ -9,6 +9,7 @@ class UMTGameInstance;
 class UMTSettingsWidget;
 class UCommonButtonBase;
 class UWidget;
+class UTextBlock;
 
 /** 메인메뉴 위젯: 표현 + 의도 전달만. 세션/트래블 로직은 UMTGameInstance(Flow)가 담당. */
 UCLASS()
@@ -55,9 +56,20 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UWidget> ConnectingOverlay;
 
+	// "접속 중" 문구 — 표시 중 점(. → .. → ...) 애니메이션 대상
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> ConnectingText;
+
 private:
 	UFUNCTION()
 	void HandleConnectingStateChanged(bool bConnecting);
+
+	// 점 개수 순환 갱신 (타이머)
+	void TickConnectingDots();
+
+	FTimerHandle ConnectingDotsTimer;
+	int32 ConnectingDotCount = 0;
+	FString ConnectingBaseText;   // WBP 원문에서 끝 점을 뗀 기본 문구
 
 	// 세션 생성/검색에 쓸 LAN 여부 — 콘솔 `MT.Local 1`이 MenuSetup 값보다 우선
 	bool UseLANForSession() const;

@@ -183,6 +183,7 @@ void UGA_AttractiveBeam::ApplyAttractiveDamage(AMTPedestrianBase* Target)
 	}
 }
 
+// 매료빔 VFX 시작
 void UGA_AttractiveBeam::StartAttractiveBeamFX()
 {
 	if (!AttractiveBeamFX)
@@ -249,7 +250,7 @@ void UGA_AttractiveBeam::StartAttractiveBeamFX()
 	}
 }
 
-//이펙트 관련 변수 업데이트
+//VFX 변수 업데이트
 void UGA_AttractiveBeam::UpdateAttractiveBeamFX(const FVector& Start, const FVector& End)
 {
 	if (!ActiveAttractiveBeamFX)
@@ -262,7 +263,7 @@ void UGA_AttractiveBeam::UpdateAttractiveBeamFX(const FVector& Start, const FVec
 	ActiveAttractiveBeamFX->SetVariableLinearColor(FName(TEXT("User.PlayerColor")), GetAvatarPlayerColor());
 }
 
-//빔 적중 여부만 업데이트
+//빔 적중 여부만 VFX 변수에 업데이트
 void UGA_AttractiveBeam::UpdateAttractiveBeamHitFX(bool bHitActor)
 {
 	if (!ActiveAttractiveBeamFX)
@@ -274,7 +275,7 @@ void UGA_AttractiveBeam::UpdateAttractiveBeamHitFX(bool bHitActor)
 }
 
 
-
+//VFX 스케일/페이드 아웃 시작 알림.
 void UGA_AttractiveBeam::StopAttractiveBeamFX()
 {
 	if (!ActiveAttractiveBeamFX || bIsAttractiveBeamFXEnding)
@@ -307,6 +308,7 @@ void UGA_AttractiveBeam::StopAttractiveBeamFX()
 	FinishAttractiveBeamFX();
 }
 
+//VFX 스케일/페이드 아웃 종료, 이펙트 제거.
 void UGA_AttractiveBeam::FinishAttractiveBeamFX()
 {
 	if (!ActiveAttractiveBeamFX)
@@ -321,6 +323,7 @@ void UGA_AttractiveBeam::FinishAttractiveBeamFX()
 	bIsAttractiveBeamFXEnding = false;
 }
 
+//VFX용 소켓 있으면 위치 확인해서 반환.
 FVector UGA_AttractiveBeam::GetAttractiveBeamFXStartLocation() const
 {
 	AActor* Avatar = GetAvatarActorFromActorInfo();
@@ -343,6 +346,7 @@ FVector UGA_AttractiveBeam::GetAttractiveBeamFXStartLocation() const
 	return Avatar->GetActorLocation();
 }
 
+//GA 사용하는 아바타의 색상 반환
 FLinearColor UGA_AttractiveBeam::GetAvatarPlayerColor() const
 {
 	const AActor* Avatar = GetAvatarActorFromActorInfo();
@@ -351,6 +355,7 @@ FLinearColor UGA_AttractiveBeam::GetAvatarPlayerColor() const
 	return MTPS ? MTPS->GetTeamColor() : FLinearColor::White;
 }
 
+//조준점 산정, 플레이어와 카메라 사이에 있는 장애물은 무시. 추후 GA_HeartBeam 조준과 함께 라이브러리 분리 필요.
 bool UGA_AttractiveBeam::TraceBeam(
 	FVector& OutTraceStart,
 	FVector& OutBeamEnd,
@@ -380,18 +385,52 @@ bool UGA_AttractiveBeam::TraceBeam(
 	const FVector CameraTraceEnd = CamLocation + (AimDirection * TraceDistance);
 	OutTraceStart = GetAttractiveBeamFXStartLocation();
 
-	FCollisionQueryParams CameraTraceParams;
-	CameraTraceParams.AddIgnoredActor(Avatar);
+	// 1) 카메라 정면 LineTrace로 시각적 조준점을 계산한다.
+	// 월드 Trace에서는 Pawn을 제외하고 벽/지형만 찾는다.
+	FCollisionQueryParams CameraWorldParams;
+	CameraWorldParams.AddIgnoredActor(Avatar);
 	for (TActorIterator<APawn> It(World); It; ++It)
 	{
-		CameraTraceParams.AddIgnoredActor(*It);
+		CameraWorldParams.AddIgnoredActor(*It);
 	}
 
 	FVector CameraTarget = CameraTraceEnd;
 	FHitResult WallHit;
-	if (World->LineTraceSingleByChannel(WallHit, CamLocation, CameraTraceEnd, ECC_Visibility, CameraTraceParams))
+	if (World->LineTraceSingleByChannel(WallHit, CamLocation, CameraTraceEnd, ECC_Visibility, CameraWorldParams))
 	{
 		CameraTarget = WallHit.ImpactPoint;
+	}
+
+	// Pawn도 반경 없는 LineTrace로 찾는다. 카메라와 플레이어 사이 Hit는 제외한다.
+	FCollisionQueryParams CameraPawnParams;
+	CameraPawnParams.AddIgnoredActor(Avatar);
+	FCollisionObjectQueryParams PawnObjectParams;
+	PawnObjectParams.AddObjectTypesToQuery(ECC_Pawn);
+	TArray<FHitResult> CameraPawnHits;
+	World->LineTraceMultiByObjectType(
+		CameraPawnHits, CamLocation, CameraTraceEnd, PawnObjectParams, CameraPawnParams);
+
+	const float PlayerDepth = FVector::DotProduct(Avatar->GetActorLocation() - CamLocation, AimDirection);
+	for (const FHitResult& Hit : CameraPawnHits)
+	{
+		AActor* HitActor = Hit.GetActor();
+		if (!IsValid(HitActor))
+		{
+			continue;
+		}
+
+		const float HitDepth = FVector::DotProduct(Hit.ImpactPoint - CamLocation, AimDirection);
+		if (HitDepth <= CameraPlayerDepthTolerance
+			|| HitDepth < PlayerDepth - CameraPlayerDepthTolerance)
+		{
+			continue;
+		}
+
+		if (Hit.Distance < FVector::Distance(CamLocation, CameraTarget))
+		{
+			CameraTarget = Hit.ImpactPoint;
+		}
+		break;
 	}
 
 	// 카메라 뒤 장애물은 플레이어 시작 빔을 막지 않는다.
@@ -405,32 +444,39 @@ bool UGA_AttractiveBeam::TraceBeam(
 		OutTraceStart,
 		OutBeamEnd,
 		ECC_Visibility,
-		CameraTraceParams);
+		CameraWorldParams);
 	if (bOutHitWorld)
 	{
 		OutBeamEnd = WorldHit.ImpactPoint;
 	}
 
-	FCollisionQueryParams PawnTraceParams;
-	PawnTraceParams.AddIgnoredActor(Avatar);
-	FHitResult PawnHit;
-	FCollisionObjectQueryParams ObjParams;
-	ObjParams.AddObjectTypesToQuery(ECC_Pawn);
-	const bool bPawnHit = World->SweepSingleByObjectType(
-		PawnHit,
+	// 3) 데미지 판정만 소켓→시각 끝점 Sphere Sweep으로 수행한다.
+	// 판정 Hit로 OutBeamEnd를 덮어쓰지 않는다.
+	FCollisionQueryParams DamageParams;
+	DamageParams.AddIgnoredActor(Avatar);
+	TArray<FHitResult> DamageHits;
+	World->SweepMultiByObjectType(
+		DamageHits,
 		OutTraceStart,
 		OutBeamEnd,
 		FQuat::Identity,
-		ObjParams,
+		PawnObjectParams,
 		FCollisionShape::MakeSphere(BeamRadius),
-		PawnTraceParams);
+		DamageParams);
 
-	AActor* HitActor = PawnHit.GetActor();
-	bOutHitActor = bPawnHit && IsValid(HitActor);
-	if (bOutHitActor)
+	for (const FHitResult& Hit : DamageHits)
 	{
-		OutBeamEnd = PawnHit.ImpactPoint;
-		OutPedestrian = Cast<AMTPedestrianBase>(HitActor);
+		AActor* HitActor = Hit.GetActor();
+		if (!IsValid(HitActor))
+		{
+			continue;
+		}
+		bOutHitActor = true;
+		if (AMTPedestrianBase* Pedestrian = Cast<AMTPedestrianBase>(HitActor))
+		{
+			OutPedestrian = Pedestrian;
+			break;
+		}
 	}
 
 	return true;
