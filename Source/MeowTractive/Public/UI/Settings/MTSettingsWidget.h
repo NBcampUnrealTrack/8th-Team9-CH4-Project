@@ -8,6 +8,7 @@
 
 class UMTMainCommonButton;
 class USlider;
+class UProgressBar;
 class UComboBoxString;
 class UCheckBox;
 class UVerticalBox;
@@ -107,6 +108,16 @@ protected:
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<USlider> SFXSlider;
+
+	// 슬라이더 뒤에 겹쳐 깔린 채움 바 — 슬라이더 값과 같이 갱신 (Slider는 조작, ProgressBar는 표시 담당)
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UProgressBar> PB_MasterSlider;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UProgressBar> PB_BGMSlider;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UProgressBar> PB_SFXSlider;
 
 	// --- 그래픽 ---
 	UPROPERTY(meta = (BindWidgetOptional))
