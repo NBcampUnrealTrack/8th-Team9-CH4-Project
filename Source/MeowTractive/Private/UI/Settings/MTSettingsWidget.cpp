@@ -4,19 +4,17 @@
 #include "Components/Slider.h"
 #include "Components/ComboBoxString.h"
 #include "Components/CheckBox.h"
-#include "Components/Button.h"
 #include "Components/VerticalBox.h"
 #include "Components/VerticalBoxSlot.h"
-#include "Components/HorizontalBox.h"
-#include "Components/HorizontalBoxSlot.h"
 #include "Components/TextBlock.h"
-#include "Blueprint/WidgetTree.h"
 #include "CommonAnimatedSwitcher.h"
 #include "CommonButtonBase.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputMappingContext.h"
 #include "UserSettings/EnhancedInputUserSettings.h"
 #include "Kismet/KismetSystemLibrary.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 void UMTKeySelector::Init(FName InMappingName)
 {
@@ -35,6 +33,35 @@ void UMTKeySelector::HandleChordSelected(FInputChord Chord)
 	}
 }
 
+void UMTKeyRowWidget::Setup(FName InMappingName, const FText& InLabelText, const FKey& InCurrentKey)
+{
+	CurrentKey = InCurrentKey;
+	if (Label)
+	{
+		Label->SetText(InLabelText);
+	}
+	if (Selector)
+	{
+		Selector->Init(InMappingName);
+		Selector->SetSelectedKey(FInputChord(InCurrentKey));
+		Selector->OnKeyRebind.BindUObject(this, &UMTKeyRowWidget::HandleSelectorRebind);
+	}
+}
+
+void UMTKeyRowWidget::HandleSelectorRebind(FName MappingName, FKey NewKey)
+{
+	const bool bApplied = OnKeyRebind.IsBound() && OnKeyRebind.Execute(MappingName, NewKey);
+	if (bApplied)
+	{
+		CurrentKey = NewKey;
+	}
+	else if (Selector)
+	{
+		// 중복 등으로 거부됨 → 셀렉터 표시를 원래 키로 되돌림
+		Selector->SetSelectedKey(FInputChord(CurrentKey));
+	}
+}
+
 void UMTSettingsWidget::NativeConstruct()
 {
 	Super::NativeConstruct();
@@ -43,11 +70,18 @@ void UMTSettingsWidget::NativeConstruct()
 
 	if (CloseButton)
 	{
-		CloseButton->OnClicked.AddDynamic(this, &UMTSettingsWidget::HandleClose);
+		CloseButton->OnClicked().AddUObject(this, &UMTSettingsWidget::HandleClose);
 	}
 	if (ApplyGraphicsButton)
 	{
-		ApplyGraphicsButton->OnClicked.AddDynamic(this, &UMTSettingsWidget::HandleApplyGraphics);
+		ApplyGraphicsButton->OnClicked().AddUObject(this, &UMTSettingsWidget::HandleApplyGraphics);
+	}
+
+	if (KeyWarningText)
+	{
+		// 문구를 미리 채워 Hidden이 예약할 공간을 확정 (레이아웃 흔들림 방지)
+		KeyWarningText->SetText(FText::FromString(TEXT("이미 사용 중인 키입니다")));
+		KeyWarningText->SetVisibility(ESlateVisibility::Hidden);
 	}
 
 	InitAudio();
@@ -59,6 +93,10 @@ void UMTSettingsWidget::NativeConstruct()
 void UMTSettingsWidget::NativeDestruct()
 {
 	// CommonButtonBase는 non-dynamic 이벤트 → 수동 해제
+	if (CloseButton)
+	{
+		CloseButton->OnClicked().RemoveAll(this);
+	}
 	if (AudioTabButton)
 	{
 		AudioTabButton->OnClicked().RemoveAll(this);
@@ -70,6 +108,14 @@ void UMTSettingsWidget::NativeDestruct()
 	if (KeyTabButton)
 	{
 		KeyTabButton->OnClicked().RemoveAll(this);
+	}
+	if (ApplyGraphicsButton)
+	{
+		ApplyGraphicsButton->OnClicked().RemoveAll(this);
+	}
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(KeyWarningTimerHandle);
 	}
 	Super::NativeDestruct();
 }
@@ -113,6 +159,12 @@ void UMTSettingsWidget::ShowTab(int32 Index)
 		{
 			Tabs[i]->SetIsSelected(i == Index, /*bGiveClickFeedback=*/false);
 		}
+	}
+
+	// 적용 버튼은 그래픽 탭에서만 — Hidden이라 다른 탭에서도 자리는 유지 (레이아웃 흔들림 방지)
+	if (ApplyGraphicsButton)
+	{
+		ApplyGraphicsButton->SetVisibility(Index == 1 ? ESlateVisibility::Visible : ESlateVisibility::Hidden);
 	}
 }
 
@@ -306,86 +358,93 @@ void UMTSettingsWidget::InitKeyBindings()
 		return;   // bEnableUserSettings 꺼짐 등 — 키 섹션 비움
 	}
 
+	if (!KeyRowWidgetClass)
+	{
+		return;   // WBP_MTSettings에 행 위젯 클래스 미지정
+	}
+
 	KeyListBox->ClearChildren();
 
-	for (const TPair<FName, FKeyMappingRow>& Row : Profile->GetPlayerMappingRows())
+	const TMap<FName, FKeyMappingRow>& Rows = Profile->GetPlayerMappingRows();
+
+	// 매핑 이름으로 First 슬롯 행 하나 생성 (이미 만든 이름은 건너뜀)
+	TSet<FName> Added;
+	auto AddRow = [&](FName MappingName)
 	{
-		for (const FPlayerKeyMapping& Mapping : Row.Value.Mappings)
+		if (Added.Contains(MappingName))
+		{
+			return;
+		}
+		const FKeyMappingRow* Row = Rows.Find(MappingName);
+		if (!Row)
+		{
+			return;
+		}
+		for (const FPlayerKeyMapping& Mapping : Row->Mappings)
 		{
 			if (Mapping.GetSlot() != EPlayerMappableKeySlot::First)
 			{
 				continue;   // 1키 = 1행
 			}
 
-			// 행: [스킬 이름 | 키 셀렉터]
-			UHorizontalBox* RowBox = WidgetTree->ConstructWidget<UHorizontalBox>();
-			UTextBlock* Label = WidgetTree->ConstructWidget<UTextBlock>();
-			Label->SetText(Mapping.GetDisplayName());
-			if (KeyRowFont.HasValidFont())
-			{
-				Label->SetFont(KeyRowFont);
-			}
-			Label->SetColorAndOpacity(FSlateColor(KeyRowLabelColor));
+			UMTKeyRowWidget* RowWidget = CreateWidget<UMTKeyRowWidget>(this, KeyRowWidgetClass);
+			RowWidget->Setup(MappingName, Mapping.GetDisplayName(), Mapping.GetCurrentKey());
+			RowWidget->OnKeyRebind.BindUObject(this, &UMTSettingsWidget::HandleKeyRebind);
 
-			UMTKeySelector* Selector = WidgetTree->ConstructWidget<UMTKeySelector>();
-			Selector->Init(Row.Key);
-			Selector->SetSelectedKey(FInputChord(Mapping.GetCurrentKey()));
-			Selector->OnKeyRebind.BindUObject(this, &UMTSettingsWidget::HandleKeyRebind);
-
-			// 톤앤매너: 핑크 라운드 버튼 + 폰트
-			{
-				auto MakeRounded = [](const FLinearColor& Color)
-				{
-					FSlateBrush Brush;
-					Brush.DrawAs = ESlateBrushDrawType::RoundedBox;
-					Brush.TintColor = FSlateColor(Color);
-					Brush.OutlineSettings = FSlateBrushOutlineSettings(FVector4(12.f, 12.f, 12.f, 12.f));
-					Brush.OutlineSettings.RoundingType = ESlateBrushRoundingType::FixedRadius;
-					return Brush;
-				};
-				FButtonStyle BtnStyle;
-				BtnStyle.SetNormal(MakeRounded(KeySelectorColor));
-				BtnStyle.SetHovered(MakeRounded(KeySelectorColor * 1.15f));
-				BtnStyle.SetPressed(MakeRounded(KeySelectorColor * 0.8f));
-				Selector->SetButtonStyle(BtnStyle);
-
-				FTextBlockStyle KeyTextStyle;
-				if (KeyRowFont.HasValidFont())
-				{
-					KeyTextStyle.SetFont(KeyRowFont);
-				}
-				KeyTextStyle.SetColorAndOpacity(FSlateColor(FLinearColor(1.f, 0.96f, 0.92f, 1.f)));
-				Selector->SetTextStyle(KeyTextStyle);
-				Selector->SetMargin(FMargin(14.f, 6.f));
-				Selector->SetKeySelectionText(FText::FromString(TEXT("아무 키나 누르세요...")));
-				Selector->SetNoKeySpecifiedText(FText::FromString(TEXT("없음")));
-			}
-
-			if (UHorizontalBoxSlot* LabelSlot = RowBox->AddChildToHorizontalBox(Label))
-			{
-				LabelSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-				LabelSlot->SetVerticalAlignment(VAlign_Center);
-			}
-			if (UHorizontalBoxSlot* SelectorSlot = RowBox->AddChildToHorizontalBox(Selector))
-			{
-				SelectorSlot->SetSize(FSlateChildSize(ESlateSizeRule::Fill));
-				SelectorSlot->SetVerticalAlignment(VAlign_Center);
-			}
-			if (UVerticalBoxSlot* RowSlot = KeyListBox->AddChildToVerticalBox(RowBox))
+			if (UVerticalBoxSlot* RowSlot = KeyListBox->AddChildToVerticalBox(RowWidget))
 			{
 				RowSlot->SetPadding(FMargin(0.f, 4.f));
 			}
+			Added.Add(MappingName);
 			break;
 		}
+	};
+
+	// IMC에 정의된 순서대로 생성 — TMap 순회는 순서 불안정이라 행이 뒤섞이는 것 방지
+	if (KeyRegistrationContext)
+	{
+		for (const FEnhancedActionKeyMapping& Mapping : KeyRegistrationContext->GetMappings())
+		{
+			if (Mapping.IsPlayerMappable())
+			{
+				AddRow(Mapping.GetMappingName());
+			}
+		}
+	}
+
+	// IMC에 없던(혹은 IMC 미지정) 나머지는 뒤에 붙임
+	for (const TPair<FName, FKeyMappingRow>& Row : Rows)
+	{
+		AddRow(Row.Key);
 	}
 }
 
-void UMTSettingsWidget::HandleKeyRebind(FName MappingName, FKey NewKey)
+bool UMTSettingsWidget::HandleKeyRebind(FName MappingName, FKey NewKey)
 {
 	UEnhancedInputUserSettings* Settings = GetInputUserSettings();
 	if (!Settings)
 	{
-		return;
+		return false;
+	}
+
+	// 다른 액션이 이미 같은 키를 쓰고 있으면 거부 (중복 방지)
+	if (const UEnhancedPlayerMappableKeyProfile* Profile = Settings->GetActiveKeyProfile())
+	{
+		for (const TPair<FName, FKeyMappingRow>& Row : Profile->GetPlayerMappingRows())
+		{
+			if (Row.Key == MappingName)
+			{
+				continue;   // 같은 액션은 검사 제외 (자기 키 재선택 허용)
+			}
+			for (const FPlayerKeyMapping& Mapping : Row.Value.Mappings)
+			{
+				if (Mapping.GetSlot() == EPlayerMappableKeySlot::First && Mapping.GetCurrentKey() == NewKey)
+				{
+					ShowKeyDuplicateWarning();
+					return false;   // 중복 → 적용 안 함 (호출측이 원래 키로 되돌림)
+				}
+			}
+		}
 	}
 
 	FMapPlayerKeyArgs Args;
@@ -397,6 +456,33 @@ void UMTSettingsWidget::HandleKeyRebind(FName MappingName, FKey NewKey)
 	Settings->MapPlayerKey(Args, FailureReason);
 	Settings->ApplySettings();
 	Settings->AsyncSaveSettings();
+	return true;
+}
+
+void UMTSettingsWidget::ShowKeyDuplicateWarning()
+{
+	if (!KeyWarningText)
+	{
+		return;   // WBP에 경고 문구 위젯이 없으면 무시
+	}
+
+	// Hidden ↔ HitTestInvisible 만 토글 (Collapsed 아님) → 공간 유지, 크기 안 흔들림
+	KeyWarningText->SetVisibility(ESlateVisibility::HitTestInvisible);
+
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(KeyWarningTimerHandle);
+		World->GetTimerManager().SetTimer(
+			KeyWarningTimerHandle,
+			[WeakThis = TWeakObjectPtr<UMTSettingsWidget>(this)]()
+			{
+				if (WeakThis.IsValid() && WeakThis->KeyWarningText)
+				{
+					WeakThis->KeyWarningText->SetVisibility(ESlateVisibility::Hidden);
+				}
+			},
+			2.0f, /*bLoop=*/false);
+	}
 }
 
 void UMTSettingsWidget::HandleClose()

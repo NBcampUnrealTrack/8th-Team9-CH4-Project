@@ -3,20 +3,25 @@
 #include "CoreMinimal.h"
 #include "Blueprint/UserWidget.h"
 #include "Components/InputKeySelector.h"
+#include "Engine/TimerHandle.h"
 #include "MTSettingsWidget.generated.h"
 
+class UMTMainCommonButton;
 class USlider;
 class UComboBoxString;
 class UCheckBox;
-class UButton;
 class UVerticalBox;
 class UCommonAnimatedSwitcher;
 class UCommonButtonBase;
 class UEnhancedInputUserSettings;
 class UInputMappingContext;
+class UTextBlock;
 
-// 키 셀렉터 → 설정 위젯으로 결과 전달 (어느 매핑인지 포함)
+// 키 셀렉터 → 행 위젯으로 결과 전달 (어느 매핑인지 포함)
 DECLARE_DELEGATE_TwoParams(FMTOnKeyRebind, FName /*MappingName*/, FKey /*NewKey*/);
+
+// 행 위젯 → 설정 위젯: 리바인드 요청. 적용되면 true, 다른 액션과 중복이면 false (행이 원래 키로 복귀)
+DECLARE_DELEGATE_RetVal_TwoParams(bool, FMTOnKeyRebindRequest, FName /*MappingName*/, FKey /*NewKey*/);
 
 /** 재바인딩용 키 셀렉터: 자기 매핑 이름을 알고 선택 결과를 넘긴다 (C++ 동적 생성 전용). */
 UCLASS()
@@ -36,6 +41,32 @@ private:
 	void HandleChordSelected(FInputChord Chord);
 
 	FName MappingName;
+};
+
+/** 키 재바인딩 한 행 (WBP에서 레이아웃/스타일 구성, 이 클래스는 행별 데이터만 채움). */
+UCLASS()
+class MEOWTRACTIVE_API UMTKeyRowWidget : public UUserWidget
+{
+	GENERATED_BODY()
+
+public:
+	void Setup(FName InMappingName, const FText& InLabelText, const FKey& InCurrentKey);
+
+	FMTOnKeyRebindRequest OnKeyRebind;
+
+protected:
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UTextBlock> Label;
+
+	UPROPERTY(meta = (BindWidget))
+	TObjectPtr<UMTKeySelector> Selector;
+
+private:
+	UFUNCTION()
+	void HandleSelectorRebind(FName MappingName, FKey NewKey);
+
+	// 현재 적용된 키 (거부 시 이 값으로 셀렉터를 되돌림)
+	FKey CurrentKey;
 };
 
 /** 설정 화면: 볼륨(마스터/배경음/효과음) + 그래픽(창모드/해상도/품질/수직동기) + 키 재바인딩.
@@ -91,30 +122,26 @@ protected:
 	TObjectPtr<UCheckBox> VSyncCheck;
 
 	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UButton> ApplyGraphicsButton;
+	TObjectPtr<UCommonButtonBase> ApplyGraphicsButton;
 
-	// --- 키 재바인딩 (행을 C++이 동적 생성) ---
+	// --- 키 재바인딩 (행 위젯(WBP_MTKeyRow)을 C++이 KeyListBox에 채워넣음) ---
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UVerticalBox> KeyListBox;
 
-	// 키 행 라벨/셀렉터 폰트 (WBP 디폴트에서 지정. 미지정 시 엔진 기본)
-	UPROPERTY(EditAnywhere, Category = "MT|UI")
-	FSlateFontInfo KeyRowFont;
+	// 키 행 위젯 클래스 (레이아웃/스타일은 이 WBP에서, 행별 텍스트만 코드에서 채움)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TSubclassOf<UMTKeyRowWidget> KeyRowWidgetClass;
 
-	// 키 행 라벨 색 (흰 패널 위 다크로즈)
-	UPROPERTY(EditAnywhere, Category = "MT|UI")
-	FLinearColor KeyRowLabelColor = FLinearColor(0.38f, 0.20f, 0.26f, 1.f);
-
-	// 키 셀렉터 버튼 색 (핑크)
-	UPROPERTY(EditAnywhere, Category = "MT|UI")
-	FLinearColor KeySelectorColor = FLinearColor(0.95f, 0.45f, 0.60f, 1.f);
+	// 키 중복 시 잠깐 표시되는 경고 문구 (WBP에 두면 표시, 없으면 무시)
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> KeyWarningText;
 
 	// 키 목록 표시용 IMC 사전 등록 — 메인메뉴처럼 폰 possess 전이라 IMC 미등록인 상황 대비 (IMC_Default 지정)
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
 	TObjectPtr<UInputMappingContext> KeyRegistrationContext;
 
 	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UButton> CloseButton;
+	TObjectPtr<UCommonButtonBase> CloseButton;
 
 private:
 	void InitTabs();
@@ -147,9 +174,16 @@ private:
 	// 볼륨 변경 공통: 저장값 갱신 + 즉시 반영
 	void ApplyVolume();
 
-	void HandleKeyRebind(FName MappingName, FKey NewKey);
+	// 적용되면 true, 다른 액션과 키가 중복이면 false (적용 안 함)
+	bool HandleKeyRebind(FName MappingName, FKey NewKey);
 	UEnhancedInputUserSettings* GetInputUserSettings() const;
+
+	// "이미 사용 중인 키입니다" 문구를 잠깐 표시
+	void ShowKeyDuplicateWarning();
 
 	// ResolutionCombo 인덱스 → 실제 해상도
 	TArray<FIntPoint> Resolutions;
+
+	// 경고 문구 자동 숨김 타이머
+	FTimerHandle KeyWarningTimerHandle;
 };
