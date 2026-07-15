@@ -13,6 +13,7 @@
 #include "Game/MTMatchGameMode.h"
 #include "Game/MTLobbyGameMode.h"
 #include "Game/MTLobbyGameState.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 
 AMTPlayerCharacter::AMTPlayerCharacter()
@@ -469,6 +470,16 @@ void AMTPlayerCharacter::StopJump()
 	{
 		Vel.Z *= 0.4f;
 		GetCharacterMovement()->Velocity = Vel;
+	}
+}
+
+void AMTPlayerCharacter::Landed(const FHitResult& Hit)
+{
+	Super::Landed(Hit);
+
+	if (LandingSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, LandingSound, GetActorLocation());
 	}
 }
 

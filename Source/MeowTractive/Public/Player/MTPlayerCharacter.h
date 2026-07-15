@@ -64,6 +64,11 @@ protected:
 
 	void StopJump();
 
+	virtual void Landed(const FHitResult& Hit) override;
+
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	USoundBase* LandingSound;
+
 	void AttractiveBeam();
 	void AttractiveBeamReleased();
 
