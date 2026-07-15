@@ -58,9 +58,10 @@ void AMTLobbyGameMode::RespawnLobbyPawn(AController* C)
 	{
 		return;
 	}
-	// 기존 폰 위치를 캡처 → 그 자리에 새 고양이 스폰 (선택 시 제자리 교체)
+	// 기존 폰 위치·카메라 방향을 캡처 → 그 자리에 새 고양이 스폰 (선택 시 제자리 교체)
 	FTransform SpawnXform;
 	bool bHasXform = false;
+	const FRotator SavedViewRotation = C->GetControlRotation();
 	if (APawn* Old = C->GetPawn())
 	{
 		SpawnXform = Old->GetActorTransform();
@@ -72,6 +73,13 @@ void AMTLobbyGameMode::RespawnLobbyPawn(AController* C)
 	if (bHasXform)
 	{
 		RestartPlayerAtTransform(C, SpawnXform);   // 기존 위치에 GetDefaultPawnClassForController 폰
+
+		// FinishRestartPlayer가 스폰 방향으로 리셋한 카메라를 교체 전 방향으로 복원
+		C->SetControlRotation(SavedViewRotation);
+		if (APlayerController* PC = Cast<APlayerController>(C))
+		{
+			PC->ClientSetRotation(SavedViewRotation);
+		}
 	}
 	else
 	{
