@@ -5,6 +5,9 @@
 #include "Game/MTGameState.h"
 #include "Player/MTPlayerState.h"
 #include "GameFramework/PlayerController.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/AmbientSound.h"
+#include "Components/AudioComponent.h"
 
 void UMTMatchGameResultWidget::NativeConstruct()
 {
@@ -55,4 +58,21 @@ void UMTMatchGameResultWidget::ShowResult()
 	}
 
     OnResultReady(Results);
+
+	OnResultReady(Results);
+
+	// BGM 페이드아웃
+	TArray<AActor*> BGMActors;
+	UGameplayStatics::GetAllActorsOfClass(GetWorld(), AAmbientSound::StaticClass(), BGMActors);
+
+	for (AActor* Actor : BGMActors)
+	{
+		if (AAmbientSound* BGM = Cast<AAmbientSound>(Actor))
+		{
+			if (UAudioComponent* AudioComp = BGM->GetAudioComponent())
+			{
+				AudioComp->FadeOut(1.0f, 0.1f); // 1초에 걸쳐 볼륨 0.1까지 감소
+			}
+		}
+	}
 }
