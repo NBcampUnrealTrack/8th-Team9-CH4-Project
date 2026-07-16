@@ -39,6 +39,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Purr")
 	TObjectPtr<UAnimMontage> CastMontage;
 
+	// 시전 사운드
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	USoundBase* PurrLoopSound;
+
+	UPROPERTY()
+	UAudioComponent* PurrAudioComponent;
+
 	// 오라 반경 (cm)
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Purr", meta = (ClampMin = "0.0"))
 	float Radius = 700.f;
