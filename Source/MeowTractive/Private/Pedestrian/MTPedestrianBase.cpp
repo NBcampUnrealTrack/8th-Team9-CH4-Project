@@ -21,6 +21,7 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "NiagaraSystem.h"
+#include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
 #include "UObject/ConstructorHelpers.h"
 
@@ -137,6 +138,16 @@ void AMTPedestrianBase::FreezeForMatchEnd()
 	SetActorTickEnabled(false);
 }
 
+void AMTPedestrianBase::Multicast_PlayAttractionTickSFX_Implementation()
+{
+	UGameplayStatics::PlaySoundAtLocation(this, AttractionTickSound, GetActorLocation());
+}
+
+void AMTPedestrianBase::Multicast_PlayAttractionCompleteSFX_Implementation()
+{
+	UGameplayStatics::PlaySoundAtLocation(this, AttractionCompleteSound, GetActorLocation());
+}
+
 // GAS ActorInfo와 Regen GE를 초기화하고 최초 UI 값을 반영한다.
 void AMTPedestrianBase::BeginPlay()
 {
@@ -240,7 +251,11 @@ void AMTPedestrianBase::HandleAttractiveHit(APlayerState* Source, float Amount)
 		// 한 플레이어가 100에 도달하면 경쟁 플레이어 수치는 즉시 0으로 초기화한다.
 		AttractiveComponent->ResetOtherAttractiveAmounts(Source);
 		UpdateLeadingPlayer();
-		BecomeAttracted(Source);
+		BecomeAttracted(Source); // ← 완료 사운드는 이 안에서 재생
+	}
+	else
+	{
+		Multicast_PlayAttractionTickSFX(); // ← 매료도가 "올라간" 순간 (완료가 아닐 때만)
 	}
 }
 
@@ -314,6 +329,7 @@ void AMTPedestrianBase::BecomeAttracted(APlayerState* Winner)
 			PlayerColor = MTPS->GetTeamColor();
 		}
 		Multicast_PlayAttractedEffect(PlayerColor);
+		Multicast_PlayAttractionCompleteSFX();
 	}
 
 	// 점수: 소유자가 바뀌면 기존 소유자 -1, 새 소유자 +1
