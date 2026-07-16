@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/GameModeBase.h"
@@ -45,7 +45,7 @@ public:
 	// 선택 고양이에 따라 로비 조종 폰 결정
 	virtual UClass* GetDefaultPawnClassForController_Implementation(AController* InController) override;
 
-	// 슬롯별 PlayerStart("Slot%d")로 스폰 → 자기 조형물 앞에 배치 (개인화 로비)
+	// 슬롯별 PlayerStart("Slot%d")로 스폰 → 자기 조형물 앞에 배치
 	virtual AActor* ChoosePlayerStart_Implementation(AController* Player) override;
 
 	// 방 설정 변경 — 호스트(리슨 로컬)만 허용. 접속 플레이어는 유지된다.
@@ -72,12 +72,6 @@ protected:
 private:
 	// 슬롯 배정/재사용 + 팀색 설정 (PostLogin·SeamlessTravel 공통)
 	void SetupLobbyPlayer(AController* C);
-
-	// 배치된 조형물들의 시작 고양이를 슬롯별로 무작위화 — 펀치 횟수로 선택을 유추하지 못하게
-	void ShuffleLobbyStatues();
-
-	// 무작위 시작 고양이 1개 (후보 없으면 None)
-	EMTCatType PickRandomStartCat() const;
 
 	// 방 설정에서 매치 맵 경로 결정 (Random이면 테이블에서 무작위)
 	FString ResolveMatchMapPath() const;

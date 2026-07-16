@@ -6,8 +6,10 @@
 
 UGC_CatHit::UGC_CatHit()
 {
-	// 스피커가 반응할 태그
-	GameplayCueTag = FGameplayTag::RequestGameplayTag(FName("GameplayCue.Cat.Hit"));
+	// 태그(GameplayCue.Cat.Hit)는 BP 에셋에서 지정한다.
+	// C++ 생성자에서 지정하면 부모/자식 태그가 같아져, 저장 시 엔진의
+	// DeriveGameplayCueTagFromClass가 GameplayCueName(레지스트리 검색키)을 None으로
+	// 기록 → 큐 매니저 스캔에서 누락돼 큐가 영영 실행되지 않는다.
 }
 
 bool UGC_CatHit::OnExecute_Implementation(AActor* MyTarget, const FGameplayCueParameters& Parameters) const

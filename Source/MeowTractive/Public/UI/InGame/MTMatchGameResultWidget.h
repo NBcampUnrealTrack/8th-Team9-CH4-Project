@@ -21,7 +21,14 @@ public:
 
 protected:
     virtual void NativeConstruct() override;
+    virtual void NativeDestruct() override;
 
     UFUNCTION(BlueprintImplementableEvent)
     void OnResultReady(const TArray<FMTPlayerResult>& Results);
+
+private:
+    // seamless travel은 뷰포트 위젯을 자동 제거하지 않음 → 월드 종료 시 직접 제거 (다음 판 잔존 방지)
+    void HandleWorldTearDown(UWorld* World);
+
+    FDelegateHandle WorldTearDownHandle;
 };

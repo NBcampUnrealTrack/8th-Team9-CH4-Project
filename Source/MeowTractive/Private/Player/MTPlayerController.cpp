@@ -104,13 +104,6 @@ void AMTPlayerController::Server_SetSelectedCat_Implementation(EMTCatType NewCat
 
 void AMTPlayerController::Server_ToggleReady_Implementation()
 {
-	const float Now = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.f;
-	if (Now - LastReadyToggleTime < ReadyCooldown)   // 0.5s 쿨다운
-	{
-		return;
-	}
-	LastReadyToggleTime = Now;
-
 	if (AMTPlayerState* MTPS = GetPlayerState<AMTPlayerState>())
 	{
 		MTPS->SetReady(!MTPS->IsReady());
@@ -183,10 +176,10 @@ void AMTPlayerController::ClientShowResult_Implementation()
     // 게임 끝 메시지
     GEngine->AddOnScreenDebugMessage(-1, 10.f, FColor::Yellow, TEXT("게임 종료!"));
 
-	// TODO: 결과 화면 위젯 생성 및 표시
-	if (ResultWidgetClass)
+	// 결과 화면 표시 — 중복 호출돼도 1개만 유지 (행 누적/이중 블러 방지)
+	if (ResultWidgetClass && !ResultWidget)
     {
-        UMTMatchGameResultWidget* ResultWidget = CreateWidget<UMTMatchGameResultWidget>(this, ResultWidgetClass);
+        ResultWidget = CreateWidget<UMTMatchGameResultWidget>(this, ResultWidgetClass);
         if (ResultWidget)
         {
             ResultWidget->AddToViewport();

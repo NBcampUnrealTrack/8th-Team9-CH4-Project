@@ -44,6 +44,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
 	TSubclassOf<class UMTMatchGameResultWidget> ResultWidgetClass;
 
+	// 표시 중인 결과 위젯 — 중복 호출 시 재생성/행 누적 방지
+	UPROPERTY(Transient)
+	TObjectPtr<class UMTMatchGameResultWidget> ResultWidget;
+
 	// ESC 일시정지 메뉴 토글 (열려 있으면 닫음). IA_Pause 바인딩·위젯이 호출. 로컬 전용.
 	UFUNCTION(BlueprintCallable, Category = "MT|UI")
 	void TogglePauseMenu();
@@ -62,9 +66,6 @@ protected:
 	virtual void SetupInputComponent() override;
 
 private:
-	float LastReadyToggleTime = -100.f;     // 서버 쿨다운 기준 시각
-	static constexpr float ReadyCooldown = 0.5f;
-
 	// 열려 있는 일시정지 메뉴 인스턴스 (없으면 nullptr = 닫힘)
 	UPROPERTY(Transient)
 	TObjectPtr<class UMTPauseMenuWidget> PauseMenu;

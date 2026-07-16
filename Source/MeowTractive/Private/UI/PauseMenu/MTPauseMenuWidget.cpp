@@ -52,6 +52,14 @@ void UMTPauseMenuWidget::HandleSettings()
 	{
 		Settings->AddToViewport(60);   // 일시정지 메뉴(50) 위
 		Settings->SetUserFocus(GetOwningPlayer());   // ESC 닫기 수신
+
+		// 설정이 떠 있는 동안 일시정지 메뉴 숨김 → 닫히면 복원 (+ ESC 수신 위해 포커스 반환)
+		SetVisibility(ESlateVisibility::Collapsed);
+		Settings->OnClosed.AddWeakLambda(this, [this]()
+		{
+			SetVisibility(ESlateVisibility::Visible);
+			SetUserFocus(GetOwningPlayer());
+		});
 	}
 }
 

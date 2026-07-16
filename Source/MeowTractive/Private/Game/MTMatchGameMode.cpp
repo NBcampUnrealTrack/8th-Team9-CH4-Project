@@ -26,13 +26,6 @@ AMTMatchGameMode::AMTMatchGameMode()
 	PlayerControllerClass = AMTPlayerController::StaticClass();
 	HUDClass = AMTPlayerHUD::StaticClass();
 
-	// 고양이 캐릭터로 교체
-	static ConstructorHelpers::FClassFinder<APawn> PawnBP(TEXT("/Game/Blueprints/Player/BP_Cat"));
-	if (PawnBP.Succeeded())
-	{
-		DefaultPawnClass = PawnBP.Class;
-	}
-
 	// 슬롯별 팀색 (빨·파·초·노)
 	TeamColors = {
 		FLinearColor(1.f, 0.2f, 0.2f),

@@ -55,7 +55,7 @@ protected:
 	EMTRoomGameMode RoomGameMode = EMTRoomGameMode::FFA;
 
 	UPROPERTY(ReplicatedUsing = OnRep_RoomSettings)
-	EMTRoomMap RoomMap = EMTRoomMap::Insadong;
+	EMTRoomMap RoomMap = EMTRoomMap::Park;
 
 	UPROPERTY(ReplicatedUsing = OnRep_RoomSettings)
 	bool bHasPassword = false;

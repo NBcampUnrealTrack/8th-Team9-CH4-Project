@@ -12,6 +12,25 @@
 void UMTMatchGameResultWidget::NativeConstruct()
 {
     Super::NativeConstruct();
+
+    // 매치→로비 seamless travel 시 이전 판 결과 위젯이 뷰포트에 남는 것 방지
+    WorldTearDownHandle = FWorldDelegates::OnWorldBeginTearDown.AddUObject(
+        this, &UMTMatchGameResultWidget::HandleWorldTearDown);
+}
+
+void UMTMatchGameResultWidget::NativeDestruct()
+{
+    FWorldDelegates::OnWorldBeginTearDown.Remove(WorldTearDownHandle);
+    Super::NativeDestruct();
+}
+
+void UMTMatchGameResultWidget::HandleWorldTearDown(UWorld* World)
+{
+    if (World == GetWorld())
+    {
+        UE_LOG(LogTemp, Log, TEXT("[MTResult] 월드 종료 → 결과 위젯 제거: %s"), *GetName());
+        RemoveFromParent();
+    }
 }
 
 bool UMTMatchGameResultWidget::IsHost() const
@@ -24,6 +43,10 @@ void UMTMatchGameResultWidget::ShowResult()
 {
     AMTGameState* GS = GetWorld()->GetGameState<AMTGameState>();
     if (!GS) return;
+
+    // 중복 호출 진단용 — 4행 버그 재발 시 이 로그로 호출 횟수/인스턴스 확인
+    UE_LOG(LogTemp, Log, TEXT("[MTResult] ShowResult 호출: widget=%s players=%d"),
+        *GetName(), GS->PlayerArray.Num());
 
     // 점수 기반 결과 목록 생성
     TArray<FMTPlayerResult> Results;
@@ -56,8 +79,6 @@ void UMTMatchGameResultWidget::ShowResult()
 		}
 		Results[i].Rank = CurrentRank;
 	}
-
-    OnResultReady(Results);
 
 	OnResultReady(Results);
 

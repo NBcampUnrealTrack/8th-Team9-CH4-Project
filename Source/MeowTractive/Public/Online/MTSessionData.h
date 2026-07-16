@@ -33,7 +33,7 @@ public:
 	EMTRoomGameMode GameMode = EMTRoomGameMode::FFA;
 
 	UPROPERTY(BlueprintReadOnly, Category = "MT|Session")
-	EMTRoomMap Map = EMTRoomMap::Insadong;
+	EMTRoomMap Map = EMTRoomMap::Park;
 
 	// C++ 전용 — 클라 측 간이 비밀번호 검증용 (BP 미노출)
 	FString AdvertisedPassword;

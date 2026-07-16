@@ -32,11 +32,10 @@ enum class EMTRoomGameMode : uint8
 	CatFight UMETA(DisplayName = "고양이 전투"),
 };
 
-// 매치 맵 선택
+// 매치 맵 선택 (콤보 인덱스 = enum 값 — UI 옵션 순서와 일치 유지)
 UENUM(BlueprintType)
 enum class EMTRoomMap : uint8
 {
-	Insadong UMETA(DisplayName = "인사동"),
 	Park     UMETA(DisplayName = "공원"),
 	Random   UMETA(DisplayName = "랜덤"),
 };
@@ -59,7 +58,7 @@ struct FMTRoomSettings
 	EMTRoomGameMode GameMode = EMTRoomGameMode::FFA;
 
 	UPROPERTY(BlueprintReadWrite, EditAnywhere, Category = "MT|Session")
-	EMTRoomMap Map = EMTRoomMap::Insadong;
+	EMTRoomMap Map = EMTRoomMap::Park;
 
 	bool HasPassword() const { return !Password.IsEmpty(); }
 };

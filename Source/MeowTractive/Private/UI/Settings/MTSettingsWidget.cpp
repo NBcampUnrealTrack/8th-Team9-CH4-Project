@@ -93,6 +93,8 @@ void UMTSettingsWidget::NativeConstruct()
 
 void UMTSettingsWidget::NativeDestruct()
 {
+	OnClosed.Broadcast();   // 어떤 경로로 닫혀도 여는 쪽이 복원할 수 있게
+
 	// CommonButtonBase는 non-dynamic 이벤트 → 수동 해제
 	if (CloseButton)
 	{

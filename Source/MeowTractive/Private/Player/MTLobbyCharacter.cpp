@@ -1,4 +1,4 @@
-#include "Player/MTLobbyCharacter.h"
+﻿#include "Player/MTLobbyCharacter.h"
 
 #include "Player/MTPlayerController.h"
 #include "Player/MTPlayerState.h"
@@ -9,6 +9,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
+#include "EngineUtils.h"
 #include "TimerManager.h"
 #include "Net/UnrealNetwork.h"
 
@@ -59,6 +60,24 @@ void AMTLobbyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AMTLobbyCharacter::UpdateLobbyVisibility()
 {
+	// 유령 자가 치유: 서버가 파괴한 배치(startup) 조형물의 파괴 통지를 늦은 조인으로 못 받은 경우,
+	// 같은 슬롯의 동적(서버 스폰) 조형물이 복제돼 오면 배치본(자신)은 낡은 것 → 로컬에서 제거.
+	if (!HasAuthority() && IsNetStartupActor() && OwnerSlot >= 0)
+	{
+		for (TActorIterator<AMTLobbyCharacter> It(GetWorld()); It; ++It)
+		{
+			AMTLobbyCharacter* Other = *It;
+			if (Other != this && IsValid(Other) &&
+				Other->OwnerSlot == OwnerSlot && !Other->IsNetStartupActor())
+			{
+				UE_LOG(LogTemp, Log, TEXT("[MTLobby] 유령 조형물 정리: %s (slot %d, 동적 교체본 %s 존재)"),
+					*GetName(), OwnerSlot, *Other->GetName());
+				Destroy();
+				return;
+			}
+		}
+	}
+
 	// 로컬 플레이어 슬롯과 OwnerSlot 비교 — 내 슬롯 조형물만 표시
 	int32 LocalSlot = -1;
 	if (const APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)

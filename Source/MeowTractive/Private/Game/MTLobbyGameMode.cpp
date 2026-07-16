@@ -21,8 +21,9 @@ AMTLobbyGameMode::AMTLobbyGameMode()
 	HUDClass = AMTLobbyHUD::StaticClass();   // 도착 직후 검은 화면 → 페이드인 (BP HUD_Lobby가 오버라이드)
 
 	// 네이티브 CDO 기본값은 쿠커가 소프트 참조로 추적 못 함 — BP_LobbyMode에서 덮어쓰고 MapsToCook 유지
-	FallbackMatchMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Map/Map_Insa/Prototype_Insadong.Prototype_Insadong")));
-	MatchMaps.Add(EMTRoomMap::Insadong, FallbackMatchMap);
+	// TODO: 공원 맵 완성 시 실제 맵으로 교체 (현재는 프로토타입 맵 사용)
+	FallbackMatchMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Map/TestMap.TestMap")));
+	MatchMaps.Add(EMTRoomMap::Park, FallbackMatchMap);
 
 	// 슬롯별 팀색 (빨·파·초·노) — AMTMatchGameMode 폴백 팔레트와 동일하게 유지
 	TeamColors = {
@@ -52,51 +53,6 @@ void AMTLobbyGameMode::BeginPlay()
 		Sessions->SetSessionJoinable(true);
 	}
 
-	ShuffleLobbyStatues();   // 플레이어 입장 전에 조형물 시작점 섞기
-}
-
-void AMTLobbyGameMode::ShuffleLobbyStatues()
-{
-	UWorld* World = GetWorld();
-	if (!HasAuthority() || !World)
-	{
-		return;
-	}
-
-	// 순회 중 스폰/파괴가 일어나므로 대상을 먼저 수집
-	TArray<AMTLobbyCharacter*> Statues;
-	for (TActorIterator<AMTLobbyCharacter> It(World); It; ++It)
-	{
-		Statues.Add(*It);
-	}
-
-	for (AMTLobbyCharacter* Statue : Statues)
-	{
-		if (!IsValid(Statue))
-		{
-			continue;
-		}
-		const int32 CycleLength = Statue->GetCycleLength();
-		if (CycleLength > 1)
-		{
-			Statue->AdvanceCycle(FMath::RandRange(0, CycleLength - 1));
-		}
-	}
-}
-
-EMTCatType AMTLobbyGameMode::PickRandomStartCat() const
-{
-	// 후보 미지정이면 폰 매핑이 있는 고양이들에서 뽑는다 (설정 이중화 방지)
-	TArray<EMTCatType> Candidates = RandomStartCats;
-	if (Candidates.Num() == 0)
-	{
-		CatPawnClasses.GetKeys(Candidates);
-	}
-	Candidates.Remove(EMTCatType::None);
-
-	return Candidates.Num() > 0
-		? Candidates[FMath::RandRange(0, Candidates.Num() - 1)]
-		: EMTCatType::None;
 }
 
 void AMTLobbyGameMode::RespawnLobbyPawn(AController* C)
@@ -250,13 +206,6 @@ void AMTLobbyGameMode::SetupLobbyPlayer(AController* C)
 		MTPS->SetPlayerSlot(AcquireSlot());
 	}
 
-	// 미선택이면 무작위 고양이 확정 — "0번 펀치 = 고정 고양이" 특정을 막고,
-	// None인 채로 매치에 가면 매치의 DefaultPawnClass로 갈리는 것도 함께 방지한다.
-	if (MTPS->GetSelectedCat() == EMTCatType::None)
-	{
-		MTPS->SetSelectedCat(PickRandomStartCat());
-	}
-
 	// 팀색은 로비에서 슬롯 기준으로 확정 → CopyProperties로 매치까지 운반
 	const int32 Slot = MTPS->GetPlayerSlot();
 	if (TeamColors.IsValidIndex(Slot))
@@ -358,7 +307,7 @@ void AMTLobbyGameMode::TickCountdown()
 FString AMTLobbyGameMode::ResolveMatchMapPath() const
 {
 	const AMTLobbyGameState* GS = GetGameState<AMTLobbyGameState>();
-	const EMTRoomMap Selected = GS ? GS->GetRoomMap() : EMTRoomMap::Insadong;
+	const EMTRoomMap Selected = GS ? GS->GetRoomMap() : EMTRoomMap::Park;
 
 	TSoftObjectPtr<UWorld> Map;
 	if (Selected == EMTRoomMap::Random)

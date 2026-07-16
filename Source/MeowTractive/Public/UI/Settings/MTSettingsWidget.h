@@ -77,6 +77,10 @@ class MEOWTRACTIVE_API UMTSettingsWidget : public UUserWidget
 {
 	GENERATED_BODY()
 
+public:
+	// 설정 창이 닫힐 때(버튼/ESC 공통) 방송 — 여는 쪽이 자기 UI 복원에 사용
+	FSimpleMulticastDelegate OnClosed;
+
 protected:
 	virtual void NativeConstruct() override;
 

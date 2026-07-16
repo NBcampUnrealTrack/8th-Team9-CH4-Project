@@ -29,7 +29,7 @@ protected:
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UCommonTextBlock> ServerText;
 
-	// 인원("3/8") 또는 비공개 방이면 "?"
+	// 인원("3/4") 또는 비공개 방이면 "?"
 	UPROPERTY(meta = (BindWidget))
 	TObjectPtr<UCommonTextBlock> StateText;
 
