@@ -37,6 +37,26 @@ void UGA_PurrAura::ActivateAbility(
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+	
+	//게임플레이 큐 등록
+	AActor* Avatar = GetAvatarActorFromActorInfo();
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	if (Avatar && ASC)
+	{
+		ActiveGameplayCueTag = GameplayCueTag.IsValid()
+			? GameplayCueTag
+			: FGameplayTag::RequestGameplayTag(
+				bRootSelf ? TEXT("GameplayCue.Cat.LieDown") : TEXT("GameplayCue.Cat.Purr"));
+
+		FGameplayCueParameters CueParams;
+		CueParams.Location = Avatar->GetActorLocation();
+		CueParams.RawMagnitude = Radius;
+		CueParams.NormalizedMagnitude = TickInterval;
+		CueParams.Instigator = Avatar;
+		CueParams.EffectCauser = Avatar;
+		CueParams.SourceObject = Avatar;
+		ASC->AddGameplayCue(ActiveGameplayCueTag, CueParams);
+	}
 
 	// 시전 애니메이션 (BP별 몽타주). LocalPredicted → 소유 클라 예측 재생 + 타 클라 복제. 채널 종료/취소 시 자동 정지.
 	if (CastMontage)
@@ -72,6 +92,7 @@ void UGA_PurrAura::ActivateAbility(
 	Wait->ReadyForActivation();
 }
 
+//골골대기 틱 함수
 void UGA_PurrAura::DoAuraTick()
 {
 	AActor* Avatar = GetAvatarActorFromActorInfo();
@@ -257,6 +278,14 @@ void UGA_PurrAura::EndAbility(
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(TickTimerHandle);
+	}
+	if (ActiveGameplayCueTag.IsValid())
+	{
+		if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+		{
+			ASC->RemoveGameplayCue(ActiveGameplayCueTag);
+		}
+		ActiveGameplayCueTag = FGameplayTag();
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
