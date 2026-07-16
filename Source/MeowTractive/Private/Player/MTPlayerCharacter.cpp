@@ -497,6 +497,7 @@ void AMTPlayerCharacter::StopJump()
 	}
 }
 
+//착지 SFX 및 VFX
 void AMTPlayerCharacter::Landed(const FHitResult& Hit)
 {
 	Super::Landed(Hit);
@@ -504,6 +505,20 @@ void AMTPlayerCharacter::Landed(const FHitResult& Hit)
 	if (LandingSound)
 	{
 		UGameplayStatics::PlaySoundAtLocation(this, LandingSound, GetActorLocation());
+	}
+
+	if (LandingNiagaraSystem)
+	{
+		UNiagaraFunctionLibrary::SpawnSystemAtLocation(
+			GetWorld(),
+			LandingNiagaraSystem,
+			GetMovementEffectLocation(),
+			FRotator::ZeroRotator,
+			FVector::OneVector,
+			true,
+			true,
+			ENCPoolMethod::AutoRelease,
+			true);
 	}
 }
 
