@@ -135,7 +135,7 @@ void AMTPlayerHUD::ShowCountdownText(const FText& Text)
 			.VAlign(VAlign_Center)
 			[
 				SAssignNew(CountdownTextBlock, STextBlock)
-				.Font(FCoreStyle::GetDefaultFontStyle("Bold", 96))
+				.Font(MakeOverlayFont(96.f))
 				.ColorAndOpacity(FLinearColor::White)
 				.ShadowOffset(FVector2D(3.f, 3.f))
 				.ShadowColorAndOpacity(FLinearColor(0.f, 0.f, 0.f, 0.8f))
