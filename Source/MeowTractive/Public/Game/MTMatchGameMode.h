@@ -98,6 +98,10 @@ private:
 	// 컨트롤러의 MTPlayerState를 로딩 완료로 표시
 	void MarkLoaded(AController* C);
 
+	// 매치 시작 전(대기·카운트다운) 시야/이동 입력 잠금.
+	// 해제는 StartMatch의 폰 스폰 때 엔진이 ClientRestart에서 ResetIgnoreInputFlags로 처리한다.
+	void LockPreMatchInput(AController* C);
+
 	// 팀색 폴백 — 로비에서 배정돼 운반된 색은 유지, 로비 미경유(PIE 직접 진입)만 진입 순서로 배정.
 	void AssignTeamColor(AController* C);
 

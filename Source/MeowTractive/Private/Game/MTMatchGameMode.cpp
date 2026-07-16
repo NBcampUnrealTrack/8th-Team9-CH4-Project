@@ -63,6 +63,7 @@ void AMTMatchGameMode::PostLogin(APlayerController* NewPlayer)
     Super::PostLogin(NewPlayer);
     MarkLoaded(NewPlayer);
     AssignTeamColor(NewPlayer);     // 슬롯 기준 팀색 (직접 진입 시 폴백 포함)
+    LockPreMatchInput(NewPlayer);   // 대기·카운트다운 동안 시야 고정
     // PIE 직행 등 로비를 안 거친 접속 — Null OSS면 "Player N" (seamless는 로비 이름 유지)
     UMTOnlineUtils::ApplyFallbackPlayerName(NewPlayer ? NewPlayer->PlayerState : nullptr);
 
@@ -80,6 +81,7 @@ void AMTMatchGameMode::HandleSeamlessTravelPlayer(AController*& C)
 	Super::HandleSeamlessTravelPlayer(C);
 	MarkLoaded(C);                  // seamless travel 완료 = 새 맵 로딩 완료
 	AssignTeamColor(C);             // 로비에서 운반된 슬롯으로 팀색 결정
+	LockPreMatchInput(C);           // 대기·카운트다운 동안 시야 고정
 
 	if (MTLogEnabled())
 	{
@@ -203,6 +205,21 @@ void AMTMatchGameMode::MarkLoaded(AController* C)
 		{
 			MTPS->SetLoaded(true);
 		}
+	}
+}
+
+void AMTMatchGameMode::LockPreMatchInput(AController* C)
+{
+	// 대기·카운트다운 중엔 폰이 없어 컨트롤러가 직접 시야를 돌린다 → 서버가 소유 클라에 잠금 지시.
+	// StartMatch의 폰 스폰(ClientRestart)에서 엔진이 잠금을 초기화하므로 별도 해제는 불필요.
+	if (HasMatchStarted())
+	{
+		return;
+	}
+	if (APlayerController* PC = Cast<APlayerController>(C))
+	{
+		PC->ClientIgnoreLookInput(true);
+		PC->ClientIgnoreMoveInput(true);
 	}
 }
 
