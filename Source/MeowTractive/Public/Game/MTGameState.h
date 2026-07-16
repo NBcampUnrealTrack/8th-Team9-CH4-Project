@@ -79,6 +79,12 @@ public:
     UFUNCTION(BlueprintPure)
     TArray<FPlayerScore> GetSortedPlayerScores() const;
 
+	UPROPERTY(EditDefaultsOnly, Category = "SFX")
+	USoundBase* MatchResultSound;
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayMatchResultSFX();
+
 protected:
 	virtual void OnRep_MatchState() override;
 
