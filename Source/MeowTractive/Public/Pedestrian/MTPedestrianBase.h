@@ -135,7 +135,7 @@ protected:
 	TObjectPtr<UWidgetComponent> AttractiveBarWidget;
 
 	UPROPERTY(EditAnywhere, Category = "Attractive|UI")
-	float AttractiveBarVisibleDistance = 1500.f;
+	float AttractiveBarVisibleDistance = 2000.f;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Appearance, VisibleInstanceOnly, Category = "Pedestrian")
 	FMTPedestrianAppearance Appearance;
