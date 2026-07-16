@@ -51,6 +51,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Cling")
 	TSubclassOf<UGameplayEffect> DamageEffect;
 
+	// 시전 사운드
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	USoundBase* ClingSound;
+
+	UPROPERTY()
+	UAudioComponent* ClingAudioComponent;
+
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Cling")
 	bool bDrawDebug = false;
 
