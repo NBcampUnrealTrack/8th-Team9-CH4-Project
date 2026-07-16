@@ -108,6 +108,16 @@ void UGA_Cling::ActivateAbility(
 		return;
 	}
 
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+	{
+		FGameplayCueParameters CueParams;
+		CueParams.Location = Character->GetActorLocation();
+		CueParams.Normal = Character->GetActorForwardVector();
+		CueParams.Instigator = Character;
+		CueParams.EffectCauser = Character;
+		ASC->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag(TEXT("GameplayCue.Cat.Cling.Cast")), CueParams);
+	}
+
 	TargetCat = Target;
 
 	// 대상에게 도약 (도착 정확도는 Attach가 보정하므로 시전 시점 방향으로 충분)
@@ -164,6 +174,16 @@ void UGA_Cling::BeginCling(AActor* Target)
 	Character->SetActorEnableCollision(false);
 	Character->AttachToActor(Target, FAttachmentTransformRules::KeepWorldTransform);
 	bClinging = true;
+
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+	{
+		FGameplayCueParameters CueParams;
+		CueParams.Location = Target->GetActorLocation();
+		CueParams.Normal = (Target->GetActorLocation() - Character->GetActorLocation()).GetSafeNormal();
+		CueParams.Instigator = Character;
+		CueParams.EffectCauser = Character;
+		ASC->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag(TEXT("GameplayCue.Cat.Cling.Impact")), CueParams);
+	}
 }
 
 void UGA_Cling::ReleaseCling()
