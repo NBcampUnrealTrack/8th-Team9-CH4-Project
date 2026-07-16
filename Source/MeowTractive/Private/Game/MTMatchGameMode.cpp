@@ -116,6 +116,8 @@ void AMTMatchGameMode::HandleMatchHasEnded()
         }
     }
 
+	GS->Multicast_PlayMatchResultSFX();
+
     // 결과 화면 표시 후 자동 복귀 (버튼 미입력 대비 타임아웃)
     GetWorldTimerManager().SetTimer(LobbyTimer, this, &AMTMatchGameMode::ReturnToLobby, ResultScreenDuration, false);
 }
@@ -179,7 +181,7 @@ void AMTMatchGameMode::SpawnInitialPedestrians()
         FVector PivotLocation = StreetPoints[RandomIdx]->GetActorLocation();
 
         FNavLocation RandomNavLocation;
-        
+
 		// 대로 포인트 주변 설정 반경 안에서 내비 바닥 찾기
 		bool bProjectSuccess = NavSys->GetRandomReachablePointInRadius(PivotLocation, PedestrianSpawnRadius, RandomNavLocation);
 

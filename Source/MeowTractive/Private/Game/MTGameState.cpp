@@ -6,7 +6,13 @@
 #include "Game/MTLog.h" // 로그
 #include "Pedestrian/MTAttractiveComponent.h"
 #include "Item/MTItemData.h"
+#include "Kismet/GameplayStatics.h"
 #include "Pedestrian/MTPedestrianBase.h"
+
+void AMTGameState::Multicast_PlayMatchResultSFX_Implementation()
+{
+	UGameplayStatics::PlaySound2D(this, MatchResultSound);
+}
 
 void AMTGameState::OnRep_MatchState()
 {
