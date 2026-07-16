@@ -110,10 +110,11 @@ void UGA_PurrAura::DoAuraTick()
 	const FGameplayTag DurationTag = FGameplayTag::RequestGameplayTag(FName("Data.Duration"));
 	const FGameplayTag SlowMultTag = FGameplayTag::RequestGameplayTag(FName("Data.SlowMult"));
 
+	TSet<AActor*> Processed; // 캡슐/메시 다중 오버랩 중복 방지 (틱당 대상 1회)
 	for (const FOverlapResult& O : Overlaps)
 	{
 		AActor* Target = O.GetActor();
-		if (!Target || !AMTPlayerCharacter::IsEnemyCat(Avatar, Target))
+		if (!Target || Processed.Contains(Target) || !AMTPlayerCharacter::IsEnemyCat(Avatar, Target))
 		{
 			continue;
 		}
@@ -130,6 +131,7 @@ void UGA_PurrAura::DoAuraTick()
 		{
 			continue;
 		}
+		Processed.Add(Target);
 
 		if (DamageEffect && TickDamage > 0.f)
 		{

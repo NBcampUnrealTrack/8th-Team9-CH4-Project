@@ -1,8 +1,11 @@
 ﻿#include "UI/MainMenu/MTMenuWidget.h"
 #include "Game/MTGameInstance.h"
 #include "Game/MTLog.h"
+#include "Online/MTSessionData.h"
+#include "UI/MainMenu/MTPasswordDialog.h"
 #include "UI/Settings/MTSettingsWidget.h"
 #include "CommonButtonBase.h"
+#include "CommonListView.h"
 #include "Components/Widget.h"
 #include "Components/TextBlock.h"
 #include "TimerManager.h"
@@ -61,6 +64,10 @@ void UMTMenuWidget::NativeConstruct()
 	{
 		Mt_MainSetting->OnClicked().AddUObject(this, &UMTMenuWidget::OpenSettings);
 	}
+	if (MT_SessionSearch)
+	{
+		MT_SessionSearch->OnClicked().AddUObject(this, &UMTMenuWidget::OpenSearchDialog);
+	}
 }
 
 void UMTMenuWidget::NativeDestruct()
@@ -68,6 +75,10 @@ void UMTMenuWidget::NativeDestruct()
 	if (Mt_MainSetting)
 	{
 		Mt_MainSetting->OnClicked().RemoveAll(this);
+	}
+	if (MT_SessionSearch)
+	{
+		MT_SessionSearch->OnClicked().RemoveAll(this);
 	}
 	if (GameFlow)
 	{
@@ -91,6 +102,88 @@ void UMTMenuWidget::OpenSettings()
 	{
 		Settings->AddToViewport(60);
 		Settings->SetUserFocus(GetOwningPlayer());   // ESC 닫기 수신
+	}
+}
+
+UMTPasswordDialog* UMTMenuWidget::OpenJoinDialog()
+{
+	if (!PasswordDialogClass)
+	{
+		MTMenuScreen(FColor::Yellow, TEXT("[MTMenu] PasswordDialogClass 미지정 → 입력 팝업 열기 불가"));
+		return nullptr;
+	}
+	UMTPasswordDialog* Dialog = CreateWidget<UMTPasswordDialog>(GetOwningPlayer(), PasswordDialogClass);
+	if (!Dialog)
+	{
+		return nullptr;
+	}
+	Dialog->AddToViewport(60);
+	Dialog->ActivateWidget();
+	return Dialog;
+}
+
+void UMTMenuWidget::OpenSearchDialog()
+{
+	if (UMTPasswordDialog* Dialog = OpenJoinDialog())
+	{
+		Dialog->SetupForSearch();
+		Dialog->OnSubmitted.AddDynamic(this, &UMTMenuWidget::HandleSearchSubmitted);
+	}
+}
+
+void UMTMenuWidget::JoinSelectedSession()
+{
+	UObject* Selected = SessionList ? SessionList->GetSelectedItem() : nullptr;
+	if (!Selected)
+	{
+		if (GameFlow)
+		{
+			GameFlow->NotifyJoinFailed(FText::FromString(TEXT("참가할 방을 선택해 주세요.")));
+		}
+		return;
+	}
+	JoinSessionItem(Selected);
+}
+
+void UMTMenuWidget::JoinSessionItem(UObject* Item)
+{
+	UMTSessionData* Data = Cast<UMTSessionData>(Item);
+	if (!Data || !GameFlow)
+	{
+		return;
+	}
+
+	// 비밀번호 방은 입력 팝업을 먼저 (확인 시 HandlePasswordSubmitted에서 참가)
+	if (Data->bHasPassword)
+	{
+		if (UMTPasswordDialog* Dialog = OpenJoinDialog())
+		{
+			PendingJoinData = Data;
+			Dialog->SetupForPassword(Data->ServerName);
+			Dialog->OnSubmitted.AddDynamic(this, &UMTMenuWidget::HandlePasswordSubmitted);
+		}
+		return;
+	}
+
+	GameFlow->JoinSessionData(Data, FString());
+}
+
+void UMTMenuWidget::HandleSearchSubmitted(const FString& RoomName, const FString& Password)
+{
+	if (GameFlow)
+	{
+		GameFlow->JoinSessionByName(RoomName, Password);   // 이름 검색 → 비번 검증도 Flow가 수행
+	}
+}
+
+void UMTMenuWidget::HandlePasswordSubmitted(const FString& RoomName, const FString& Password)
+{
+	// 팝업 대상은 1회 소비 (틀리면 Flow가 OnJoinFailed로 안내)
+	UMTSessionData* Data = PendingJoinData;
+	PendingJoinData = nullptr;
+	if (GameFlow && Data)
+	{
+		GameFlow->JoinSessionData(Data, Password);
 	}
 }
 

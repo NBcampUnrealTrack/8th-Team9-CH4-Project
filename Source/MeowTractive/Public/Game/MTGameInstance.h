@@ -52,6 +52,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
 	void JoinSessionByName(const FString& RoomName, const FString& Password);
 
+	// 참가 실패 안내 방송 — UI가 자체 검증(미선택 등) 실패를 같은 표시 경로로 보낼 때 사용
+	UFUNCTION(BlueprintCallable, Category = "MT|Flow")
+	void NotifyJoinFailed(const FText& Reason) { OnJoinFailed.Broadcast(Reason); }
+
 	// 현재 방 설정 (호스트 로컬 기준. 로비 표시는 MTLobbyGameState 복제값 사용)
 	UFUNCTION(BlueprintPure, Category = "MT|Flow")
 	FMTRoomSettings GetRoomSettings() const { return CurrentRoomSettings; }

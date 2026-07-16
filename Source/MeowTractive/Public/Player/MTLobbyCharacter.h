@@ -28,6 +28,12 @@ public:
 	// 서버: 펀치 히트 → (소유자 검증) 다음 BP 스폰 + 선택 갱신 + 자기 파괴
 	virtual void OnPunchSelect(AActor* InstigatorPawn) override;
 
+	// 서버: 사이클을 Steps번 진행한 조형물로 교체 (시작 고양이 무작위화). 마지막 조형물 반환.
+	AMTLobbyCharacter* AdvanceCycle(int32 Steps);
+
+	// NextCatActorClass 체인이 처음으로 돌아올 때까지의 길이 (고양이 종류 수). CDO만 훑어 스폰 없음.
+	int32 GetCycleLength() const;
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
@@ -50,6 +56,9 @@ protected:
 	// "C키로 선택" 프롬프트 (WidgetClass는 BP에서 지정)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MT|Lobby")
 	TObjectPtr<UWidgetComponent> PromptWidget;
+
+	// 다음 고양이 조형물 스폰 (슬롯 승계). 실패 시 nullptr — 호출자는 자기 파괴를 보류한다.
+	AMTLobbyCharacter* SpawnNextCat();
 
 private:
 	FTimerHandle VisibilityTimer;   // 로컬 슬롯/복제 지연 대비 주기 재평가

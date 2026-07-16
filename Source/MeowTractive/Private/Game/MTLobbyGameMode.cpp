@@ -5,6 +5,7 @@
 #include "Online/MTOnlineUtils.h"
 #include "Player/MTPlayerState.h"
 #include "Player/MTPlayerController.h"
+#include "Player/MTLobbyCharacter.h"
 #include "UI/Lobby/MTLobbyHUD.h"
 #include "GameFramework/GameStateBase.h"
 #include "GameFramework/GameSession.h"
@@ -50,6 +51,52 @@ void AMTLobbyGameMode::BeginPlay()
 	{
 		Sessions->SetSessionJoinable(true);
 	}
+
+	ShuffleLobbyStatues();   // 플레이어 입장 전에 조형물 시작점 섞기
+}
+
+void AMTLobbyGameMode::ShuffleLobbyStatues()
+{
+	UWorld* World = GetWorld();
+	if (!HasAuthority() || !World)
+	{
+		return;
+	}
+
+	// 순회 중 스폰/파괴가 일어나므로 대상을 먼저 수집
+	TArray<AMTLobbyCharacter*> Statues;
+	for (TActorIterator<AMTLobbyCharacter> It(World); It; ++It)
+	{
+		Statues.Add(*It);
+	}
+
+	for (AMTLobbyCharacter* Statue : Statues)
+	{
+		if (!IsValid(Statue))
+		{
+			continue;
+		}
+		const int32 CycleLength = Statue->GetCycleLength();
+		if (CycleLength > 1)
+		{
+			Statue->AdvanceCycle(FMath::RandRange(0, CycleLength - 1));
+		}
+	}
+}
+
+EMTCatType AMTLobbyGameMode::PickRandomStartCat() const
+{
+	// 후보 미지정이면 폰 매핑이 있는 고양이들에서 뽑는다 (설정 이중화 방지)
+	TArray<EMTCatType> Candidates = RandomStartCats;
+	if (Candidates.Num() == 0)
+	{
+		CatPawnClasses.GetKeys(Candidates);
+	}
+	Candidates.Remove(EMTCatType::None);
+
+	return Candidates.Num() > 0
+		? Candidates[FMath::RandRange(0, Candidates.Num() - 1)]
+		: EMTCatType::None;
 }
 
 void AMTLobbyGameMode::RespawnLobbyPawn(AController* C)
@@ -172,16 +219,11 @@ void AMTLobbyGameMode::KickPlayer(AController* Requestor, APlayerState* Target)
 	// 슬롯 반환은 Logout에서 처리됨
 }
 
-void AMTLobbyGameMode::PostLogin(APlayerController* NewPlayer)
+void AMTLobbyGameMode::HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer)
 {
-	Super::PostLogin(NewPlayer);
-	SetupLobbyPlayer(NewPlayer);   // 신규 접속(세션 참가)
-}
-
-void AMTLobbyGameMode::HandleSeamlessTravelPlayer(AController*& C)
-{
-	Super::HandleSeamlessTravelPlayer(C);
-	SetupLobbyPlayer(C);           // 매치→로비 복귀: 슬롯 그대로 재사용
+	// 폰 스폰(Super)보다 먼저 슬롯·고양이 확정 — 스폰 위치와 폰 클래스가 이 값들로 결정된다
+	SetupLobbyPlayer(NewPlayer);
+	Super::HandleStartingNewPlayer_Implementation(NewPlayer);
 }
 
 void AMTLobbyGameMode::SetupLobbyPlayer(AController* C)
@@ -206,6 +248,13 @@ void AMTLobbyGameMode::SetupLobbyPlayer(AController* C)
 	else
 	{
 		MTPS->SetPlayerSlot(AcquireSlot());
+	}
+
+	// 미선택이면 무작위 고양이 확정 — "0번 펀치 = 고정 고양이" 특정을 막고,
+	// None인 채로 매치에 가면 매치의 DefaultPawnClass로 갈리는 것도 함께 방지한다.
+	if (MTPS->GetSelectedCat() == EMTCatType::None)
+	{
+		MTPS->SetSelectedCat(PickRandomStartCat());
 	}
 
 	// 팀색은 로비에서 슬롯 기준으로 확정 → CopyProperties로 매치까지 운반

@@ -17,7 +17,9 @@
 #include "NiagaraComponent.h"
 #include "NiagaraFunctionLibrary.h"
 #include "Kismet/GameplayStatics.h"
+#include "Materials/MaterialInterface.h"
 #include "Net/UnrealNetwork.h"
+#include "UObject/ConstructorHelpers.h"
 
 AMTPlayerCharacter::AMTPlayerCharacter()
 {
@@ -53,6 +55,14 @@ AMTPlayerCharacter::AMTPlayerCharacter()
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Full);
 
 	AttributeSet = CreateDefaultSubobject<UMTPlayerAttributeSet>(TEXT("AttributeSetBase"));
+
+	// 로비 실루엣용 (BP_MTPlayerCharacter 상속 → 전 고양이 공통). BP에서 교체 가능.
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> DisguiseMat(
+		TEXT("/Game/Cat_Simple/Cat/Materials/M_CatSimple_C1"));
+	if (DisguiseMat.Succeeded())
+	{
+		LobbyDisguiseMaterial = DisguiseMat.Object;
+	}
 }
 
 void AMTPlayerCharacter::BeginPlay()
@@ -82,7 +92,7 @@ void AMTPlayerCharacter::BeginPlay()
 
 	// 클라는 보통 여기서 적용됨. 호스트(seamless)는 아직 미possess라 NotifyControllerChanged에서 적용.
 	ApplyLocalInputMode();
-	UpdateLobbyVisibility();   // 로비 개인화 가시성 (매치선 무효)
+	ApplyLobbyDisguise();   // 로비: 남의 폰 실루엣 처리 (매치선 무효)
 
 	if (MTLogEnabled())
 	{
@@ -162,14 +172,17 @@ void AMTPlayerCharacter::PossessedBy(AController* NewController)
 			Cat = DefaultCatType; // 로비 선택 없을 때 폴백
 		}
 
+		// 로비에선 Q/E 액티브 스킬 미부여 (이동·펀치로 조작만 연습). 패시브는 그대로.
+		const bool bInLobby = GetWorld() && GetWorld()->GetGameState<AMTLobbyGameState>();
+
 		if (const FMTCatAbilitySet* Set = CatAbilities.Find(Cat))
 		{
-			if (Set->SkillA)
+			if (Set->SkillA && !bInLobby)
 			{
 				AbilitySystemComponent->GiveAbility(
 					FGameplayAbilitySpec(Set->SkillA, 1, (int32)EMTAbilitySlot::SkillA, this));
 			}
-			if (Set->SkillB)
+			if (Set->SkillB && !bInLobby)
 			{
 				AbilitySystemComponent->GiveAbility(
 					FGameplayAbilitySpec(Set->SkillB, 1, (int32)EMTAbilitySlot::SkillB, this));
@@ -235,23 +248,30 @@ void AMTPlayerCharacter::NotifyControllerChanged()
 
 	// possession 직후 — 호스트(seamless travel)는 여기서 게임 입력모드 확정
 	ApplyLocalInputMode();
-	UpdateLobbyVisibility();   // possession 확정 후 내 폰 표시 복원
+	ApplyLobbyDisguise();   // possession 확정 후 내/남 폰 판정 재적용
 }
 
-void AMTPlayerCharacter::UpdateLobbyVisibility()
+void AMTPlayerCharacter::ApplyLobbyDisguise()
 {
-	// 로비에서만: 내 폰만 보이고 남 폰은 숨김. 매치에선 전원 표시(무효).
+	// 로비에서만: 남의 폰을 실루엣 머티리얼로 덮어 선택 고양이를 감춘다. 매치에선 원래 외형(무효).
 	UWorld* World = GetWorld();
 	if (!World || !World->GetGameState<AMTLobbyGameState>())
 	{
 		return;
 	}
-	const bool bMine = IsLocallyControlled();
-	SetActorHiddenInGame(!bMine);
-	// 서버는 펀치/판정 위해 충돌 유지. 순수 클라만 남 폰 충돌 해제(부딪힘 방지).
-	if (!HasAuthority())
+	if (IsLocallyControlled() || !LobbyDisguiseMaterial)
 	{
-		SetActorEnableCollision(bMine);
+		return;   // 내 폰은 선택한 고양이 그대로
+	}
+
+	// 세 고양이가 메시를 공유하므로 머티리얼만 덮으면 종류가 드러나지 않는다
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	{
+		const int32 NumMaterials = MeshComp->GetNumMaterials();
+		for (int32 i = 0; i < NumMaterials; ++i)
+		{
+			MeshComp->SetMaterial(i, LobbyDisguiseMaterial);
+		}
 	}
 }
 

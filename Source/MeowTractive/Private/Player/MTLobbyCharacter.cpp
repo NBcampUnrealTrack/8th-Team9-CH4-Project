@@ -96,24 +96,69 @@ void AMTLobbyCharacter::OnPunchSelect(AActor* InstigatorPawn)
 		return;
 	}
 
-	if (!NextCatActorClass)
-	{
-		return;
-	}
-
 	// 다음 조형물 스폰 (같은 위치, 슬롯 승계). 실패 시 자기 유지.
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AMTLobbyCharacter* NextActor = World->SpawnActor<AMTLobbyCharacter>(
-		NextCatActorClass, GetActorTransform(), Params);
-	if (!NextActor)
+	if (!SpawnNextCat())
 	{
 		return;
 	}
-	NextActor->OwnerSlot = OwnerSlot;
 
 	// 때린 순간 보이던 고양이(이 조형물)를 선택 (준비 검증·로비 폰 재스폰은 컨트롤러가 처리)
 	PC->Server_SetSelectedCat(RepresentedCat);
 
 	Destroy();
+}
+
+AMTLobbyCharacter* AMTLobbyCharacter::SpawnNextCat()
+{
+	UWorld* World = GetWorld();
+	if (!World || !NextCatActorClass)
+	{
+		return nullptr;
+	}
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AMTLobbyCharacter* NextActor = World->SpawnActor<AMTLobbyCharacter>(
+		NextCatActorClass, GetActorTransform(), Params);
+	if (NextActor)
+	{
+		NextActor->OwnerSlot = OwnerSlot;
+	}
+	return NextActor;
+}
+
+int32 AMTLobbyCharacter::GetCycleLength() const
+{
+	// 체인이 자기 클래스로 돌아오면 한 바퀴. 끊겨 있으면 거기까지가 길이.
+	const UClass* const StartClass = GetClass();
+	int32 Length = 1;
+	TSubclassOf<AMTLobbyCharacter> Next = NextCatActorClass;
+
+	while (Next && Next.Get() != StartClass && Length < 16)   // 16 = 체인 오설정 시 무한루프 방지
+	{
+		++Length;
+		Next = Next.GetDefaultObject()->NextCatActorClass;
+	}
+	return Length;
+}
+
+AMTLobbyCharacter* AMTLobbyCharacter::AdvanceCycle(int32 Steps)
+{
+	if (!HasAuthority())
+	{
+		return this;
+	}
+
+	AMTLobbyCharacter* Current = this;
+	for (int32 i = 0; i < Steps; ++i)
+	{
+		AMTLobbyCharacter* Next = Current->SpawnNextCat();
+		if (!Next)
+		{
+			break;   // 체인 오설정 — 현재 조형물 유지
+		}
+		Current->Destroy();
+		Current = Next;
+	}
+	return Current;
 }

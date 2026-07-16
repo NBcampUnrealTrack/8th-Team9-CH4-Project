@@ -14,6 +14,7 @@ class UInputMappingContext;
 class UInputAction;
 class UNiagaraComponent;
 class UNiagaraSystem;
+class UMaterialInterface;
 struct FInputActionValue;
 
 // 어빌리티 입력 슬롯 (FGameplayAbilitySpec.InputID). 고양이별로 다른 스킬이 같은 슬롯에 매핑됨.
@@ -115,8 +116,12 @@ protected:
 	// 스턴 중이면 스킬/이동 입력 무시
 	bool IsStunned() const;
 
-	// 로비에서만 개인화: 내 폰만 표시(파생 조형물은 소유 슬롯 기준으로 override). 매치에선 무효.
-	virtual void UpdateLobbyVisibility();
+	// 로비에서만: 남의 폰을 실루엣 머티리얼로 덮어 선택 고양이를 감춘다 (카운터픽 방지). 매치에선 무효.
+	virtual void ApplyLobbyDisguise();
+
+	// 로비에서 남의 폰에 덮어씌울 머티리얼. 세 고양이가 메시를 공유하므로 이것만으로 선택이 가려진다.
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MT|Lobby")
+	TObjectPtr<UMaterialInterface> LobbyDisguiseMaterial;
 
 	// 사망 애니메이션
 	UPROPERTY(EditDefaultsOnly, Category = "Die")

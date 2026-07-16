@@ -14,10 +14,11 @@ public:
 	AMTLobbyGameMode();
 
 	virtual void BeginPlay() override;
-	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
-	// 매치→로비 복귀(seamless travel) 시에도 슬롯 셋업
-	virtual void HandleSeamlessTravelPlayer(AController*& C) override;
+
+	// 폰 스폰 직전 훅 — 신규 접속·매치 복귀(seamless) 양쪽이 여기로 모인다.
+	// 슬롯/고양이가 정해진 뒤에 스폰돼야 하므로 Super보다 먼저 셋업한다.
+	virtual void HandleStartingNewPlayer_Implementation(APlayerController* NewPlayer) override;
 
 	// 전원(호스트 포함) 준비 완료 + 최소 2명
 	bool CanStartMatch() const;
@@ -31,6 +32,11 @@ public:
 	// 선택 고양이별 조종 폰 (BP_Fatty/Spotted/Mackerel — 인게임과 동일). 없으면 DefaultPawnClass.
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Lobby")
 	TMap<EMTCatType, TSubclassOf<APawn>> CatPawnClasses;
+
+	// 무작위 초기 선택 후보 — 미선택 플레이어에게 이 중 하나를 배정한다.
+	// 고정값이면 "0번 펀치 = 그 고양이"로 특정되므로 랜덤. 비면 CatPawnClasses 키에서 뽑는다.
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Lobby")
+	TArray<EMTCatType> RandomStartCats;
 
 	// 슬롯별 팀색 (인덱스 = PlayerSlot). 빨·파·초·노 순 — CopyProperties로 매치까지 운반됨
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Lobby")
@@ -66,6 +72,12 @@ protected:
 private:
 	// 슬롯 배정/재사용 + 팀색 설정 (PostLogin·SeamlessTravel 공통)
 	void SetupLobbyPlayer(AController* C);
+
+	// 배치된 조형물들의 시작 고양이를 슬롯별로 무작위화 — 펀치 횟수로 선택을 유추하지 못하게
+	void ShuffleLobbyStatues();
+
+	// 무작위 시작 고양이 1개 (후보 없으면 None)
+	EMTCatType PickRandomStartCat() const;
 
 	// 방 설정에서 매치 맵 경로 결정 (Random이면 테이블에서 무작위)
 	FString ResolveMatchMapPath() const;
