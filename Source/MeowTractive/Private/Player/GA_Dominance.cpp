@@ -50,6 +50,16 @@ void UGA_Dominance::ActivateAbility(
 		return;
 	}
 
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+	{
+		FGameplayCueParameters CueParams;
+		CueParams.Location = Character->GetActorLocation();
+		CueParams.Normal = Character->GetActorForwardVector();
+		CueParams.Instigator = Character;
+		CueParams.EffectCauser = Character;
+		ASC->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag(TEXT("GameplayCue.Cat.Dominance.Cast")), CueParams);
+	}
+
 	// 전방 돌진 (타겟 없이 발동 — 명중 판정은 돌진 중 CheckDashHit)
 	UAbilityTask_ApplyRootMotionConstantForce* Lunge =
 		UAbilityTask_ApplyRootMotionConstantForce::ApplyRootMotionConstantForce(
@@ -127,6 +137,13 @@ void UGA_Dominance::CheckDashHit()
 		{
 			continue;
 		}
+
+		FGameplayCueParameters CueParams;
+		CueParams.Location = Target->GetActorLocation();
+		CueParams.Normal = (Target->GetActorLocation() - Avatar->GetActorLocation()).GetSafeNormal();
+		CueParams.Instigator = Avatar;
+		CueParams.EffectCauser = Avatar;
+		SourceASC->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag(TEXT("GameplayCue.Cat.Dominance.Impact")), CueParams);
 
 		// 처형 판정: 피해 직전 체력이 처형선 이하면 즉사 피해
 		const float TargetHp = TargetASC->GetNumericAttribute(UMTPlayerAttributeSet::GetHpAttribute());
