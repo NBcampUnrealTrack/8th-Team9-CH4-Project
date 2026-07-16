@@ -1,6 +1,7 @@
 #include "UI/InGame/MTSkillSlotWidget.h"
 #include "AbilitySystemComponent.h"
 #include "Player/MTGameplayAbility.h"
+#include "Player/GA_Dash.h"
 #include "Player/MTPlayerCharacter.h"
 #include "Player/MTPlayerAttributeSet.h"
 #include "Components/Image.h"
@@ -24,6 +25,7 @@ void UMTSkillSlotWidget::BindAbilityByTag(UAbilitySystemComponent* InASC, FGamep
 	BoundASC = InASC;
 	AbilityTag = InAbilityTag;
 	SlotInputID = INDEX_NONE;
+	AbilityClass = nullptr;
 	bDashSlot = false;
 	SpecHandle = FGameplayAbilitySpecHandle();
 }
@@ -33,6 +35,17 @@ void UMTSkillSlotWidget::BindAbilityBySlot(UAbilitySystemComponent* InASC, int32
 	BoundASC = InASC;
 	AbilityTag = FGameplayTag();
 	SlotInputID = InInputID;
+	AbilityClass = nullptr;
+	bDashSlot = false;
+	SpecHandle = FGameplayAbilitySpecHandle();
+}
+
+void UMTSkillSlotWidget::BindAbilityByClass(UAbilitySystemComponent* InASC, TSubclassOf<UGameplayAbility> InAbilityClass)
+{
+	BoundASC = InASC;
+	AbilityTag = FGameplayTag();
+	SlotInputID = INDEX_NONE;
+	AbilityClass = InAbilityClass;
 	bDashSlot = false;
 	SpecHandle = FGameplayAbilitySpecHandle();
 }
@@ -41,6 +54,7 @@ void UMTSkillSlotWidget::BindDash(AMTPlayerCharacter* InCharacter)
 {
 	DashCharacter = InCharacter;
 	BoundASC = InCharacter ? InCharacter->GetAbilitySystemComponent() : nullptr;
+	AbilityClass = UGA_Dash::StaticClass();   // 아이콘은 대시 어빌리티에서 해석
 	bDashSlot = true;
 	SpecHandle = FGameplayAbilitySpecHandle();
 }
@@ -61,15 +75,16 @@ void UMTSkillSlotWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 {
 	Super::NativeTick(MyGeometry, InDeltaTime);
 
+	// 스펙 복제 지연 대비 — 아이콘 해석 전까지 재시도 (대시도 아이콘 위해 스펙 해석)
+	if (!SpecHandle.IsValid())
+	{
+		ResolveAbilitySpec();
+	}
+
 	if (bDashSlot)
 	{
 		UpdateDashSlot();
 		return;
-	}
-
-	if (!SpecHandle.IsValid())
-	{
-		ResolveAbilitySpec();
 	}
 	UpdateAbilityCooldown();
 }
@@ -88,9 +103,19 @@ void UMTSkillSlotWidget::ResolveAbilitySpec()
 		{
 			continue;
 		}
-		const bool bMatch = (SlotInputID != INDEX_NONE)
-			? (Spec.InputID == SlotInputID)
-			: (AbilityTag.IsValid() && Spec.Ability->GetAssetTags().HasTagExact(AbilityTag));
+		bool bMatch = false;
+		if (SlotInputID != INDEX_NONE)
+		{
+			bMatch = (Spec.InputID == SlotInputID);
+		}
+		else if (AbilityTag.IsValid())
+		{
+			bMatch = Spec.Ability->GetAssetTags().HasTagExact(AbilityTag);
+		}
+		else if (AbilityClass)
+		{
+			bMatch = Spec.Ability->IsA(AbilityClass);   // 패시브·대시: 클래스 매칭
+		}
 		if (!bMatch)
 		{
 			continue;

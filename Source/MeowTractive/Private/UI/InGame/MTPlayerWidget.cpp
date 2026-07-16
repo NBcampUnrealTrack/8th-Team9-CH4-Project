@@ -89,9 +89,10 @@ void UMTPlayerWidget::TryBindCharacter()
 		.AddUObject(this, &UMTPlayerWidget::HandleHpChanged);
 
 	// 스킬 슬롯 연결 (스펙 복제 지연은 슬롯이 자체 재시도)
-	if (PunchSlot)
+	if (PassiveSlot)
 	{
-		PunchSlot->BindAbilityByTag(ASC, MTGameplayTags::Ability::TAG_Skill_Attack_MeowPunch);
+		// 선택 고양이의 패시브 아이콘 표시 (입력·쿨다운 없음)
+		PassiveSlot->BindAbilityByClass(ASC, Character->GetActivePassiveClass());
 	}
 	if (DashSlot)
 	{
@@ -139,7 +140,7 @@ void UMTPlayerWidget::RefreshAccentColor()
 	}
 	const FLinearColor MyColor = MyPS->GetTeamColor();
 
-	UMTSkillSlotWidget* Slots[] = { PunchSlot, DashSlot, SkillASlot, SkillBSlot };
+	UMTSkillSlotWidget* Slots[] = { PassiveSlot, DashSlot, SkillASlot, SkillBSlot };
 	for (UMTSkillSlotWidget* SkillSlot : Slots)
 	{
 		if (SkillSlot)

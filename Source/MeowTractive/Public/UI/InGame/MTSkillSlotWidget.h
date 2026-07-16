@@ -11,6 +11,7 @@ class UTextBlock;
 class UProgressBar;
 class UTexture2D;
 class UAbilitySystemComponent;
+class UGameplayAbility;
 class AMTPlayerCharacter;
 
 /** 스킬 슬롯: 아이콘 + 쿨다운(초/진행률) 표시. 대시 슬롯은 잔여 충전 수 + 재충전 진행 표시. */
@@ -26,7 +27,10 @@ public:
 	// 제네릭 슬롯(Q/E): 슬롯 InputID로 스펙 검색
 	void BindAbilityBySlot(UAbilitySystemComponent* InASC, int32 InInputID);
 
-	// 대시: 잔여 충전 수 + 재충전 진행 (캐릭터 복제값 기준)
+	// 패시브: 어빌리티 클래스로 스펙 검색 (입력·쿨다운 없음 → 정적 아이콘)
+	void BindAbilityByClass(UAbilitySystemComponent* InASC, TSubclassOf<UGameplayAbility> InAbilityClass);
+
+	// 대시: 잔여 충전 수 + 재충전 진행 (캐릭터 복제값 기준). 아이콘은 대시 어빌리티에서 해석.
 	void BindDash(AMTPlayerCharacter* InCharacter);
 
 	// 플레이어 색 강조 (쿨다운 바/카운트) — 매치가 부여한 TeamColor를 HUD가 전달
@@ -66,6 +70,7 @@ private:
 	TWeakObjectPtr<AMTPlayerCharacter> DashCharacter;
 	FGameplayTag AbilityTag;
 	int32 SlotInputID = INDEX_NONE;
+	TSubclassOf<UGameplayAbility> AbilityClass;   // 클래스 매칭용(패시브·대시)
 	FGameplayAbilitySpecHandle SpecHandle;
 	bool bDashSlot = false;
 };

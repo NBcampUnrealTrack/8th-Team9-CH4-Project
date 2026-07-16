@@ -58,9 +58,9 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> AttractedCountText;
 
-	// 우하단: 스킬 슬롯 (근접공격 / 대시 / Q / E)
+	// 우하단: 스킬 슬롯 (패시브 / 대시 / Q / E)
 	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UMTSkillSlotWidget> PunchSlot;
+	TObjectPtr<UMTSkillSlotWidget> PassiveSlot;
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UMTSkillSlotWidget> DashSlot;

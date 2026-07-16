@@ -1,14 +1,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Abilities/GameplayAbility.h"
+#include "Player/MTGameplayAbility.h"
 #include "GA_Dash.generated.h"
 
 class UGameplayEffect;
 class UAbilitySystemComponent;
 
 UCLASS()
-class MEOWTRACTIVE_API UGA_Dash : public UGameplayAbility
+class MEOWTRACTIVE_API UGA_Dash : public UMTGameplayAbility
 {
 	GENERATED_BODY()
 

@@ -72,6 +72,19 @@ void AMTPlayerCharacter::BeginPlay()
 	const bool bLocally = IsLocallyControlled();
 	APlayerController* PC = Cast<APlayerController>(GetController());
 
+	// 실루엣 복원용 원본 머티리얼 캐시 — 덮이기 전(BeginPlay 시작)에 1회 저장
+	if (OriginalMaterials.Num() == 0)
+	{
+		if (const USkeletalMeshComponent* MeshComp = GetMesh())
+		{
+			OriginalMaterials.Reset();
+			for (UMaterialInterface* Mat : MeshComp->GetMaterials())
+			{
+				OriginalMaterials.Add(Mat);
+			}
+		}
+	}
+
 	// 소유 클라 포함 모든 머신에서 ActorInfo 세팅 (LocalPredicted 어빌리티/속성·태그 복제 동작).
 	// 서버는 PossessedBy에서도 호출하지만 반복 호출 안전.
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
@@ -251,6 +264,33 @@ void AMTPlayerCharacter::NotifyControllerChanged()
 	ApplyLobbyDisguise();   // possession 확정 후 내/남 폰 판정 재적용
 }
 
+TSubclassOf<UGameplayAbility> AMTPlayerCharacter::GetActivePassiveClass() const
+{
+	// PossessedBy의 고양이 결정과 동일: 선택값 우선, 없으면 폴백
+	EMTCatType Cat = EMTCatType::None;
+	if (const AMTPlayerState* PS = GetPlayerState<AMTPlayerState>())
+	{
+		Cat = PS->GetSelectedCat();
+	}
+	if (Cat == EMTCatType::None)
+	{
+		Cat = DefaultCatType;
+	}
+
+	if (const FMTCatAbilitySet* Set = CatAbilities.Find(Cat))
+	{
+		// 대표 패시브 = 첫 유효 항목 (고양이당 1개 전제, 여러 개면 첫 번째)
+		for (const TSubclassOf<UGameplayAbility>& Passive : Set->Passives)
+		{
+			if (Passive)
+			{
+				return Passive;
+			}
+		}
+	}
+	return nullptr;
+}
+
 void AMTPlayerCharacter::ApplyLobbyDisguise()
 {
 	// 로비에서만: 남의 폰을 실루엣 머티리얼로 덮어 선택 고양이를 감춘다. 매치에선 원래 외형(무효).
@@ -259,19 +299,29 @@ void AMTPlayerCharacter::ApplyLobbyDisguise()
 	{
 		return;
 	}
-	if (IsLocallyControlled() || !LobbyDisguiseMaterial)
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (!MeshComp)
 	{
-		return;   // 내 폰은 선택한 고양이 그대로
+		return;
 	}
 
-	// 세 고양이가 메시를 공유하므로 머티리얼만 덮으면 종류가 드러나지 않는다
-	if (USkeletalMeshComponent* MeshComp = GetMesh())
+	// 소유 판정은 BeginPlay(호스트=미possess)와 possession 후에 뒤바뀔 수 있으므로 양방향 보정.
+	// 한 방향(덮기)만 하면 BeginPlay에서 자기 폰을 덮은 뒤 복원되지 않아 검게 굳는다.
+	if (IsLocallyControlled() || !LobbyDisguiseMaterial)
 	{
-		const int32 NumMaterials = MeshComp->GetNumMaterials();
-		for (int32 i = 0; i < NumMaterials; ++i)
+		// 내 폰: 원본 고양이로 복원 (덮였던 경우 되돌림)
+		for (int32 i = 0; i < OriginalMaterials.Num(); ++i)
 		{
-			MeshComp->SetMaterial(i, LobbyDisguiseMaterial);
+			MeshComp->SetMaterial(i, OriginalMaterials[i]);
 		}
+		return;
+	}
+
+	// 남의 폰: 실루엣으로 덮기 (세 고양이가 메시를 공유 → 종류 은폐)
+	const int32 NumMaterials = MeshComp->GetNumMaterials();
+	for (int32 i = 0; i < NumMaterials; ++i)
+	{
+		MeshComp->SetMaterial(i, LobbyDisguiseMaterial);
 	}
 }
 

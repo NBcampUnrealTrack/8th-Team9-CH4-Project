@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Abilities/GameplayAbility.h"
+#include "Player/MTGameplayAbility.h"
 #include "GameplayEffectTypes.h"
 #include "GA_SpottedPassive.generated.h"
 
@@ -9,7 +9,7 @@ class UGameplayEffect;
 
 /** 활발냥이(패시브): Grant 즉시 무한 GE로 MaxDashCharges +1, MaxHp -20. 현재 충전도 +1 보정. 서버 권위. */
 UCLASS()
-class MEOWTRACTIVE_API UGA_SpottedPassive : public UGameplayAbility
+class MEOWTRACTIVE_API UGA_SpottedPassive : public UMTGameplayAbility
 {
 	GENERATED_BODY()
 

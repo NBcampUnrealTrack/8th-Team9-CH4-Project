@@ -119,12 +119,16 @@ protected:
 	// 스턴 중이면 스킬/이동 입력 무시
 	bool IsStunned() const;
 
-	// 로비에서만: 남의 폰을 실루엣 머티리얼로 덮어 선택 고양이를 감춘다 (카운터픽 방지). 매치에선 무효.
+	// 로비에서만: 남의 폰은 실루엣, 내 폰은 원본. 소유 판정 확정마다(BeginPlay·possession) 재적용해 양방향 보정. 매치에선 무효.
 	virtual void ApplyLobbyDisguise();
 
 	// 로비에서 남의 폰에 덮어씌울 머티리얼. 세 고양이가 메시를 공유하므로 이것만으로 선택이 가려진다.
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "MT|Lobby")
 	TObjectPtr<UMaterialInterface> LobbyDisguiseMaterial;
+
+	// 실루엣 복원용 원본 머티리얼 캐시 (BeginPlay에서 덮이기 전 1회 저장).
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UMaterialInterface>> OriginalMaterials;
 
 	// 사망 애니메이션
 	UPROPERTY(EditDefaultsOnly, Category = "Die")
@@ -210,6 +214,9 @@ public:
 
 	// 근접/대시 데미지 대상 판정: 서로 다른 고양이 + 적팀(개인전은 자기 외 전원 적)
 	static bool IsEnemyCat(const AActor* SourceActor, const AActor* TargetActor);
+
+	// 현재 선택 고양이의 대표 패시브 클래스 (HUD 패시브 슬롯용). PossessedBy의 부여 로직과 동일 기준.
+	TSubclassOf<UGameplayAbility> GetActivePassiveClass() const;
 
 	// 피격 큐(GC_CatHit) 등에서 사망자 연출 스킵용 — BP 노출
 	UFUNCTION(BlueprintPure, Category = "MT|State")

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Abilities/GameplayAbility.h"
+#include "Player/MTGameplayAbility.h"
 #include "GameplayEffectTypes.h"
 #include "GA_FattyPassive.generated.h"
 
@@ -9,7 +9,7 @@ class UGameplayEffect;
 
 /** 게으르냥(패시브): Grant 즉시 무한 GE로 MaxHp +50, MoveSpeedMult ×0.7 (-30%). 현재 Hp도 +50 보정. 서버 권위. */
 UCLASS()
-class MEOWTRACTIVE_API UGA_FattyPassive : public UGameplayAbility
+class MEOWTRACTIVE_API UGA_FattyPassive : public UMTGameplayAbility
 {
 	GENERATED_BODY()
 

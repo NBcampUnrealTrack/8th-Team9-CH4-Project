@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Abilities/GameplayAbility.h"
+#include "Player/MTGameplayAbility.h"
 #include "GameplayEffectTypes.h"
 #include "GA_EyeBeamRangePassive.generated.h"
 
@@ -9,7 +9,7 @@ class UGameplayEffect;
 
 /** 쳐다보냥(패시브): Grant 즉시 무한 GE로 EyeBeamRange +0.5 → 눈빛 사거리 1.5배. 서버 권위. */
 UCLASS()
-class MEOWTRACTIVE_API UGA_EyeBeamRangePassive : public UGameplayAbility
+class MEOWTRACTIVE_API UGA_EyeBeamRangePassive : public UMTGameplayAbility
 {
 	GENERATED_BODY()
 
