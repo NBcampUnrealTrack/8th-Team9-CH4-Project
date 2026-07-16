@@ -1,17 +1,19 @@
-﻿#include "Player/MTLobbyCharacter.h"
+#include "Player/MTLobbyCharacter.h"
 
 #include "Player/MTPlayerController.h"
 #include "Player/MTPlayerState.h"
 #include "Game/MTLobbyGameMode.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
-#include "EngineUtils.h"
+#include "Materials/MaterialInterface.h"
 #include "TimerManager.h"
 #include "Net/UnrealNetwork.h"
+#include "UObject/ConstructorHelpers.h"
 
 AMTLobbyCharacter::AMTLobbyCharacter()
 {
@@ -21,12 +23,26 @@ AMTLobbyCharacter::AMTLobbyCharacter()
 	PromptWidget->SetWidgetSpace(EWidgetSpace::Screen);
 	PromptWidget->SetDrawAtDesiredSize(true);
 	PromptWidget->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
+
+	// 기본 사이클 (플레이어 폰 BP와 동일한 머티리얼 — 점박이→고등어→뚱냥이)
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SpottedMat(TEXT("/Game/Cat_Simple/Cat/Toon/M_CatSimple_C7_Toon"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> MackerelMat(TEXT("/Game/Cat_Simple/Cat/Toon/M_CatSimple_C6_Toon"));
+	static ConstructorHelpers::FObjectFinder<UMaterialInterface> FattyMat(TEXT("/Game/Cat_Simple/Cat/Toon/M_CatSimple_C5_Toon"));
+	if (SpottedMat.Succeeded() && MackerelMat.Succeeded() && FattyMat.Succeeded())
+	{
+		CatOptions = {
+			{ EMTCatType::Spotted,  SpottedMat.Object },
+			{ EMTCatType::Mackerel, MackerelMat.Object },
+			{ EMTCatType::Fatty,    FattyMat.Object },
+		};
+	}
 }
 
 void AMTLobbyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(AMTLobbyCharacter, OwnerSlot);
+	DOREPLIFETIME(AMTLobbyCharacter, CatIndex);
 }
 
 void AMTLobbyCharacter::BeginPlay()
@@ -39,6 +55,21 @@ void AMTLobbyCharacter::BeginPlay()
 		Move->DisableMovement();
 		Move->SetComponentTickEnabled(false);
 	}
+
+	// 서버: 초기 표시 = BP가 지정한 RepresentedCat (이후 셔플이 무작위로 덮음)
+	if (HasAuthority() && CatIndex == INDEX_NONE)
+	{
+		CatIndex = 0;
+		for (int32 i = 0; i < CatOptions.Num(); ++i)
+		{
+			if (CatOptions[i].Cat == RepresentedCat)
+			{
+				CatIndex = i;
+				break;
+			}
+		}
+	}
+	ApplyCatMaterial();
 
 	UpdateLobbyVisibility();
 	// 로컬 슬롯·OwnerSlot 복제가 늦을 수 있어 주기적으로 재평가 (로비 HUD 폴링과 동일한 방식)
@@ -60,24 +91,6 @@ void AMTLobbyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AMTLobbyCharacter::UpdateLobbyVisibility()
 {
-	// 유령 자가 치유: 서버가 파괴한 배치(startup) 조형물의 파괴 통지를 늦은 조인으로 못 받은 경우,
-	// 같은 슬롯의 동적(서버 스폰) 조형물이 복제돼 오면 배치본(자신)은 낡은 것 → 로컬에서 제거.
-	if (!HasAuthority() && IsNetStartupActor() && OwnerSlot >= 0)
-	{
-		for (TActorIterator<AMTLobbyCharacter> It(GetWorld()); It; ++It)
-		{
-			AMTLobbyCharacter* Other = *It;
-			if (Other != this && IsValid(Other) &&
-				Other->OwnerSlot == OwnerSlot && !Other->IsNetStartupActor())
-			{
-				UE_LOG(LogTemp, Log, TEXT("[MTLobby] 유령 조형물 정리: %s (slot %d, 동적 교체본 %s 존재)"),
-					*GetName(), OwnerSlot, *Other->GetName());
-				Destroy();
-				return;
-			}
-		}
-	}
-
 	// 로컬 플레이어 슬롯과 OwnerSlot 비교 — 내 슬롯 조형물만 표시
 	int32 LocalSlot = -1;
 	if (const APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
@@ -97,6 +110,11 @@ void AMTLobbyCharacter::UpdateLobbyVisibility()
 	}
 }
 
+EMTCatType AMTLobbyCharacter::GetRepresentedCat() const
+{
+	return CatOptions.IsValidIndex(CatIndex) ? CatOptions[CatIndex].Cat : RepresentedCat;
+}
+
 void AMTLobbyCharacter::OnPunchSelect(AActor* InstigatorPawn)
 {
 	// 서버 권위 + 로비 GameMode에서만 동작
@@ -110,74 +128,36 @@ void AMTLobbyCharacter::OnPunchSelect(AActor* InstigatorPawn)
 	const APawn* Pawn = Cast<APawn>(InstigatorPawn);
 	AMTPlayerController* PC = Pawn ? Cast<AMTPlayerController>(Pawn->GetController()) : nullptr;
 	const AMTPlayerState* PS = PC ? PC->GetPlayerState<AMTPlayerState>() : nullptr;
-	if (!PS || PS->GetPlayerSlot() != OwnerSlot)
+	if (!PS || PS->GetPlayerSlot() != OwnerSlot || CatOptions.Num() == 0)
 	{
 		return;
 	}
 
-	// 다음 조형물 스폰 (같은 위치, 슬롯 승계). 실패 시 자기 유지.
-	if (!SpawnNextCat())
+	// 때린 순간 보이던 고양이를 선택 (준비 검증·로비 폰 재스폰은 컨트롤러가 처리)
+	PC->Server_SetSelectedCat(GetRepresentedCat());
+
+	// 다음 후보로 머티리얼만 순환 — 액터 교체 없음
+	CatIndex = (FMath::Max(0, CatIndex) + 1) % CatOptions.Num();
+	OnRep_CatIndex();   // 리슨 호스트 즉시 반영
+}
+
+void AMTLobbyCharacter::OnRep_CatIndex()
+{
+	ApplyCatMaterial();
+}
+
+void AMTLobbyCharacter::ApplyCatMaterial()
+{
+	if (!CatOptions.IsValidIndex(CatIndex) || !CatOptions[CatIndex].Material)
 	{
 		return;
 	}
-
-	// 때린 순간 보이던 고양이(이 조형물)를 선택 (준비 검증·로비 폰 재스폰은 컨트롤러가 처리)
-	PC->Server_SetSelectedCat(RepresentedCat);
-
-	Destroy();
-}
-
-AMTLobbyCharacter* AMTLobbyCharacter::SpawnNextCat()
-{
-	UWorld* World = GetWorld();
-	if (!World || !NextCatActorClass)
+	if (USkeletalMeshComponent* MeshComp = GetMesh())
 	{
-		return nullptr;
-	}
-
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	AMTLobbyCharacter* NextActor = World->SpawnActor<AMTLobbyCharacter>(
-		NextCatActorClass, GetActorTransform(), Params);
-	if (NextActor)
-	{
-		NextActor->OwnerSlot = OwnerSlot;
-	}
-	return NextActor;
-}
-
-int32 AMTLobbyCharacter::GetCycleLength() const
-{
-	// 체인이 자기 클래스로 돌아오면 한 바퀴. 끊겨 있으면 거기까지가 길이.
-	const UClass* const StartClass = GetClass();
-	int32 Length = 1;
-	TSubclassOf<AMTLobbyCharacter> Next = NextCatActorClass;
-
-	while (Next && Next.Get() != StartClass && Length < 16)   // 16 = 체인 오설정 시 무한루프 방지
-	{
-		++Length;
-		Next = Next.GetDefaultObject()->NextCatActorClass;
-	}
-	return Length;
-}
-
-AMTLobbyCharacter* AMTLobbyCharacter::AdvanceCycle(int32 Steps)
-{
-	if (!HasAuthority())
-	{
-		return this;
-	}
-
-	AMTLobbyCharacter* Current = this;
-	for (int32 i = 0; i < Steps; ++i)
-	{
-		AMTLobbyCharacter* Next = Current->SpawnNextCat();
-		if (!Next)
+		const int32 NumMaterials = MeshComp->GetNumMaterials();
+		for (int32 i = 0; i < NumMaterials; ++i)
 		{
-			break;   // 체인 오설정 — 현재 조형물 유지
+			MeshComp->SetMaterial(i, CatOptions[CatIndex].Material);
 		}
-		Current->Destroy();
-		Current = Next;
 	}
-	return Current;
 }
