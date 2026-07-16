@@ -75,6 +75,18 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Attractive")
 	bool IsAttracted() const { return bIsAttracted; }
 
+	UPROPERTY(EditDefaultsOnly, Category = "SFX")
+	USoundBase* AttractionTickSound;
+
+	UPROPERTY(EditDefaultsOnly, Category = "SFX")
+	USoundBase* AttractionCompleteSound;
+
+	UFUNCTION(NetMulticast, Unreliable)
+	void Multicast_PlayAttractionTickSFX();
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_PlayAttractionCompleteSFX();
+
 protected:
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
