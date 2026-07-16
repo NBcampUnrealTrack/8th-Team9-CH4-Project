@@ -3,7 +3,7 @@
 TPS 캐주얼 액션 / 경쟁형 멀티플레이 / 파티 게임 / 탑뷰 익스트랙션
 (Casual Action · Competitive Multiplayer · Party · Top-down Extraction)
 
-- **엔진**: Unreal Engine **5.5**
+- **엔진**: Unreal Engine **5.8**
 - **런타임 모듈**: `MeowTractive` (C++)
 - **사용 플러그인**:
   - `GameplayAbilities` — GAS(캐릭터·NPC 능력/스탯)
