@@ -12,6 +12,7 @@
 #include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
+#include "Kismet/GameplayStatics.h"
 
 UGA_Cling::UGA_Cling()
 {
@@ -109,6 +110,21 @@ void UGA_Cling::ActivateAbility(
 	}
 
 	TargetCat = Target;
+
+	if (ClingSound)
+	{
+		if (Character)
+		{
+			ClingAudioComponent = UGameplayStatics::SpawnSoundAttached(
+				ClingSound,
+				Character->GetRootComponent(),
+				NAME_None,
+				FVector::ZeroVector,
+				EAttachLocation::SnapToTarget,
+				true // bStopWhenAttachedToDestroyed
+			);
+		}
+	}
 
 	// 대상에게 도약 (도착 정확도는 Attach가 보정하므로 시전 시점 방향으로 충분)
 	const FVector To = Target->GetActorLocation() - Character->GetActorLocation();

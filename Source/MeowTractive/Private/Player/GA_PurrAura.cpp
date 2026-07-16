@@ -12,6 +12,8 @@
 #include "Engine/World.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 UGA_PurrAura::UGA_PurrAura()
 {
@@ -37,7 +39,7 @@ void UGA_PurrAura::ActivateAbility(
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
-	
+
 	//게임플레이 큐 등록
 	AActor* Avatar = GetAvatarActorFromActorInfo();
 	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
@@ -65,6 +67,21 @@ void UGA_PurrAura::ActivateAbility(
 			UAbilityTask_PlayMontageAndWait::CreatePlayMontageAndWaitProxy(
 				this, NAME_None, CastMontage, 1.f, NAME_None, /*bStopWhenAbilityEnds=*/true);
 		MontageTask->ReadyForActivation();
+	}
+
+	if (PurrLoopSound)
+	{
+		if (Avatar)
+		{
+			PurrAudioComponent = UGameplayStatics::SpawnSoundAttached(
+				PurrLoopSound,
+				Avatar->GetRootComponent(),
+				NAME_None,
+				FVector::ZeroVector,
+				EAttachLocation::SnapToTarget,
+				true // bStopWhenAttachedToDestroyed
+			);
+		}
 	}
 
 	if (bRootSelf)
@@ -288,6 +305,12 @@ void UGA_PurrAura::EndAbility(
 			ASC->RemoveGameplayCue(ActiveGameplayCueTag);
 		}
 		ActiveGameplayCueTag = FGameplayTag();
+	}
+
+	if (PurrAudioComponent)
+	{
+		PurrAudioComponent->FadeOut(0.3f, 0.f); // 뚝 끊기지 않게 0.3초 페이드아웃
+		PurrAudioComponent = nullptr;
 	}
 
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);
