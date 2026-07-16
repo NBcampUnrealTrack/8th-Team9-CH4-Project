@@ -30,6 +30,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Glare", meta = (ClampMin = "0.0"))
 	float TargetRadius = 40.f;
 
+	// 카메라와 플레이어 사이에 검출된 Pawn을 조준점에서 제외할 때 사용할 여유 거리 (cm)
+	UPROPERTY(EditDefaultsOnly, Category = "Glare", meta = (ClampMin = "0.0"))
+	float CameraPlayerDepthTolerance = 10.f;
+
+	// 빔 시작 위치를 가져올 캐릭터 Mesh 소켓. 없으면 아바타 위치 사용.
+	UPROPERTY(EditDefaultsOnly, Category = "Glare|FX")
+	FName GlareSocketName = TEXT("glare");
+
 	// 데미지 (GE에 SetByCaller Data.Damage로 주입)
 	UPROPERTY(EditDefaultsOnly, Category = "Glare", meta = (ClampMin = "0.0"))
 	float Damage = 20.f;
@@ -58,8 +66,10 @@ protected:
 	void OnGlare(const FVector& Start, const FVector& End, bool bHit);
 
 private:
-	// 카메라 조준선상 첫 적 고양이 탐색 (없으면 nullptr)
+	// 카메라 정면 조준점을 계산한 뒤, 시작점부터 끝점까지 기존 Sphere Sweep으로 적 고양이 판정.
 	AActor* FindTargetCat(FVector& OutStart, FVector& OutEnd) const;
+	FVector GetGlareFXStartLocation() const;
+	void ExecuteGlareGameplayCue(const FVector& Start, const FVector& End) const;
 
 	// 패시브 배율 반영 사거리
 	float GetEffectiveRange() const;

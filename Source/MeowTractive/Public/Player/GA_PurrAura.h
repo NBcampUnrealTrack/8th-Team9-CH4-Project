@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "GameplayTagContainer.h"
 #include "Player/MTGameplayAbility.h"
 #include "GA_PurrAura.generated.h"
 
@@ -66,6 +67,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Purr")
 	bool bRootSelf = false;
 
+	// 나이아가라 GameplayCue 태그. 미지정 시 Purr/LieDown을 bRootSelf 기준으로 자동 선택.
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Purr|FX")
+	FGameplayTag GameplayCueTag;
+
 	// 데미지 GE (GE_CatDamage — SetByCaller Data.Damage)
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Purr")
 	TSubclassOf<UGameplayEffect> DamageEffect;
@@ -98,5 +103,6 @@ private:
 	void SetSelfRooted(bool bRooted);
 
 	FTimerHandle TickTimerHandle;
+	FGameplayTag ActiveGameplayCueTag;
 	bool bRooted = false;
 };

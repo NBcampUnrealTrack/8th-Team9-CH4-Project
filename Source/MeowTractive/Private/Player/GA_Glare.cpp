@@ -2,9 +2,12 @@
 
 #include "Player/MTPlayerCharacter.h"
 #include "Player/MTPlayerAttributeSet.h"
+#include "Player/MTPlayerState.h"
 #include "Game/MTGameplayTags.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystemBlueprintLibrary.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayTagContainer.h"
@@ -44,7 +47,8 @@ AActor* UGA_Glare::FindTargetCat(FVector& OutStart, FVector& OutEnd) const
 	AActor* Avatar = GetAvatarActorFromActorInfo();
 	const APawn* Pawn = Cast<APawn>(Avatar);
 	APlayerController* PC = Pawn ? Cast<APlayerController>(Pawn->GetController()) : nullptr;
-	if (!PC)
+	UWorld* World = GetWorld();
+	if (!PC || !World)
 	{
 		return nullptr;
 	}
@@ -53,41 +57,156 @@ AActor* UGA_Glare::FindTargetCat(FVector& OutStart, FVector& OutEnd) const
 	FRotator CamRotation;
 	PC->GetPlayerViewPoint(CamLocation, CamRotation);
 
-	OutStart = CamLocation;
-	OutEnd = OutStart + CamRotation.Vector() * GetEffectiveRange();
+	const FVector AimDirection = CamRotation.Vector();
+	const float Range = GetEffectiveRange();
+	const FVector CameraTraceEnd = CamLocation + AimDirection * Range;
+	OutStart = GetGlareFXStartLocation();
 
-	FCollisionQueryParams Params;
-	Params.AddIgnoredActor(Avatar);
-
-	// 벽에 막히면 거기까지 (관통 없음)
-	FHitResult WallHit;
-	if (GetWorld()->LineTraceSingleByChannel(WallHit, OutStart, OutEnd, ECC_Visibility, Params))
+	// 카메라 정면 LineTrace로 시각적 조준점을 계산한다. 월드 Trace에서는 Pawn을 제외한다.
+	FCollisionQueryParams WorldParams;
+	WorldParams.AddIgnoredActor(Avatar);
+	for (TActorIterator<APawn> It(World); It; ++It)
 	{
-		OutEnd = WallHit.ImpactPoint;
+		WorldParams.AddIgnoredActor(*It);
 	}
 
-	// 조준선상 첫 폰 — 적 고양이가 아니면 실패 (관통 X)
-	FHitResult PawnHit;
-	FCollisionObjectQueryParams ObjParams;
-	ObjParams.AddObjectTypesToQuery(ECC_Pawn);
-	if (GetWorld()->SweepSingleByObjectType(
-		PawnHit, OutStart, OutEnd, FQuat::Identity, ObjParams, FCollisionShape::MakeSphere(TargetRadius), Params))
+	FVector CameraTarget = CameraTraceEnd;
+	FHitResult CameraWorldHit;
+	if (World->LineTraceSingleByChannel(
+		CameraWorldHit, CamLocation, CameraTraceEnd, ECC_Visibility, WorldParams))
 	{
-		OutEnd = PawnHit.ImpactPoint;
-		AActor* Target = PawnHit.GetActor();
-		if (AMTPlayerCharacter::IsEnemyCat(Avatar, Target))
+		CameraTarget = CameraWorldHit.ImpactPoint;
+	}
+
+	// 카메라 정면의 Pawn은 반경 없는 LineTrace로 찾는다. 카메라와 플레이어 사이 Hit는 제외한다.
+	FCollisionQueryParams CameraPawnParams;
+	CameraPawnParams.AddIgnoredActor(Avatar);
+	FCollisionObjectQueryParams PawnObjectParams;
+	PawnObjectParams.AddObjectTypesToQuery(ECC_Pawn);
+	TArray<FHitResult> CameraPawnHits;
+	World->LineTraceMultiByObjectType(
+		CameraPawnHits, CamLocation, CameraTraceEnd, PawnObjectParams, CameraPawnParams);
+
+	const float PlayerDepth = FVector::DotProduct(Avatar->GetActorLocation() - CamLocation, AimDirection);
+	for (const FHitResult& Hit : CameraPawnHits)
+	{
+		if (!IsValid(Hit.GetActor()))
 		{
-			if (const AMTPlayerCharacter* TargetChar = Cast<AMTPlayerCharacter>(Target))
-			{
-				if (TargetChar->IsDead())
-				{
-					return nullptr;
-				}
-			}
-			return Target;
+			continue;
+		}
+
+		const float HitDepth = FVector::DotProduct(Hit.ImpactPoint - CamLocation, AimDirection);
+		if (HitDepth <= CameraPlayerDepthTolerance
+			|| HitDepth < PlayerDepth - CameraPlayerDepthTolerance)
+		{
+			continue;
+		}
+
+		if (Hit.Distance < FVector::Distance(CamLocation, CameraTarget))
+		{
+			CameraTarget = Hit.ImpactPoint;
+		}
+		break;
+	}
+
+	// 카메라 뒤의 조준점은 사용하지 않는다.
+	OutEnd = FVector::DotProduct(CameraTarget - OutStart, AimDirection) > 0.f
+		? CameraTarget
+		: OutStart + AimDirection * Range;
+
+	// 캐릭터 시작점에서 조준점까지 다시 LineTrace하여 실제 빔의 월드 관통을 막는다.
+	FHitResult BeamWorldHit;
+	if (World->LineTraceSingleByChannel(
+		BeamWorldHit, OutStart, OutEnd, ECC_Visibility, WorldParams))
+	{
+		OutEnd = BeamWorldHit.ImpactPoint;
+	}
+
+	// 기존 데미지 판정은 Sphere Sweep이므로 유지한다. 판정 Hit로 시각적 끝점을 덮어쓰지 않는다.
+	FCollisionQueryParams DamageParams;
+	DamageParams.AddIgnoredActor(Avatar);
+	FHitResult DamageHit;
+	if (!World->SweepSingleByObjectType(
+		DamageHit,
+		OutStart,
+		OutEnd,
+		FQuat::Identity,
+		PawnObjectParams,
+		FCollisionShape::MakeSphere(TargetRadius),
+		DamageParams))
+	{
+		return nullptr;
+	}
+
+	AActor* Target = DamageHit.GetActor();
+	if (!AMTPlayerCharacter::IsEnemyCat(Avatar, Target))
+	{
+		return nullptr;
+	}
+
+	if (const AMTPlayerCharacter* TargetChar = Cast<AMTPlayerCharacter>(Target))
+	{
+		if (TargetChar->IsDead())
+		{
+			return nullptr;
 		}
 	}
-	return nullptr;
+
+	return Target;
+}
+
+//째려보기 소켓 있으면 위치 반환
+FVector UGA_Glare::GetGlareFXStartLocation() const
+{
+	AActor* Avatar = GetAvatarActorFromActorInfo();
+	if (const AMTPlayerCharacter* Character = Cast<AMTPlayerCharacter>(Avatar))
+	{
+		if (const USkeletalMeshComponent* Mesh = Character->GetMesh())
+		{
+			if (Mesh->DoesSocketExist(GlareSocketName))
+			{
+				return Mesh->GetSocketLocation(GlareSocketName);
+			}
+		}
+	}
+
+	return Avatar ? Avatar->GetActorLocation() : FVector::ZeroVector;
+}
+
+//째려보기 큐 실행, 관련변수는 큐 파라미터로 전달.
+void UGA_Glare::ExecuteGlareGameplayCue(const FVector& Start, const FVector& End) const
+{
+	UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo();
+	AActor* Avatar = GetAvatarActorFromActorInfo();
+	if (!ASC || !Avatar)
+	{
+		return;
+	}
+
+	FGameplayCueParameters CueParams;
+	CueParams.Location = End;
+	CueParams.Instigator = Avatar;
+	CueParams.EffectCauser = Avatar;
+
+	if (const APawn* AvatarPawn = Cast<APawn>(Avatar))
+	{
+		CueParams.SourceObject = AvatarPawn->GetPlayerState<AMTPlayerState>();
+	}
+
+	// FGameplayCueParameters에는 임의 Vector 슬롯이 하나뿐이므로 TraceStart/TraceEnd는 HitResult로 전달한다.
+	FGameplayEffectContextHandle CueContext = ASC->MakeEffectContext();
+	FHitResult CueTrace;
+	CueTrace.TraceStart = Start;	//시작지점
+	CueTrace.TraceEnd = End;	//끝지점
+	CueTrace.Location = End;
+	CueTrace.ImpactPoint = End;
+	CueContext.AddHitResult(CueTrace, true);
+	CueParams.EffectContext = CueContext;
+
+	//큐 실행
+	ASC->ExecuteGameplayCue(
+		FGameplayTag::RequestGameplayTag(FName("GameplayCue.Cat.Glare")),
+		CueParams);
 }
 
 void UGA_Glare::ActivateAbility(
@@ -115,6 +234,7 @@ void UGA_Glare::ActivateAbility(
 	}
 
 	OnGlare(Start, End, bHit); // 연출 훅 (예측 클라/서버 모두)
+	ExecuteGlareGameplayCue(Start, End);
 
 	// 데미지/슬로우 적용은 서버 권위
 	if (bHit && HasAuthority(&ActivationInfo))

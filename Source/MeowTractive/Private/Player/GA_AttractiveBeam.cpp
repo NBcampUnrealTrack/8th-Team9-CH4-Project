@@ -270,7 +270,6 @@ void UGA_AttractiveBeam::UpdateAttractiveBeamHitFX(bool bHitActor)
 	{
 		return;
 	}
-	UE_LOG(LogTemp, Warning, TEXT("Update Trace %d"), bHitActor);
 	ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.TraceHit")), bHitActor);
 }
 
