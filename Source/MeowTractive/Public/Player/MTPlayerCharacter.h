@@ -85,6 +85,9 @@ protected:
 	TObjectPtr<UNiagaraSystem> JumpNiagaraSystem;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects|Movement", meta = (AllowPrivateAccess = "true"))
+	TObjectPtr<UNiagaraSystem> LandingNiagaraSystem;
+
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects|Movement", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UNiagaraSystem> WalkNiagaraSystem;
 
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "Effects|Movement", meta = (AllowPrivateAccess = "true"))
