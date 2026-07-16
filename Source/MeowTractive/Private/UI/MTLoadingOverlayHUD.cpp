@@ -1,10 +1,35 @@
 #include "UI/MTLoadingOverlayHUD.h"
 #include "Blueprint/UserWidget.h"
+#include "Engine/Font.h"
 #include "Engine/GameViewportClient.h"
 #include "TimerManager.h"
 #include "Styling/CoreStyle.h"
+#include "UObject/ConstructorHelpers.h"
 #include "Widgets/Layout/SBorder.h"
 #include "Widgets/Text/STextBlock.h"
+
+AMTLoadingOverlayHUD::AMTLoadingOverlayHUD()
+{
+	// WBP 다이얼로그들과 같은 서체로 통일
+	static ConstructorHelpers::FObjectFinder<UFont> GumiFont(
+		TEXT("/Game/Developers/Rubin/UI/Font/Gumi_Romance_Font"));
+	if (GumiFont.Succeeded())
+	{
+		OverlayFont = GumiFont.Object;
+	}
+}
+
+FSlateFontInfo AMTLoadingOverlayHUD::MakeOverlayFont(float Size) const
+{
+	if (!OverlayFont)
+	{
+		return FCoreStyle::GetDefaultFontStyle("Regular", Size);
+	}
+	FFontOutlineSettings Outline;
+	Outline.OutlineSize = 3;
+	Outline.OutlineColor = FLinearColor(0.f, 0.f, 0.f, 1.f);
+	return FSlateFontInfo(OverlayFont, Size, TEXT("Default"), Outline);
+}
 
 void AMTLoadingOverlayHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
@@ -40,7 +65,7 @@ void AMTLoadingOverlayHUD::ShowLoadingOverlay()
 			[
 				SAssignNew(FallbackTextBlock, STextBlock)
 				.Text(FallbackLoadingText)
-				.Font(FCoreStyle::GetDefaultFontStyle("Regular", 24))
+				.Font(MakeOverlayFont(24.f))
 			];
 		Viewport->AddViewportWidgetContent(LoadingSlateWidget.ToSharedRef(), 100);
 	}

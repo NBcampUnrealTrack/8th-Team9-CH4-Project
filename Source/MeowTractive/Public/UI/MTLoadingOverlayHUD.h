@@ -1,10 +1,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Fonts/SlateFontInfo.h"
 #include "GameFramework/HUD.h"
 #include "MTLoadingOverlayHUD.generated.h"
 
 class UUserWidget;
+class UFont;
 class SWidget;
 class STextBlock;
 
@@ -15,12 +17,21 @@ class MEOWTRACTIVE_API AMTLoadingOverlayHUD : public AHUD
 	GENERATED_BODY()
 
 public:
+	AMTLoadingOverlayHUD();
+
 	// 오버레이 WBP (미지정 시 기본 검은 화면 + FallbackLoadingText)
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
 	TSubclassOf<UUserWidget> LoadingWidgetClass;
 
+	// 폴백 오버레이/카운트다운 공용 폰트 (WBP 다이얼로그와 동일 서체)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TObjectPtr<UFont> OverlayFont;
+
 protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
+
+	// OverlayFont 기반 폰트 정보 (미지정 시 엔진 기본으로 폴백)
+	FSlateFontInfo MakeOverlayFont(float Size) const;
 
 	void ShowLoadingOverlay();
 	void RemoveLoadingOverlay();
