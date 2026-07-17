@@ -1,9 +1,11 @@
 MeowTractive/Binaries/Win64/D3D12/x64/D3D12Core.dll	2026-06-18T08:13:09.906Z
 MeowTractive/Binaries/Win64/D3D12/x64/d3d12SDKLayers.dll	2026-06-18T08:13:10.010Z
 MeowTractive/Binaries/Win64/DML/x64/DirectML.dll	2026-06-18T08:11:49.750Z
-MeowTractive/Binaries/Win64/MeowTractive.exe	2026-07-16T10:26:52.909Z
+MeowTractive/Binaries/Win64/MeowTractive.exe	2026-07-17T04:00:52.366Z
 MeowTractive/Binaries/Win64/tbb12.dll	2026-06-18T08:12:33.813Z
 MeowTractive/Binaries/Win64/tbbmalloc.dll	2026-06-18T08:12:33.813Z
+Engine/Extras/Redist/en-us/vc_redist.x64.exe	2026-06-18T07:50:22.835Z
+Engine/Extras/Redist/en-us/vc_redist.arm64.exe	2026-06-18T07:50:19.580Z
 Engine/Binaries/ThirdParty/DbgHelp/dbghelp.dll	2026-06-18T07:32:04.467Z
 Engine/Binaries/ThirdParty/MsQuic/v220/win64/msquic.dll	2026-06-18T07:33:11.676Z
 Engine/Binaries/ThirdParty/NVIDIA/NVaftermath/Win64/GFSDK_Aftermath_Lib.x64.dll	2026-06-18T07:33:12.223Z
@@ -16,7 +18,7 @@ Engine/Binaries/ThirdParty/Windows/XAudio2_9/x64/xaudio2_9redist.dll	2026-06-18T
 Engine/Content/Renderer/TessellationTable.bin	2026-06-18T07:44:45.832Z
 Engine/Content/Slate/Cursor/invisible.cur	2026-06-18T07:44:45.849Z
 Engine/Plugins/NNE/NNERuntimeORT/Binaries/ThirdParty/Onnxruntime/Win64/onnxruntime.dll	2026-06-18T08:06:12.340Z
-Engine/Config/StagedBuild_MeowTractive.ini	2026-07-16T10:30:24.706Z
+Engine/Config/StagedBuild_MeowTractive.ini	2026-07-17T04:02:18.847Z
 MeowTractive/Content/Movies/Intro.mp4	2026-07-06T06:39:02.277Z
 Engine/Binaries/ThirdParty/Vulkan/Win64/VkLayer_api_dump.dll	2026-06-18T07:33:45.155Z
 Engine/Binaries/ThirdParty/Vulkan/Win64/VkLayer_api_dump.json	2026-06-18T07:33:45.157Z
@@ -32,5 +34,5 @@ Engine/Binaries/ThirdParty/Vulkan/Win64/VkLayer_khronos_synchronization2.dll	202
 Engine/Binaries/ThirdParty/Vulkan/Win64/VkLayer_khronos_synchronization2.json	2026-06-18T07:33:46.011Z
 Engine/Binaries/ThirdParty/Vulkan/Win64/VkLayer_khronos_validation.dll	2026-06-18T07:33:47.236Z
 Engine/Binaries/ThirdParty/Vulkan/Win64/VkLayer_khronos_validation.json	2026-06-18T07:33:47.238Z
-MeowTractive.exe	2026-07-16T10:30:24.699Z
+MeowTractive.exe	2026-07-17T04:02:18.841Z
 NOTICES.txt	2026-06-18T08:12:41.506Z
