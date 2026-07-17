@@ -295,8 +295,11 @@ void AMTLobbyGameMode::TickCountdown()
 	if (Remaining <= 0)
 	{
 		GetWorldTimerManager().ClearTimer(CountdownTimer);
-		GS->SetStartCountdown(0);   // "시작!" 표시용
-		TryStartMatch();
+		GS->SetStartCountdown(0);   // "게임시작!" 표시
+
+		// 문구 노출 + 클라 페이드아웃 후 트래블. 0 도달 = 시작 확정이라 재검증 없이 ForceStart
+		// (지연 중 준비 해제로 취소되면 클라가 검은 화면에 갇히므로)
+		GetWorldTimerManager().SetTimer(TravelDelayTimer, this, &AMTLobbyGameMode::ForceStartMatch, StartTravelDelay, false);
 	}
 	else
 	{

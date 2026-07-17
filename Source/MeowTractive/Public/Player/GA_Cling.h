@@ -51,6 +51,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Cling")
 	TSubclassOf<UGameplayEffect> DamageEffect;
 
+	// 스턴 지속 (s) — 피해와 함께 적용. 0 또는 StunEffect 미지정이면 스턴 없음.
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Cling", meta = (ClampMin = "0.0"))
+	float StunDuration = 1.f;
+
+	// 스턴 GE (GE_Stun — Duration=SetByCaller Data.Duration, Dash/MeowPunch와 동일 에셋 재사용)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Cling")
+	TSubclassOf<UGameplayEffect> StunEffect;
+
 	// 시전 사운드
 	UPROPERTY(EditDefaultsOnly, Category = "Sound")
 	USoundBase* ClingSound;

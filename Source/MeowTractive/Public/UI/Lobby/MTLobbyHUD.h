@@ -25,10 +25,30 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI", meta = (ClampMin = "0.0"))
 	float MaxDisplayTime = 5.f;
 
+	// 카운트다운 0("게임시작!") 후 페이드아웃 시작까지 대기(초) — 문구 보여주는 시간
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI", meta = (ClampMin = "0.0"))
+	float StartFadeDelay = 0.5f;
+
+	// 트래블 직전 검은 화면 페이드아웃 시간(초). GameMode StartTravelDelay와 합이 맞아야 함
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI", meta = (ClampMin = "0.0"))
+	float TravelFadeDuration = 1.f;
+
 private:
 	// 내 폰 준비 → 페이드인 공개
 	void TryReveal();
 
+	// 로비 GameState 카운트다운 구독 (복제 지연 대비 재시도)
+	void TryBindCountdown();
+
+	UFUNCTION()
+	void HandleStartCountdownChanged(int32 RemainingSeconds);
+
+	// "게임시작!" 노출 후 검은 화면으로 페이드아웃
+	void StartTravelFade();
+
 	float ShownTime = 0.f;
 	FTimerHandle RevealTimer;
+	FTimerHandle CountdownBindTimer;
+	FTimerHandle TravelFadeTimer;
+	bool bTravelFadeStarted = false;
 };

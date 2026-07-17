@@ -166,6 +166,20 @@ void UGA_Dominance::CheckDashHit()
 			SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
 		}
 
+		// 명중 시 스턴 (처형이면 사망 처리라 생략)
+		if (!bExecute && StunEffect && StunDuration > 0.f)
+		{
+			FGameplayEffectContextHandle SCtx = SourceASC->MakeEffectContext();
+			SCtx.AddSourceObject(Avatar);
+			FGameplayEffectSpecHandle SSpec = SourceASC->MakeOutgoingSpec(StunEffect, GetAbilityLevel(), SCtx);
+			if (SSpec.IsValid())
+			{
+				SSpec.Data->SetSetByCallerMagnitude(
+					FGameplayTag::RequestGameplayTag(FName("Data.Duration")), StunDuration);
+				SourceASC->ApplyGameplayEffectSpecToTarget(*SSpec.Data.Get(), TargetASC);
+			}
+		}
+
 		// 첫 명중에서 돌진 종료 (단일 대상)
 		EndAbility(CurrentSpecHandle, CurrentActorInfo, CurrentActivationInfo, true, false);
 		return;

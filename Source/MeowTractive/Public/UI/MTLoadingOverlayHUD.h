@@ -39,6 +39,9 @@ protected:
 	// 오버레이를 서서히 걷어 게임 화면 페이드인 (Duration 후 제거)
 	void FadeOutLoadingOverlay(float Duration = 1.f);
 
+	// 화면을 서서히 검은 오버레이로 덮음 (트래블 직전 연출 — 완료 후 오버레이 유지)
+	void FadeInLoadingOverlay(float Duration = 1.f);
+
 	// 폴백 오버레이 문구 갱신 (점 애니메이션용 — WBP 지정 시 무시, WBP가 자체 연출)
 	void SetFallbackOverlayText(const FText& NewText);
 
@@ -60,4 +63,5 @@ private:
 	FTimerHandle FadeTimer;
 	float FadeElapsed = 0.f;
 	float FadeDuration = 0.f;
+	bool bFadeToBlack = false;   // true = 덮는 방향(투명→검정), false = 걷는 방향
 };

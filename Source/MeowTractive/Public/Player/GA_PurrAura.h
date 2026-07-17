@@ -117,7 +117,13 @@ private:
 
 	void SetSelfRooted(bool bRooted);
 
+	// 공중 시전 낙하 후 착지 → 완전 고정 (LandedDelegate)
+	UFUNCTION()
+	void OnRootLanded(const FHitResult& Hit);
+
 	FTimerHandle TickTimerHandle;
 	FGameplayTag ActiveGameplayCueTag;
 	bool bRooted = false;
+	bool bWaitingToLand = false;
+	float SavedAirControl = 0.35f;
 };

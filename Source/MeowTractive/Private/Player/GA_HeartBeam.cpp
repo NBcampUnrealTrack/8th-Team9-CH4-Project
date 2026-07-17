@@ -11,6 +11,7 @@
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/CharacterMovementComponent.h"
 #include "GameplayTagContainer.h"
 #include "EngineUtils.h"
 #include "Engine/World.h"
@@ -63,6 +64,9 @@ void UGA_HeartBeam::ActivateAbility(
 		EndAbility(Handle, ActorInfo, ActivationInfo, true, true);
 		return;
 	}
+
+	// 시전 중 자리고정 + 카메라 방향 회전 (소유 클라·서버 양쪽 실행)
+	SetSelfRooted(true);
 
 	StartHeartBeamFX();
 	OnBeamStart();
@@ -128,7 +132,6 @@ void UGA_HeartBeam::FireBeam()
 
 	const FGameplayTag DamageTag = FGameplayTag::RequestGameplayTag(FName("Data.Damage"));
 	const float AttractTick = AttractPerSecond * FireInterval;
-	const float DamageTick = DamagePerSecond * FireInterval;
 
 	TSet<AActor*> Processed; // 스윕 다중 히트 중복 방지
 	for (const FHitResult& Hit : Hits)
@@ -146,7 +149,7 @@ void UGA_HeartBeam::FireBeam()
 			continue;
 		}
 
-		// 행인 → 매료
+		// 행인만 매료 (고양이 피해 없음)
 		if (Target->IsA(AMTPedestrianBase::StaticClass()))
 		{
 			if (AttractEffect && AttractTick > 0.f)
@@ -157,30 +160,6 @@ void UGA_HeartBeam::FireBeam()
 				if (Spec.IsValid())
 				{
 					Spec.Data->SetSetByCallerMagnitude(DamageTag, AttractTick);
-					SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
-				}
-			}
-			continue;
-		}
-
-		// 적 고양이 → 데미지
-		if (AMTPlayerCharacter::IsEnemyCat(Avatar, Target))
-		{
-			if (const AMTPlayerCharacter* TargetChar = Cast<AMTPlayerCharacter>(Target))
-			{
-				if (TargetChar->IsDead())
-				{
-					continue;
-				}
-			}
-			if (DamageEffect && DamageTick > 0.f)
-			{
-				FGameplayEffectContextHandle Ctx = SourceASC->MakeEffectContext();
-				Ctx.AddSourceObject(Avatar);
-				FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(DamageEffect, GetAbilityLevel(), Ctx);
-				if (Spec.IsValid())
-				{
-					Spec.Data->SetSetByCallerMagnitude(DamageTag, DamageTick);
 					SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
 				}
 			}
@@ -223,6 +202,11 @@ void UGA_HeartBeam::EndAbility(
 		World->GetTimerManager().ClearTimer(DurationTimerHandle);
 		World->GetTimerManager().ClearTimer(BeamVisualTimerHandle);
 		World->GetTimerManager().ClearTimer(BeamFXFadeInTimerHandle);
+	}
+
+	if (bRooted)
+	{
+		SetSelfRooted(false);
 	}
 
 	StopHeartBeamFX();
@@ -384,6 +368,28 @@ FVector UGA_HeartBeam::GetHeartBeamFXStartLocation() const
 		}
 	}
 	return Avatar ? Avatar->GetActorLocation() : FVector::ZeroVector;
+}
+
+// 시전 중 이동 잠금 (해제는 EndAbility)
+void UGA_HeartBeam::SetSelfRooted(bool bNewRooted)
+{
+	ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
+	UCharacterMovementComponent* Move = Character ? Character->GetCharacterMovement() : nullptr;
+	if (!Move)
+	{
+		return;
+	}
+
+	if (bNewRooted)
+	{
+		Move->StopMovementImmediately();
+		Move->DisableMovement();
+	}
+	else
+	{
+		Move->SetMovementMode(MOVE_Walking);
+	}
+	bRooted = bNewRooted;
 }
 
 FLinearColor UGA_HeartBeam::GetAvatarPlayerColor() const

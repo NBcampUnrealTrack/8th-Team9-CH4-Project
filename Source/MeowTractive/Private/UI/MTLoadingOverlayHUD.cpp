@@ -91,6 +91,28 @@ void AMTLoadingOverlayHUD::FadeOutLoadingOverlay(float Duration)
 		RemoveLoadingOverlay();
 		return;
 	}
+	bFadeToBlack = false;
+	FadeElapsed = 0.f;
+	FadeDuration = Duration;
+	GetWorldTimerManager().SetTimer(FadeTimer, this, &AMTLoadingOverlayHUD::TickFade, 0.02f, true);
+}
+
+void AMTLoadingOverlayHUD::FadeInLoadingOverlay(float Duration)
+{
+	GetWorldTimerManager().ClearTimer(FadeTimer);   // 걷는 중이어도 덮는 방향이 우선 (트래블 직전)
+
+	ShowLoadingOverlay();
+	if (Duration <= 0.f)
+	{
+		if (LoadingWidget) { LoadingWidget->SetRenderOpacity(1.f); }
+		if (LoadingSlateWidget.IsValid()) { LoadingSlateWidget->SetRenderOpacity(1.f); }
+		return;
+	}
+
+	if (LoadingWidget) { LoadingWidget->SetRenderOpacity(0.f); }
+	if (LoadingSlateWidget.IsValid()) { LoadingSlateWidget->SetRenderOpacity(0.f); }
+
+	bFadeToBlack = true;
 	FadeElapsed = 0.f;
 	FadeDuration = Duration;
 	GetWorldTimerManager().SetTimer(FadeTimer, this, &AMTLoadingOverlayHUD::TickFade, 0.02f, true);
@@ -99,7 +121,8 @@ void AMTLoadingOverlayHUD::FadeOutLoadingOverlay(float Duration)
 void AMTLoadingOverlayHUD::TickFade()
 {
 	FadeElapsed += 0.02f;
-	const float Opacity = FMath::Clamp(1.f - FadeElapsed / FadeDuration, 0.f, 1.f);
+	const float Alpha = FMath::Clamp(FadeElapsed / FadeDuration, 0.f, 1.f);
+	const float Opacity = bFadeToBlack ? Alpha : 1.f - Alpha;
 
 	if (LoadingWidget)
 	{
@@ -110,9 +133,16 @@ void AMTLoadingOverlayHUD::TickFade()
 		LoadingSlateWidget->SetRenderOpacity(Opacity);
 	}
 
-	if (Opacity <= 0.f)
+	if (Alpha >= 1.f)
 	{
-		RemoveLoadingOverlay();
+		if (bFadeToBlack)
+		{
+			GetWorldTimerManager().ClearTimer(FadeTimer);   // 검은 화면 유지 (트래블 대기)
+		}
+		else
+		{
+			RemoveLoadingOverlay();
+		}
 	}
 }
 

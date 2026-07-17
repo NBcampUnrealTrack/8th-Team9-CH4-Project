@@ -307,14 +307,55 @@ void UGA_PurrAura::SetSelfRooted(bool bNewRooted)
 		if (bNewRooted)
 		{
 			Move->StopMovementImmediately();
-			Move->SetMovementMode(MOVE_None);
+			if (Move->IsMovingOnGround())
+			{
+				Move->SetMovementMode(MOVE_None);
+			}
+			else
+			{
+				// 공중 시전: 중력으로 낙하(입력 드리프트 차단), 착지 시 OnRootLanded가 고정
+				SavedAirControl = Move->AirControl;
+				Move->AirControl = 0.f;
+				Move->SetMovementMode(MOVE_Falling);
+				Character->LandedDelegate.AddDynamic(this, &UGA_PurrAura::OnRootLanded);
+				bWaitingToLand = true;
+			}
 		}
 		else
 		{
+			if (bWaitingToLand)
+			{
+				Character->LandedDelegate.RemoveDynamic(this, &UGA_PurrAura::OnRootLanded);
+				Move->AirControl = SavedAirControl;
+				bWaitingToLand = false;
+			}
 			Move->SetMovementMode(MOVE_Walking);
 		}
 	}
 	bRooted = bNewRooted;
+}
+
+void UGA_PurrAura::OnRootLanded(const FHitResult& Hit)
+{
+	ACharacter* Character = Cast<ACharacter>(GetAvatarActorFromActorInfo());
+	if (!Character)
+	{
+		return;
+	}
+	if (bWaitingToLand)
+	{
+		Character->LandedDelegate.RemoveDynamic(this, &UGA_PurrAura::OnRootLanded);
+		bWaitingToLand = false;
+	}
+	if (UCharacterMovementComponent* Move = Character->GetCharacterMovement())
+	{
+		Move->AirControl = SavedAirControl;
+		if (bRooted)
+		{
+			Move->StopMovementImmediately();
+			Move->SetMovementMode(MOVE_None);
+		}
+	}
 }
 
 void UGA_PurrAura::EndAbility(

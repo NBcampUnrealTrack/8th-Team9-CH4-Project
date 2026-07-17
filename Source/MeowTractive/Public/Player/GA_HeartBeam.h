@@ -8,7 +8,7 @@ class UGameplayEffect;
 class UNiagaraComponent;
 class UNiagaraSystem;
 
-/** 하트광선: 5초간 카메라 전방 일자 빔(구체 스윕). 경로상 행인=매료, 적 고양이=데미지 (둘 다 초당 10). 적용 서버 권위. */
+/** 하트광선: 5초간 카메라 전방 일자 빔(구체 스윕)으로 경로상 행인 매료. 시전 중 이동 불가. 적용 서버 권위. */
 UCLASS()
 class MEOWTRACTIVE_API UGA_HeartBeam : public UMTGameplayAbility
 {
@@ -60,17 +60,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam", meta = (ClampMin = "0.0"))
 	float AttractPerSecond = 10.f;
 
-	// 적 고양이 데미지 초당량
-	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam", meta = (ClampMin = "0.0"))
-	float DamagePerSecond = 10.f;
-
 	// 행인 매료 GE (GA_AttractiveBeam과 동일 — SetByCaller Data.Damage)
 	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam")
 	TSubclassOf<UGameplayEffect> AttractEffect;
-
-	// 적 고양이 데미지 GE (GE_CatDamage — SetByCaller Data.Damage)
-	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam")
-	TSubclassOf<UGameplayEffect> DamageEffect;
 
 	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam")
 	bool bDrawDebug = true;
@@ -115,6 +107,9 @@ private:
 
 	float GetEffectiveRange() const;
 
+	// 시전 중 자리고정 (해제는 EndAbility)
+	void SetSelfRooted(bool bNewRooted);
+
 	FTimerHandle BeamTimerHandle;
 	FTimerHandle DurationTimerHandle;
 	FTimerHandle BeamVisualTimerHandle;
@@ -122,4 +117,5 @@ private:
 	FTimerHandle BeamFXCleanupTimerHandle;
 	bool bIsBeamVisualUpdateActive = false;
 	bool bIsHeartBeamFXEnding = false;
+	bool bRooted = false;
 };

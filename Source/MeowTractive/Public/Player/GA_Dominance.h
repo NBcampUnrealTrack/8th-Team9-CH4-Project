@@ -51,6 +51,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Dominance")
 	TSubclassOf<UGameplayEffect> DamageEffect;
 
+	// 스턴 지속 (s) — 명중 시 적용. 0 또는 StunEffect 미지정이면 스턴 없음. (처형 시엔 사망이라 무의미)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Dominance", meta = (ClampMin = "0.0"))
+	float StunDuration = 1.f;
+
+	// 스턴 GE (GE_Stun — Duration=SetByCaller Data.Duration, Dash/MeowPunch와 동일 에셋 재사용)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Dominance")
+	TSubclassOf<UGameplayEffect> StunEffect;
+
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Dominance")
 	bool bDrawDebug = false;
 

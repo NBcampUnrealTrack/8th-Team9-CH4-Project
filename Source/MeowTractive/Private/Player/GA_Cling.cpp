@@ -250,6 +250,20 @@ void UGA_Cling::OnClingFinished()
 						FGameplayTag::RequestGameplayTag(FName("Data.Damage")), Damage);
 					SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), TargetASC);
 				}
+
+				// 피해와 함께 스턴 (지속시간 SetByCaller 주입)
+				if (StunEffect && StunDuration > 0.f)
+				{
+					FGameplayEffectContextHandle SCtx = SourceASC->MakeEffectContext();
+					SCtx.AddSourceObject(GetAvatarActorFromActorInfo());
+					FGameplayEffectSpecHandle SSpec = SourceASC->MakeOutgoingSpec(StunEffect, GetAbilityLevel(), SCtx);
+					if (SSpec.IsValid())
+					{
+						SSpec.Data->SetSetByCallerMagnitude(
+							FGameplayTag::RequestGameplayTag(FName("Data.Duration")), StunDuration);
+						SourceASC->ApplyGameplayEffectSpecToTarget(*SSpec.Data.Get(), TargetASC);
+					}
+				}
 			}
 		}
 	}

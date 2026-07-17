@@ -92,4 +92,10 @@ private:
 	// 전원 준비 후 시작까지 카운트다운(초) — 그 사이 준비 해제/이탈하면 취소
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Lobby")
 	int32 AutoStartSeconds = 3;
+
+	// 카운트다운 0("게임시작!") 후 트래블까지 대기(초) — HUD의 문구 노출(0.5)+페이드아웃(1.0)과 합 맞춤
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Lobby", meta = (ClampMin = "0.0"))
+	float StartTravelDelay = 1.5f;
+
+	FTimerHandle TravelDelayTimer;
 };
