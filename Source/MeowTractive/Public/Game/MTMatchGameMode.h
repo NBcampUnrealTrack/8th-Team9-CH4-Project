@@ -110,6 +110,12 @@ private:
 	// 시작 카운트다운 1초 감소 — 0 도달 시 ReadyToStartMatch가 true
 	void TickStartCountdown();
 
+	UPROPERTY(EditDefaultsOnly, Category = "Sound")
+	USoundBase* CountdownTickSound;
+
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayCountdownTickSound();
+
 	FTimerHandle StartCountdownTimer;
 	bool bStartCountdownRunning = false;
 	bool bStartCountdownFinished = false;

@@ -19,6 +19,8 @@
 #include "NiagaraSystem.h"
 #include "TimerManager.h"
 #include "DrawDebugHelpers.h"
+#include "Components/AudioComponent.h"
+#include "Kismet/GameplayStatics.h"
 
 UGA_HeartBeam::UGA_HeartBeam()
 {
@@ -246,6 +248,17 @@ void UGA_HeartBeam::StartHeartBeamFX()
 			AttachComponent = Character->GetMesh();
 		}
 	}
+
+	if (BeamLoopSound)
+	{
+		if (Avatar)
+		{
+			BeamAudioComponent = UGameplayStatics::SpawnSoundAttached(
+				BeamLoopSound, Avatar->GetRootComponent(),
+				NAME_None, FVector::ZeroVector, EAttachLocation::SnapToTarget, true);
+		}
+	}
+
 	if (!AttachComponent)
 	{
 		return;
@@ -325,10 +338,17 @@ void UGA_HeartBeam::StopHeartBeamFX()
 	ActiveHeartBeamFX->SetVariableBool(FName(TEXT("User.BeamEnding")), true);
 	ActiveHeartBeamFX->SetVariableFloat(FName(TEXT("User.BeamFadeOutTime")), BeamFXFadeOutTime);
 
+	if (BeamAudioComponent)
+	{
+		BeamAudioComponent->FadeOut(0.3f, 0.f);
+		BeamAudioComponent = nullptr;
+	}
+
 	if (BeamFXFadeOutTime <= 0.f)
 	{
 		FinishHeartBeamFX();
 	}
+
 	else if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
