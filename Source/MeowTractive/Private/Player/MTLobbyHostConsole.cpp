@@ -5,6 +5,7 @@
 #include "Blueprint/UserWidget.h"
 #include "Components/BoxComponent.h"
 #include "Components/WidgetComponent.h"
+#include "UI/Lobby/MTSelectPromptWidget.h"
 #include "GameFramework/PlayerController.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
@@ -49,8 +50,19 @@ void AMTLobbyHostConsole::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+void AMTLobbyHostConsole::PushPromptLabel()
+{
+	if (UMTSelectPromptWidget* Prompt = PromptWidget
+		? Cast<UMTSelectPromptWidget>(PromptWidget->GetUserWidgetObject()) : nullptr)
+	{
+		Prompt->SetActionLabel(PromptLabel);
+	}
+}
+
 void AMTLobbyHostConsole::UpdateHostVisibility()
 {
+	PushPromptLabel();   // 위젯 생성 지연 대비 주기 재시도 (멱등)
+
 	bool bLocalIsHost = false;
 	if (const APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)
 	{

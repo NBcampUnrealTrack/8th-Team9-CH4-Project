@@ -1,6 +1,7 @@
 #include "Player/GA_PurrAura.h"
 
 #include "Player/MTPlayerCharacter.h"
+#include "Pedestrian/MTPedestrianBase.h"
 #include "Game/MTGameplayTags.h"
 #include "Abilities/Tasks/AbilityTask_WaitDelay.h"
 #include "Abilities/Tasks/AbilityTask_PlayMontageAndWait.h"
@@ -14,6 +15,7 @@
 #include "DrawDebugHelpers.h"
 #include "Components/AudioComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "UObject/ConstructorHelpers.h"
 
 UGA_PurrAura::UGA_PurrAura()
 {
@@ -24,6 +26,13 @@ UGA_PurrAura::UGA_PurrAura()
 	ActivationOwnedTags.AddTag(MTGameplayTags::State::TAG_State_Casting);
 	ActivationBlockedTags.AddTag(MTGameplayTags::State::TAG_State_Casting);
 	CancelAbilitiesWithTag.AddTag(MTGameplayTags::Ability::TAG_Skill_Attract_Beam);
+
+	// 행인 매료 GE 기본값 (매료빔과 동일 에셋 — BP에서 교체 가능)
+	static ConstructorHelpers::FClassFinder<UGameplayEffect> AttractGE(TEXT("/Game/Blueprints/Pedestrian/GE/GE_AttractiveDamage"));
+	if (AttractGE.Succeeded())
+	{
+		AttractiveDamageGE = AttractGE.Class;
+	}
 }
 
 void UGA_PurrAura::ActivateAbility(
@@ -152,7 +161,31 @@ void UGA_PurrAura::DoAuraTick()
 	for (const FOverlapResult& O : Overlaps)
 	{
 		AActor* Target = O.GetActor();
-		if (!Target || Processed.Contains(Target) || !AMTPlayerCharacter::IsEnemyCat(Avatar, Target))
+		if (!Target || Processed.Contains(Target))
+		{
+			continue;
+		}
+
+		// 이중 판정: 반경 내 행인에겐 매료 (매료빔과 동일 GE — instigator=고양이로 가해자 기록)
+		if (AMTPedestrianBase* Ped = Cast<AMTPedestrianBase>(Target))
+		{
+			Processed.Add(Target);
+			UAbilitySystemComponent* PedASC = UAbilitySystemBlueprintLibrary::GetAbilitySystemComponent(Ped);
+			if (PedASC && AttractiveDamageGE && TickAttractiveDamage > 0.f)
+			{
+				FGameplayEffectContextHandle Ctx = SourceASC->MakeEffectContext();
+				Ctx.AddSourceObject(Avatar);
+				FGameplayEffectSpecHandle Spec = SourceASC->MakeOutgoingSpec(AttractiveDamageGE, GetAbilityLevel(), Ctx);
+				if (Spec.IsValid())
+				{
+					Spec.Data->SetSetByCallerMagnitude(DamageTag, TickAttractiveDamage);
+					SourceASC->ApplyGameplayEffectSpecToTarget(*Spec.Data.Get(), PedASC);
+				}
+			}
+			continue;
+		}
+
+		if (!AMTPlayerCharacter::IsEnemyCat(Avatar, Target))
 		{
 			continue;
 		}

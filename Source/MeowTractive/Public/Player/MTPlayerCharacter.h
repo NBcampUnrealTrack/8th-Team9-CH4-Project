@@ -215,6 +215,9 @@ public:
 	// 근접/대시 데미지 대상 판정: 서로 다른 고양이 + 적팀(개인전은 자기 외 전원 적)
 	static bool IsEnemyCat(const AActor* SourceActor, const AActor* TargetActor);
 
+	// 매치 종료: 진행 중 스킬 취소 + 이동 정지 (결과 화면 동안 행동 지속 방지). 서버 전용
+	void FreezeForMatchEnd();
+
 	// 현재 선택 고양이의 대표 패시브 클래스 (HUD 패시브 슬롯용). PossessedBy의 부여 로직과 동일 기준.
 	TSubclassOf<UGameplayAbility> GetActivePassiveClass() const;
 

@@ -23,6 +23,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI", meta = (ClampMin = "0.0"))
 	float RevealFadeDuration = 1.f;
 
+	// 3·2·1 표시 순간의 틱 사운드 (표시 타이밍과 동기)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TObjectPtr<USoundBase> CountdownTickSound;
+
+	// "시작!" 표시 순간의 사운드
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TObjectPtr<USoundBase> MatchStartSound;
+
 	UMTPlayerWidget* GetPlayerWidget() const { return PlayerWidget; }
 
 protected:
@@ -53,10 +61,19 @@ private:
 	TSharedPtr<SWidget> CountdownContainer;
 	TSharedPtr<STextBlock> CountdownTextBlock;
 
+	// 페이드인 완료 후 카운트 표시 시작 (페이드 중엔 값만 저장)
+	void HandleRevealFinished();
+
+	// 현재 카운트 값 표시 (>0 숫자, 0 = 시작!)
+	void UpdateCountdownText(int32 Value);
+
 	FTimerHandle BindRetryTimer;
 	FTimerHandle WaitingDotsTimer;
 	FTimerHandle CountdownHideTimer;
+	FTimerHandle RevealDoneTimer;
 	int32 WaitingDotCount = 0;
 	FString WaitingBaseText;      // FallbackLoadingText에서 끝 점을 뗀 기본 문구
 	bool bCountdownShown = false;
+	bool bRevealFinished = false;         // 페이드인 완료 여부
+	int32 PendingCountdownValue = -1;     // 페이드 중 도착한 최신 카운트 값
 };

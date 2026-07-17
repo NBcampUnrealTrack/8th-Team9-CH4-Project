@@ -6,6 +6,7 @@
 #include "Online/MTOnlineUtils.h"
 #include "Player/MTPlayerState.h"
 #include "Player/MTPlayerController.h"
+#include "Player/MTPlayerCharacter.h"
 #include "UI/InGame/MTPlayerHUD.h"
 #include "Pedestrian/MTPedestrianBase.h"
 #include "Pedestrian/MTPedestrianSpawnManager.h"
@@ -98,6 +99,15 @@ void AMTMatchGameMode::HandleMatchHasEnded()
         if (AMTPedestrianBase* Ped = Cast<AMTPedestrianBase>(A))
         {
             Ped->FreezeForMatchEnd();
+        }
+    }
+
+    // 결과 화면 동안 고양이도 정지 (진행 중 스킬 취소 + 이동 잠금 — 행인과 동일 패턴)
+    for (APlayerState* PS : GS->PlayerArray)
+    {
+        if (AMTPlayerCharacter* Cat = Cast<AMTPlayerCharacter>(PS->GetPawn()))
+        {
+            Cat->FreezeForMatchEnd();
         }
     }
 
@@ -380,7 +390,9 @@ bool AMTMatchGameMode::ReadyToStartMatch_Implementation()
 		{
 			MTGS->SetMatchStartCountdown(StartCountdownSeconds);
 		}
-		GetWorldTimerManager().SetTimer(StartCountdownTimer, this, &AMTMatchGameMode::TickStartCountdown, 1.f, true);
+		// 첫 감소는 페이드인이 끝난 뒤부터 (첫 값 복제 = 클라 페이드 시작 신호)
+		GetWorldTimerManager().SetTimer(StartCountdownTimer, this, &AMTMatchGameMode::TickStartCountdown,
+			1.f, true, CountdownRevealDelay + 1.f);
 	}
 	return false;
 }

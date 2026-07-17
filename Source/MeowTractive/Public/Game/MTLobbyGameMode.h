@@ -26,6 +26,9 @@ public:
 	// 호스트 시작 요청 처리 (조건 충족 시 다음 맵으로 ServerTravel)
 	void TryStartMatch();
 
+	// 개발용 강제 시작 — 인원/준비 조건 무시 (콘솔 `MT.Start`가 호출)
+	void ForceStartMatch();
+
 	// Ready 상태 변경 시 PlayerController가 호출 → 전원 준비면 자동 시작 카운트다운
 	void NotifyReadyChanged();
 

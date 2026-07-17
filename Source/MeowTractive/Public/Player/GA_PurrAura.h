@@ -62,6 +62,14 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Purr", meta = (ClampMin = "0.0"))
 	float TickDamage = 5.f;
 
+	// 틱당 행인 매료량 (이중 판정 — 반경 내 행인에겐 피해 대신 매료). 0이면 매료 없음
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Purr", meta = (ClampMin = "0.0"))
+	float TickAttractiveDamage = 5.f;
+
+	// 행인 매료 GE (GE_AttractiveDamage — SetByCaller Data.Damage, 매료빔과 동일 에셋)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|Purr")
+	TSubclassOf<UGameplayEffect> AttractiveDamageGE;
+
 	// 감속 곱배율 (0.8 = 20% 감속, 0.5 = 50% 감속)
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Purr", meta = (ClampMin = "0.05", ClampMax = "1.0"))
 	float SlowMultiplier = 0.8f;

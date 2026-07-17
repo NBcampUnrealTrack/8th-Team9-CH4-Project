@@ -264,6 +264,27 @@ void AMTPlayerCharacter::NotifyControllerChanged()
 	ApplyLobbyDisguise();   // possession 확정 후 내/남 폰 판정 재적용
 }
 
+void AMTPlayerCharacter::FreezeForMatchEnd()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
+
+	// 진행 중 스킬 전부 종료 — 결과 화면이 UIOnly로 바뀌면 홀드 키 release가 안 와서 빔류가 계속 나간다
+	if (AbilitySystemComponent)
+	{
+		AbilitySystemComponent->CancelAllAbilities();
+	}
+
+	// 이동 완전 정지 (행인 FreezeForMatchEnd와 동일 패턴 — 서버 정지가 이동 복제로 전 클라 정지)
+	if (UCharacterMovementComponent* Move = GetCharacterMovement())
+	{
+		Move->StopMovementImmediately();
+		Move->DisableMovement();
+	}
+}
+
 TSubclassOf<UGameplayAbility> AMTPlayerCharacter::GetActivePassiveClass() const
 {
 	// PossessedBy의 고양이 결정과 동일: 선택값 우선, 없으면 폴백

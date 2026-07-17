@@ -63,9 +63,16 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "MT|Lobby")
 	int32 OwnerSlot = -1;
 
-	// "C키로 선택" 프롬프트 (WidgetClass는 BP에서 지정)
+	// "[키] 행동" 프롬프트 (WidgetClass는 BP에서 지정 — WBP_Select)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MT|Lobby")
 	TObjectPtr<UWidgetComponent> PromptWidget;
+
+	// 프롬프트에 표시할 행동 이름 ("[C] 고양이 선택")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MT|Lobby")
+	FText PromptLabel = NSLOCTEXT("MT", "PromptSelectCat", "고양이 선택");
+
+	// 프롬프트 위젯에 행동 이름 주입 (위젯 생성 지연 대비 — 가시성 타이머에서 재시도)
+	void PushPromptLabel();
 
 private:
 	// 현재 표시 중인 사이클 인덱스 (서버 확정 → 전 클라 복제)

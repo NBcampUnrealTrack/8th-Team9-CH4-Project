@@ -33,9 +33,16 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MT|Lobby")
 	TObjectPtr<UBoxComponent> InteractionBox;
 
-	// "C키" 프롬프트 (WidgetClass는 BP에서 지정)
+	// "[키] 행동" 프롬프트 (WidgetClass는 BP에서 지정 — WBP_Select)
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MT|Lobby")
 	TObjectPtr<UWidgetComponent> PromptWidget;
+
+	// 프롬프트에 표시할 행동 이름 (BP 서브클래스가 지정: "방 설정" / "플레이어 목록")
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "MT|Lobby")
+	FText PromptLabel = NSLOCTEXT("MT", "PromptOpen", "열기");
+
+	// 프롬프트 위젯에 행동 이름 주입 (위젯 생성 지연 대비 — 가시성 타이머에서 재시도)
+	void PushPromptLabel();
 
 	// 펀치 시 열릴 콘솔 위젯 (WBP_LobbyRoomSettings / WBP_LobbyKick)
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Lobby")

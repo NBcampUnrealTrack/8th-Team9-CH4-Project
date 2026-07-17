@@ -3,14 +3,29 @@
 #include "Game/MTGameState.h"
 #include "Blueprint/UserWidget.h"
 #include "Engine/GameViewportClient.h"
+#include "Kismet/GameplayStatics.h"
+#include "Sound/SoundBase.h"
 #include "TimerManager.h"
 #include "Styling/CoreStyle.h"
+#include "UObject/ConstructorHelpers.h"
 #include "Widgets/Layout/SBox.h"
 #include "Widgets/Text/STextBlock.h"
 
 AMTPlayerHUD::AMTPlayerHUD()
 {
 	FallbackLoadingText = NSLOCTEXT("MT", "WaitingPlayers", "모든 플레이어를 기다리는 중...");
+
+	// 플레이스홀더 사운드 — 전용 에셋 나오면 BP에서 교체
+	static ConstructorHelpers::FObjectFinder<USoundBase> TickSnd(TEXT("/Game/Sound/InGame/SFX_AttractionTick"));
+	if (TickSnd.Succeeded())
+	{
+		CountdownTickSound = TickSnd.Object;
+	}
+	static ConstructorHelpers::FObjectFinder<USoundBase> StartSnd(TEXT("/Game/Sound/InGame/SFX_Meow"));
+	if (StartSnd.Succeeded())
+	{
+		MatchStartSound = StartSnd.Object;
+	}
 }
 
 void AMTPlayerHUD::BeginPlay()
@@ -51,6 +66,7 @@ void AMTPlayerHUD::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	GetWorldTimerManager().ClearTimer(BindRetryTimer);
 	GetWorldTimerManager().ClearTimer(WaitingDotsTimer);
 	GetWorldTimerManager().ClearTimer(CountdownHideTimer);
+	GetWorldTimerManager().ClearTimer(RevealDoneTimer);
 	RemoveCountdownText();
 	Super::EndPlay(EndPlayReason);
 }
@@ -90,16 +106,52 @@ void AMTPlayerHUD::HandleStartCountdownChanged(int32 Value)
 		bCountdownShown = true;
 		GetWorldTimerManager().ClearTimer(WaitingDotsTimer);
 		FadeOutLoadingOverlay(RevealFadeDuration);
+
+		// 3·2·1은 페이드인이 끝난 뒤부터 표시
+		if (RevealFadeDuration > 0.f)
+		{
+			GetWorldTimerManager().SetTimer(RevealDoneTimer, this, &AMTPlayerHUD::HandleRevealFinished, RevealFadeDuration, false);
+		}
+		else
+		{
+			bRevealFinished = true;
+		}
 	}
 
+	PendingCountdownValue = Value;
+	if (bRevealFinished)
+	{
+		UpdateCountdownText(Value);
+	}
+}
+
+void AMTPlayerHUD::HandleRevealFinished()
+{
+	bRevealFinished = true;
+	if (PendingCountdownValue >= 0)
+	{
+		UpdateCountdownText(PendingCountdownValue);
+	}
+}
+
+void AMTPlayerHUD::UpdateCountdownText(int32 Value)
+{
 	if (Value > 0)
 	{
 		ShowCountdownText(FText::AsNumber(Value));
+		if (CountdownTickSound)
+		{
+			UGameplayStatics::PlaySound2D(this, CountdownTickSound);
+		}
 	}
 	else
 	{
 		// 0 = 시작! (StartMatch와 동시) — 잠시 보여주고 제거
 		ShowCountdownText(NSLOCTEXT("MT", "MatchStart", "시작!"));
+		if (MatchStartSound)
+		{
+			UGameplayStatics::PlaySound2D(this, MatchStartSound);
+		}
 		GetWorldTimerManager().SetTimer(CountdownHideTimer, this, &AMTPlayerHUD::RemoveCountdownText, 0.8f, false);
 	}
 }

@@ -338,6 +338,15 @@ void AMTLobbyGameMode::TryStartMatch()
 	{
 		return;
 	}
+	ForceStartMatch();
+}
+
+void AMTLobbyGameMode::ForceStartMatch()
+{
+	if (!HasAuthority())
+	{
+		return;
+	}
 	const FString MapPath = ResolveMatchMapPath();
 	if (!ensureMsgf(!MapPath.IsEmpty(), TEXT("매치 맵 미지정 — MatchMaps/FallbackMatchMap 확인")))
 	{
@@ -346,6 +355,23 @@ void AMTLobbyGameMode::TryStartMatch()
 	// 방 설정의 맵으로 리슨 서버 전환
 	GetWorld()->ServerTravel(MapPath + TEXT("?listen"));
 }
+
+// 콘솔: `MT.Start 1` — 개발용 강제 시작. 인원/준비 조건 무시 (로비의 리슨 호스트 전용)
+static FAutoConsoleCommandWithWorldAndArgs GMTStartCmd(
+	TEXT("MT.Start"),
+	TEXT("개발용: 로비에서 인원/준비 조건을 무시하고 즉시 매치 시작 (호스트 전용)"),
+	FConsoleCommandWithWorldAndArgsDelegate::CreateLambda(
+		[](const TArray<FString>& Args, UWorld* World)
+		{
+			AMTLobbyGameMode* Lobby = World ? World->GetAuthGameMode<AMTLobbyGameMode>() : nullptr;
+			if (!Lobby)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("[MT.Start] 로비의 호스트에서만 사용 가능합니다."));
+				return;
+			}
+			UE_LOG(LogTemp, Log, TEXT("[MT.Start] 개발용 강제 시작"));
+			Lobby->ForceStartMatch();
+		}));
 
 int32 AMTLobbyGameMode::AcquireSlot()
 {

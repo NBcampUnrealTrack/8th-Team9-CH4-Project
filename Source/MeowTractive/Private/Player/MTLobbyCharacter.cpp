@@ -6,6 +6,7 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/WidgetComponent.h"
+#include "UI/Lobby/MTSelectPromptWidget.h"
 #include "GameFramework/Controller.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
@@ -89,8 +90,19 @@ void AMTLobbyCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+void AMTLobbyCharacter::PushPromptLabel()
+{
+	if (UMTSelectPromptWidget* Prompt = PromptWidget
+		? Cast<UMTSelectPromptWidget>(PromptWidget->GetUserWidgetObject()) : nullptr)
+	{
+		Prompt->SetActionLabel(PromptLabel);
+	}
+}
+
 void AMTLobbyCharacter::UpdateLobbyVisibility()
 {
+	PushPromptLabel();   // 위젯 컴포넌트의 위젯 생성이 늦을 수 있어 주기 재시도 (멱등)
+
 	// 로컬 플레이어 슬롯과 OwnerSlot 비교 — 내 슬롯 조형물만 표시
 	int32 LocalSlot = -1;
 	if (const APlayerController* PC = GetWorld() ? GetWorld()->GetFirstPlayerController() : nullptr)

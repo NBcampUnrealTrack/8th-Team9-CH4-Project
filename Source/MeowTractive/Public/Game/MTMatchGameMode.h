@@ -58,6 +58,10 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Match Rules", meta = (ClampMin = "0"))
 	int32 StartCountdownSeconds = 3;
 
+	// 카운트다운 첫 감소 전 대기(초) — 클라 페이드인(HUD RevealFadeDuration)이 끝난 뒤 3·2·1이 보이게
+	UPROPERTY(EditDefaultsOnly, Category = "Match Rules", meta = (ClampMin = "0.0"))
+	float CountdownRevealDelay = 1.f;
+
 #pragma region Rule
 
 protected:
