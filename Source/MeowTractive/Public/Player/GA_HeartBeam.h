@@ -45,6 +45,13 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam", meta = (ClampMin = "0.0"))
 	float CameraPlayerDepthTolerance = 10.f;
 
+	// 사운드
+	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam|Sound")
+	USoundBase* BeamLoopSound;
+
+	UPROPERTY()
+	UAudioComponent* BeamAudioComponent;
+
 	// 판정/틱 간격 (s)
 	UPROPERTY(EditDefaultsOnly, Category = "HeartBeam", meta = (ClampMin = "0.01"))
 	float FireInterval = 0.1f;

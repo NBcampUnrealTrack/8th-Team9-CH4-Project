@@ -381,6 +381,9 @@ bool AMTMatchGameMode::ReadyToStartMatch_Implementation()
 	if (!bStartCountdownRunning)
 	{
 		bStartCountdownRunning = true;
+
+		MulticastPlayCountdownTickSound();
+
 		if (StartCountdownSeconds <= 0)
 		{
 			bStartCountdownFinished = true;   // 카운트다운 미사용 → 즉시 시작
@@ -412,6 +415,14 @@ void AMTMatchGameMode::TickStartCountdown()
 	{
 		GetWorldTimerManager().ClearTimer(StartCountdownTimer);
 		bStartCountdownFinished = true;   // 다음 틱 ReadyToStartMatch → StartMatch
+	}
+}
+
+void AMTMatchGameMode::MulticastPlayCountdownTickSound_Implementation()
+{
+	if (CountdownTickSound)
+	{
+		UGameplayStatics::PlaySound2D(this, CountdownTickSound);
 	}
 }
 

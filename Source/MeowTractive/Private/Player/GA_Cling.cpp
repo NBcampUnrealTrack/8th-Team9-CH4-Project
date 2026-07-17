@@ -109,6 +109,16 @@ void UGA_Cling::ActivateAbility(
 		return;
 	}
 
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+	{
+		FGameplayCueParameters CueParams;
+		CueParams.Location = Character->GetActorLocation();
+		CueParams.Normal = Character->GetActorForwardVector();
+		CueParams.Instigator = Character;
+		CueParams.EffectCauser = Character;
+		ASC->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag(TEXT("GameplayCue.Cat.Cling.Cast")), CueParams);
+	}
+
 	TargetCat = Target;
 
 	if (ClingSound)
@@ -180,6 +190,16 @@ void UGA_Cling::BeginCling(AActor* Target)
 	Character->SetActorEnableCollision(false);
 	Character->AttachToActor(Target, FAttachmentTransformRules::KeepWorldTransform);
 	bClinging = true;
+
+	if (UAbilitySystemComponent* ASC = GetAbilitySystemComponentFromActorInfo())
+	{
+		FGameplayCueParameters CueParams;
+		CueParams.Location = Target->GetActorLocation();
+		CueParams.Normal = (Target->GetActorLocation() - Character->GetActorLocation()).GetSafeNormal();
+		CueParams.Instigator = Character;
+		CueParams.EffectCauser = Character;
+		ASC->ExecuteGameplayCue(FGameplayTag::RequestGameplayTag(TEXT("GameplayCue.Cat.Cling.Impact")), CueParams);
+	}
 }
 
 void UGA_Cling::ReleaseCling()
