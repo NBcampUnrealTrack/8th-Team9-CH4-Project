@@ -3,7 +3,7 @@
 #include "Player/MTPlayerController.h"
 #include "Components/EditableTextBox.h"
 #include "Components/ComboBoxString.h"
-#include "Components/Button.h"
+#include "CommonButtonBase.h"
 
 void UMTLobbyRoomSettingsWidget::NativeConstruct()
 {
@@ -11,7 +11,7 @@ void UMTLobbyRoomSettingsWidget::NativeConstruct()
 
 	if (ApplyButton)
 	{
-		ApplyButton->OnClicked.AddDynamic(this, &UMTLobbyRoomSettingsWidget::HandleApply);
+		ApplyButton->OnClicked().AddUObject(this, &UMTLobbyRoomSettingsWidget::HandleApply);
 	}
 
 	// 현재 방 설정으로 초기화 (호스트 전용 UI — GameInstance 값이 권위)
@@ -42,6 +42,16 @@ void UMTLobbyRoomSettingsWidget::NativeConstruct()
 		MapCombo->AddOption(TEXT("랜덤"));
 		MapCombo->SetSelectedIndex((int32)Current.Map);
 	}
+}
+
+void UMTLobbyRoomSettingsWidget::NativeDestruct()
+{
+	// CommonButtonBase는 non-dynamic 이벤트 → 수동 해제
+	if (ApplyButton)
+	{
+		ApplyButton->OnClicked().RemoveAll(this);
+	}
+	Super::NativeDestruct();
 }
 
 void UMTLobbyRoomSettingsWidget::HandleApply()

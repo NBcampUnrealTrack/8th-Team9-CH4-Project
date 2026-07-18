@@ -138,7 +138,7 @@ void UMTMenuWidget::JoinSelectedSession()
 	{
 		if (GameFlow)
 		{
-			GameFlow->NotifyJoinFailed(FText::FromString(TEXT("참가할 방을 선택해 주세요.")));
+			GameFlow->NotifyJoinFailed(FText::FromString(TEXT("참가할 방을 선택해 주세요")));
 		}
 		return;
 	}

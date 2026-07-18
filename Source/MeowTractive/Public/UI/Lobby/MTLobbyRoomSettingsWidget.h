@@ -6,7 +6,7 @@
 
 class UEditableTextBox;
 class UComboBoxString;
-class UButton;
+class UCommonButtonBase;
 
 /** 호스트 콘솔 — 방 설정 변경: 현재 설정 표시 → 적용 시 Server_UpdateRoomSettings. */
 UCLASS()
@@ -16,6 +16,7 @@ class MEOWTRACTIVE_API UMTLobbyRoomSettingsWidget : public UMTLobbyConsoleWidget
 
 protected:
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UEditableTextBox> RoomNameInput;
@@ -30,9 +31,8 @@ protected:
 	TObjectPtr<UComboBoxString> MapCombo;
 
 	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UButton> ApplyButton;
+	TObjectPtr<UCommonButtonBase> ApplyButton;
 
 private:
-	UFUNCTION()
 	void HandleApply();
 };

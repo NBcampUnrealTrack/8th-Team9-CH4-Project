@@ -1,5 +1,5 @@
 #include "UI/Lobby/MTLobbyConsoleWidget.h"
-#include "Components/Button.h"
+#include "CommonButtonBase.h"
 #include "GameFramework/PlayerController.h"
 
 void UMTLobbyConsoleWidget::NativeConstruct()
@@ -11,8 +11,18 @@ void UMTLobbyConsoleWidget::NativeConstruct()
 
 	if (CloseButton)
 	{
-		CloseButton->OnClicked.AddDynamic(this, &UMTLobbyConsoleWidget::HandleClose);
+		CloseButton->OnClicked().AddUObject(this, &UMTLobbyConsoleWidget::HandleClose);
 	}
+}
+
+void UMTLobbyConsoleWidget::NativeDestruct()
+{
+	// CommonButtonBase는 non-dynamic 이벤트 → 수동 해제
+	if (CloseButton)
+	{
+		CloseButton->OnClicked().RemoveAll(this);
+	}
+	Super::NativeDestruct();
 }
 
 FReply UMTLobbyConsoleWidget::NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent)

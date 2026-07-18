@@ -4,7 +4,7 @@
 #include "Blueprint/UserWidget.h"
 #include "MTLobbyConsoleWidget.generated.h"
 
-class UButton;
+class UCommonButtonBase;
 
 /** 로비 호스트 콘솔 위젯 공통 베이스: 닫기 버튼/ESC → 제거 + 커서 복원. */
 UCLASS(Abstract)
@@ -19,12 +19,12 @@ public:
 
 protected:
 	virtual void NativeConstruct() override;
+	virtual void NativeDestruct() override;
 	virtual FReply NativeOnKeyDown(const FGeometry& InGeometry, const FKeyEvent& InKeyEvent) override;
 
 	UPROPERTY(meta = (BindWidgetOptional))
-	TObjectPtr<UButton> CloseButton;
+	TObjectPtr<UCommonButtonBase> CloseButton;
 
 private:
-	UFUNCTION()
 	void HandleClose();
 };
