@@ -13,6 +13,7 @@ namespace MTGameplayTags
 		UE_DEFINE_GAMEPLAY_TAG(TAG_Skill_Spotted_Dominance, "Skill.Spotted.Dominance");
 		UE_DEFINE_GAMEPLAY_TAG(TAG_Skill_Fatty_Purr, "Skill.Fatty.Purr");
 		UE_DEFINE_GAMEPLAY_TAG(TAG_Skill_Fatty_LieDown, "Skill.Fatty.LieDown");
+		UE_DEFINE_GAMEPLAY_TAG(TAG_Skill_Interact, "Skill.Interact");
 	}
 
 	namespace Cooldown
@@ -34,6 +35,7 @@ namespace MTGameplayTags
 	namespace Event
 	{
 		UE_DEFINE_GAMEPLAY_TAG(TAG_Event_MeowPunch_Hit, "Event.Montage.MeowPunch.Hit");
+		UE_DEFINE_GAMEPLAY_TAG(TAG_Event_Interact_Hit, "Event.Montage.Interact.Hit");
 	}
 
 	namespace GameplayCue

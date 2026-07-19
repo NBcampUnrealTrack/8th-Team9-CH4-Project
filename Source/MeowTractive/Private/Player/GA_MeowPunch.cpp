@@ -150,11 +150,9 @@ void UGA_MeowPunch::PerformHit()
 			continue;
 		}
 
-		// 로비 선택 조형물: IsEnemyCat 우회 — 데미지 대신 선택 순환 (서버 권위)
-		if (IMTLobbySelectable* Selectable = Cast<IMTLobbySelectable>(Target))
+		// 로비 선택 조형물은 공격 대상 아님 (상호작용은 GA_Interact 전담)
+		if (Cast<IMTLobbySelectable>(Target))
 		{
-			Damaged.Add(Target);
-			Selectable->OnPunchSelect(Avatar);
 			continue;
 		}
 
