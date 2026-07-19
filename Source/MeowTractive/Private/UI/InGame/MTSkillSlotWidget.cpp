@@ -8,14 +8,16 @@
 #include "Components/TextBlock.h"
 #include "Components/ProgressBar.h"
 #include "GameFramework/GameStateBase.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 void UMTSkillSlotWidget::NativePreConstruct()
 {
 	Super::NativePreConstruct();
 
-	if (SkillIcon && DefaultIcon)
+	if (DefaultIcon)
 	{
-		SkillIcon->SetBrushFromTexture(DefaultIcon);
+		ApplyIcon(DefaultIcon);
 	}
 	SetCooldownVisuals(0.f, 0.f, false);
 }
@@ -65,10 +67,7 @@ void UMTSkillSlotWidget::SetAccentColor(const FLinearColor& InColor)
 	{
 		CooldownBar->SetFillColorAndOpacity(InColor);
 	}
-	if (CountText)
-	{
-		CountText->SetColorAndOpacity(FSlateColor(InColor));
-	}
+	// CountText 색은 WBP 설정값 유지 (TeamColor 덮어쓰기 제거)
 }
 
 void UMTSkillSlotWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTime)
@@ -130,7 +129,7 @@ void UMTSkillSlotWidget::ResolveAbilitySpec()
 			{
 				if (UTexture2D* Icon = MTAbility->GetAbilityIcon())
 				{
-					SkillIcon->SetBrushFromTexture(Icon);
+					ApplyIcon(Icon);
 				}
 			}
 		}
@@ -174,6 +173,7 @@ void UMTSkillSlotWidget::UpdateDashSlot()
 	if (CountText)
 	{
 		CountText->SetText(FText::AsNumber(Charges));
+		CountText->SetVisibility(ESlateVisibility::HitTestInvisible);   // 횟수형(대시) 슬롯에서만 노출
 	}
 
 	// 재충전 진행: 완료 서버시각 − 현재 서버시각 (완충이면 EndTime=0)
@@ -204,6 +204,45 @@ void UMTSkillSlotWidget::SetCooldownVisuals(float Remaining, float Duration, boo
 	}
 	if (SkillIcon)
 	{
-		SkillIcon->SetColorAndOpacity(bDimIcon ? FLinearColor(0.25f, 0.25f, 0.25f, 1.f) : FLinearColor::White);
+		if (CooldownMID)
+		{
+			// 진행도 = 경과 비율(0→1). 머티리얼이 6시 시작·반시계로 부채꼴을 넓혀 원본을 드러냄
+			const float Progress = (Duration > KINDA_SMALL_NUMBER) ? FMath::Clamp(1.f - Remaining / Duration, 0.f, 1.f) : 1.f;
+			CooldownMID->SetScalarParameterValue(TEXT("Progress"), Progress);
+			SkillIcon->SetColorAndOpacity(FLinearColor::White);   // 어둡게 처리는 머티리얼이 담당
+		}
+		else
+		{
+			SkillIcon->SetColorAndOpacity(bDimIcon ? FLinearColor(0.25f, 0.25f, 0.25f, 1.f) : FLinearColor::White);
+		}
+	}
+}
+
+void UMTSkillSlotWidget::ApplyIcon(UTexture2D* IconTexture)
+{
+	if (!SkillIcon)
+	{
+		return;
+	}
+
+	// 쿨다운 머티리얼이 있으면 MID를 만들어 브러시로 쓰고, 아이콘은 IconTex 파라미터로 전달
+	if (CooldownMaterial)
+	{
+		if (!CooldownMID)
+		{
+			CooldownMID = UMaterialInstanceDynamic::Create(CooldownMaterial, this);
+			SkillIcon->SetBrushFromMaterial(CooldownMID);
+		}
+		if (IconTexture)
+		{
+			CooldownMID->SetTextureParameterValue(TEXT("IconTex"), IconTexture);
+		}
+		return;
+	}
+
+	// 폴백: 머티리얼 미지정 시 텍스처를 브러시에 직접
+	if (IconTexture)
+	{
+		SkillIcon->SetBrushFromTexture(IconTexture);
 	}
 }

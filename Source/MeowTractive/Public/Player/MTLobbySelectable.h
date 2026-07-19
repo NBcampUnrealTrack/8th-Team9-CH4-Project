@@ -10,7 +10,7 @@ class UMTLobbySelectable : public UInterface
 	GENERATED_BODY()
 };
 
-/** 로비에서 근접공격(MeowPunch)으로 상호작용 가능한 대상. PerformHit이 서버 권위에서 호출. */
+/** 로비에서 상호작용(GA_Interact, F)으로 선택 가능한 대상. PerformSelect가 서버 권위에서 호출. */
 class IMTLobbySelectable
 {
 	GENERATED_BODY()

@@ -7,6 +7,7 @@
 #include "Player/MTPlayerAttributeSet.h"
 #include "AbilitySystemComponent.h"
 #include "Components/TextBlock.h"
+#include "CommonTextBlock.h"
 #include "Components/ProgressBar.h"
 #include "Components/VerticalBox.h"
 #include "Blueprint/WidgetTree.h"
@@ -211,7 +212,30 @@ void UMTPlayerWidget::RefreshRanking()
 			Index + 1, *Name, Sorted[Index].AttractedCount);
 	};
 
-	// 플레이어별 TeamColor 행 (매치가 슬롯별로 부여한 색)
+	// 플레이어별 TeamColor 행 — 디자이너가 꾸민 템플릿(RankingRowTemplate)을 복제해 사용
+	if (RankingBox && RankingRowTemplate)
+	{
+		if (RankingText)
+		{
+			RankingText->SetVisibility(ESlateVisibility::Collapsed);
+		}
+		RankingBox->ClearChildren();   // 템플릿도 박스에서 빠지지만 BindWidget이 원본을 살려둠
+		for (int32 i = 0; i < Sorted.Num(); ++i)
+		{
+			// 템플릿 복제 → 폰트/그림자/letterSpacing 등 스타일을 그대로 상속
+			UCommonTextBlock* Row = DuplicateObject<UCommonTextBlock>(RankingRowTemplate, WidgetTree);
+			Row->SetText(FText::FromString(MakeLine(i)));
+			Row->SetVisibility(ESlateVisibility::Visible);   // 템플릿은 Collapsed → 복제본은 보이게
+			RankingBox->AddChildToVerticalBox(Row);
+
+			// TeamColor는 CommonUI 스타일 색을 이기도록 AddChild(=Synchronize) 이후에 적용
+			const AMTPlayerState* MTPS = Cast<AMTPlayerState>(Sorted[i].PlayerState.Get());
+			Row->SetColorAndOpacity(FSlateColor(MTPS ? MTPS->GetTeamColor() : FLinearColor::White));
+		}
+		return;
+	}
+
+	// 폴백: 템플릿 미배치 시 코드로 행 직접 생성
 	if (RankingBox)
 	{
 		if (RankingText)

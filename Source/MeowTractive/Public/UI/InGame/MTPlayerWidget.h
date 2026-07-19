@@ -6,6 +6,7 @@
 #include "MTPlayerWidget.generated.h"
 
 class UTextBlock;
+class UCommonTextBlock;
 class UProgressBar;
 class UVerticalBox;
 class UImage;
@@ -42,6 +43,10 @@ protected:
 	// 좌상단: 순위 폴백 (RankingBox 없을 때 단색 멀티라인)
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> RankingText;
+
+	// 순위 행 템플릿 — RankingBox 안에 Collapsed로 배치. 행마다 이걸 복제해 텍스트/팀색만 교체
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UCommonTextBlock> RankingRowTemplate;
 
 	// 중앙 상단: 남은 시간 (M:SS)
 	UPROPERTY(meta = (BindWidgetOptional))

@@ -22,6 +22,8 @@ namespace MTGameplayTags
 		// 뚱냥이(치즈) 골골 키트
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Skill_Fatty_Purr);    // 골골거리기 (광역 도트 + 약감속)
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Skill_Fatty_LieDown); // 드러눕기 (자기속박 광역 도트 + 강감속)
+
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Skill_Interact); // 로비 상호작용 (F)
 	}
 
 	// --- 쿨다운 식별 태그 (쿨다운 중 부여) ---
@@ -46,6 +48,7 @@ namespace MTGameplayTags
 	namespace Event
 	{
 		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_MeowPunch_Hit); // 펀치 데미지 창
+		UE_DECLARE_GAMEPLAY_TAG_EXTERN(TAG_Event_Interact_Hit);  // 상호작용 판정 창
 	}
 
 	// --- GameplayCue (연출 전용) ---

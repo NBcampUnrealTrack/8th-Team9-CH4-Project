@@ -10,7 +10,7 @@ class UWidgetComponent;
 class UUserWidget;
 
 /**
- * 로비 호스트 전용 콘솔 조형물: 호스트에게만 보이고, 펀치(C) 시 지정 위젯을 연다.
+ * 로비 호스트 전용 콘솔 조형물: 호스트에게만 보이고, 상호작용(F) 시 지정 위젯을 연다.
  * BP 서브클래스 2종(방설정/강퇴)이 메시·프롬프트·ConsoleWidgetClass를 지정해 로비 맵에 배치.
  * 고양이 선택 조형물(AMTLobbyCharacter)과 같은 IMTLobbySelectable 경로로 동작한다.
  */
