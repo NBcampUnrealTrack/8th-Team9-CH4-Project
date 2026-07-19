@@ -10,6 +10,8 @@ class UImage;
 class UTextBlock;
 class UProgressBar;
 class UTexture2D;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
 class UAbilitySystemComponent;
 class UGameplayAbility;
 class AMTPlayerCharacter;
@@ -59,12 +61,19 @@ protected:
 	UPROPERTY(EditAnywhere, Category = "MT|UI")
 	TObjectPtr<UTexture2D> DefaultIcon;
 
+	// 방사형 쿨다운 머티리얼 (SkillIcon 브러시로 사용). 미지정 시 아이콘 텍스처를 직접 표시(폴백)
+	UPROPERTY(EditAnywhere, Category = "MT|UI")
+	TObjectPtr<UMaterialInterface> CooldownMaterial;
+
 private:
 	// 스펙 검색 + 어빌리티 아이콘 적용 (스펙 복제 지연/리스폰 대응)
 	void ResolveAbilitySpec();
 	void UpdateAbilityCooldown();
 	void UpdateDashSlot();
 	void SetCooldownVisuals(float Remaining, float Duration, bool bDimIcon);
+
+	// 아이콘 적용 — 쿨다운 머티리얼 있으면 MID의 IconTex 파라미터로, 없으면 브러시에 직접
+	void ApplyIcon(UTexture2D* IconTexture);
 
 	TWeakObjectPtr<UAbilitySystemComponent> BoundASC;
 	TWeakObjectPtr<AMTPlayerCharacter> DashCharacter;
@@ -73,4 +82,8 @@ private:
 	TSubclassOf<UGameplayAbility> AbilityClass;   // 클래스 매칭용(패시브·대시)
 	FGameplayAbilitySpecHandle SpecHandle;
 	bool bDashSlot = false;
+
+	// SkillIcon 브러시에 적용된 쿨다운 머티리얼 인스턴스 (Progress/IconTex 세팅용)
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> CooldownMID;
 };
