@@ -3,11 +3,14 @@
 
 #include "UI/InGame/MTMatchGameResultWidget.h"
 #include "Game/MTGameState.h"
+#include "Game/MTGameInstance.h"
 #include "Player/MTPlayerState.h"
+#include "Player/MTPlayerController.h"
 #include "GameFramework/PlayerController.h"
 #include "Kismet/GameplayStatics.h"
 #include "Sound/AmbientSound.h"
 #include "Components/AudioComponent.h"
+#include "CommonButtonBase.h"
 
 void UMTMatchGameResultWidget::NativeConstruct()
 {
@@ -16,12 +19,50 @@ void UMTMatchGameResultWidget::NativeConstruct()
     // 매치→로비 seamless travel 시 이전 판 결과 위젯이 뷰포트에 남는 것 방지
     WorldTearDownHandle = FWorldDelegates::OnWorldBeginTearDown.AddUObject(
         this, &UMTMatchGameResultWidget::HandleWorldTearDown);
+
+    // 이동 버튼 클릭 처리 (BP OnClicked에서 C++로 이관)
+    if (ToLobby)
+    {
+        ToLobby->OnClicked().AddUObject(this, &UMTMatchGameResultWidget::HandleToLobby);
+    }
+    if (ToMain)
+    {
+        ToMain->OnClicked().AddUObject(this, &UMTMatchGameResultWidget::HandleToMain);
+    }
 }
 
 void UMTMatchGameResultWidget::NativeDestruct()
 {
+    // CommonButtonBase는 non-dynamic 이벤트 → 수동 해제
+    if (ToLobby)
+    {
+        ToLobby->OnClicked().RemoveAll(this);
+    }
+    if (ToMain)
+    {
+        ToMain->OnClicked().RemoveAll(this);
+    }
+
     FWorldDelegates::OnWorldBeginTearDown.Remove(WorldTearDownHandle);
     Super::NativeDestruct();
+}
+
+void UMTMatchGameResultWidget::HandleToLobby()
+{
+    // 로비로 돌아가기 (호스트 검증은 서버 RPC 측에서 수행)
+    if (AMTPlayerController* PC = Cast<AMTPlayerController>(GetOwningPlayer()))
+    {
+        PC->Server_ReturnToLobby();
+    }
+}
+
+void UMTMatchGameResultWidget::HandleToMain()
+{
+    // 나가기 = Flow(GameInstance)가 세션 정리 + 메인메뉴 복귀
+    if (UMTGameInstance* GI = Cast<UMTGameInstance>(GetGameInstance()))
+    {
+        GI->LeaveGame();
+    }
 }
 
 void UMTMatchGameResultWidget::HandleWorldTearDown(UWorld* World)
