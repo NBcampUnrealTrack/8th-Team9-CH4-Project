@@ -9,6 +9,8 @@ class AMTPlayerState;
 class AMTLobbyGameState;
 class AMTPlayerController;
 class UTexture2D;
+class UTextBlock;
+class UEnhancedInputUserSettings;
 
 // 목록/상태 갱신 신호 (BP가 구독해 위젯 리프레시)
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FMTOnLobbyHUDRefresh);
@@ -83,7 +85,17 @@ protected:
 	virtual void NativeConstruct() override;
 	virtual void NativeDestruct() override;
 
+	// "R키를 눌러 게임준비" 힌트 — IA_Ready 재바인딩 시 자동 갱신
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> ReadyKeyText;
+
 private:
+	// IA_Ready의 현재 키를 힌트 텍스트에 반영
+	void RefreshReadyKeyHint();
+
+	UFUNCTION()
+	void HandleInputSettingsChanged(UEnhancedInputUserSettings* Settings);
+
 	AMTLobbyGameState* GetLobbyGS() const;
 	AMTPlayerController* GetMTPC() const;
 

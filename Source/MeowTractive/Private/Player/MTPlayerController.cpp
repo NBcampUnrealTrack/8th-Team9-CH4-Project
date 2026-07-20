@@ -27,10 +27,15 @@ void AMTPlayerController::SetupInputComponent()
 		{
 			UE_CLOG(MTLogEnabled(), LogMT, Warning, TEXT("[MTPC] PauseAction 미지정 → 일시정지 입력 없음 (BP_MTPlayerController에서 IA_Pause 지정)"));
 		}
+
+		if (SkillInfoAction)
+		{
+			EIC->BindAction(SkillInfoAction, ETriggerEvent::Started, this, &AMTPlayerController::ToggleSkillInfo);
+		}
 	}
 
-	// F1 → 스킬 정보 패널 토글 (Enhanced Input과 별개로 컨트롤러 InputComponent에 직접 바인딩)
-	if (InputComponent)
+	// 폴백: IA_SkillInfo 미지정 시 기존 F1 하드바인딩 유지 (재바인딩 불가)
+	if (!SkillInfoAction && InputComponent)
 	{
 		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &AMTPlayerController::ToggleSkillInfo);
 	}
@@ -42,11 +47,31 @@ void AMTPlayerController::ToggleSkillInfo()
 	{
 		return;
 	}
+
+	// 매치: HUD 위젯의 패널 토글
 	if (AMTPlayerHUD* MTHUD = GetHUD<AMTPlayerHUD>())
 	{
 		if (UMTPlayerWidget* Widget = MTHUD->GetPlayerWidget())
 		{
 			Widget->ToggleSkillInfo();
+			return;
+		}
+	}
+
+	// 로비 등 매치 HUD 없는 맵: 스킬 정보 전용 위젯을 임시 표시/제거
+	if (SkillInfoFallbackWidget)
+	{
+		SkillInfoFallbackWidget->RemoveFromParent();
+		SkillInfoFallbackWidget = nullptr;
+		return;
+	}
+	if (SkillInfoFallbackWidgetClass)
+	{
+		SkillInfoFallbackWidget = CreateWidget<UMTPlayerWidget>(this, SkillInfoFallbackWidgetClass);
+		if (SkillInfoFallbackWidget)
+		{
+			SkillInfoFallbackWidget->AddToViewport(10);
+			SkillInfoFallbackWidget->SetSkillInfoOnlyMode();
 		}
 	}
 }

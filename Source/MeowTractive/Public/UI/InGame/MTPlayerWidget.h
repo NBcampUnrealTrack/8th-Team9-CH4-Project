@@ -15,6 +15,7 @@ class UMTSkillDescData;
 class AMTGameState;
 class AMTPlayerCharacter;
 class UAbilitySystemComponent;
+class UEnhancedInputUserSettings;
 struct FOnAttributeChangeData;
 
 /** 인게임 HUD: 순위/남은시간/체력/매료 수/스킬 쿨다운. 데이터는 GameState + 소유 폰 ASC 구독. */
@@ -31,6 +32,9 @@ public:
 	// F1 토글: 스킬 정보 패널 열기/닫기 (열 때 현재 고양이 기준으로 설명/아이콘 갱신)
 	UFUNCTION(BlueprintCallable, Category = "MT|HUD")
 	void ToggleSkillInfo();
+
+	// 로비 등 매치 HUD 밖: 스킬 정보 패널만 남기고 즉시 연다 (AddToViewport 이후 호출)
+	void SetSkillInfoOnlyMode();
 
 protected:
 	virtual void NativeConstruct() override;
@@ -85,6 +89,14 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UWidget> SkillInfoCanvas;
 
+	// 도움말 키 힌트 ("F1 - 도움말") — IA_SkillInfo 재바인딩 시 자동 갱신
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> SkillInfoKeyText;
+
+	// 패널 내부 닫기 힌트 ("F1키를 눌러 도움말 닫기") — 위와 함께 갱신
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> SkillInfoCloseText;
+
 	// 패시브 / 스킬1 / 스킬2 설명 텍스트
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UTextBlock> SkillInfo1;
@@ -137,9 +149,18 @@ private:
 	// 현재 고양이의 패시브/스킬 설명을 SkillInfo 텍스트에 반영
 	void RefreshSkillInfo();
 
+	// IA_SkillInfo의 현재 키를 힌트 텍스트에 반영
+	void RefreshSkillInfoKeyHint();
+
+	UFUNCTION()
+	void HandleInputSettingsChanged(UEnhancedInputUserSettings* Settings);
+
 
 	TWeakObjectPtr<AMTGameState> BoundGameState;
 	TWeakObjectPtr<AMTPlayerCharacter> BoundCharacter;
+
+	// 사망 중(폰 없음) 스킬 정보 해석용 — 마지막으로 바인딩한 폰 클래스 (CDO의 CatAbilities 참조)
+	TSubclassOf<AMTPlayerCharacter> LastCharacterClass;
 	TWeakObjectPtr<UAbilitySystemComponent> BoundASC;
 	FDelegateHandle HpChangedHandle;
 	FDelegateHandle MaxHpChangedHandle;

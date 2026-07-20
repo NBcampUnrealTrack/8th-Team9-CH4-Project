@@ -74,6 +74,18 @@ void UMTSkillSlotWidget::BindAbilityByClass(UAbilitySystemComponent* InASC, TSub
 	AbilityClass = InAbilityClass;
 	bDashSlot = false;
 	SpecHandle = FGameplayAbilitySpecHandle();
+
+	// 스펙 해석 없이 CDO 아이콘 즉시 적용 — 사망 중(ASC 없음)·패널 Collapsed(틱 정지)에도 표시됨
+	if (InAbilityClass)
+	{
+		if (const UMTGameplayAbility* AbilityCDO = Cast<UMTGameplayAbility>(InAbilityClass->GetDefaultObject()))
+		{
+			if (UTexture2D* Icon = AbilityCDO->GetAbilityIcon())
+			{
+				ApplyIcon(Icon);
+			}
+		}
+	}
 }
 
 void UMTSkillSlotWidget::BindDash(AMTPlayerCharacter* InCharacter)

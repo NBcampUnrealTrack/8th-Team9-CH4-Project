@@ -6,6 +6,10 @@
 #include "Game/MTGameInstance.h"
 #include "GameFramework/GameStateBase.h"
 #include "TimerManager.h"
+#include "Components/TextBlock.h"
+#include "EnhancedInputSubsystems.h"
+#include "UserSettings/EnhancedInputUserSettings.h"
+#include "UI/MTUIInputUtils.h"
 
 void UMTLobbyHUDWidget::NativeConstruct()
 {
@@ -24,6 +28,20 @@ void UMTLobbyHUDWidget::NativeConstruct()
 	{
 		World->GetTimerManager().SetTimer(RefreshTimer, this, &UMTLobbyHUDWidget::PollRefresh, 0.4f, true);
 	}
+
+	// R키 힌트 — 키 재바인딩 이벤트 구독으로 동적 갱신
+	if (const ULocalPlayer* LP = GetOwningLocalPlayer())
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+		{
+			if (UEnhancedInputUserSettings* Settings = Subsystem->GetUserSettings())
+			{
+				Settings->OnSettingsChanged.AddUniqueDynamic(this, &UMTLobbyHUDWidget::HandleInputSettingsChanged);
+			}
+		}
+	}
+	RefreshReadyKeyHint();
+
 	OnRefresh.Broadcast();
 }
 
@@ -34,11 +52,37 @@ void UMTLobbyHUDWidget::NativeDestruct()
 		GS->OnRoomSettingsChanged.RemoveDynamic(this, &UMTLobbyHUDWidget::HandleRoomSettingsChanged);
 		GS->OnStartCountdownChanged.RemoveDynamic(this, &UMTLobbyHUDWidget::HandleCountdownChanged);
 	}
+	if (const ULocalPlayer* LP = GetOwningLocalPlayer())
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+		{
+			if (UEnhancedInputUserSettings* Settings = Subsystem->GetUserSettings())
+			{
+				Settings->OnSettingsChanged.RemoveDynamic(this, &UMTLobbyHUDWidget::HandleInputSettingsChanged);
+			}
+		}
+	}
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().ClearTimer(RefreshTimer);
 	}
 	Super::NativeDestruct();
+}
+
+void UMTLobbyHUDWidget::RefreshReadyKeyHint()
+{
+	if (!ReadyKeyText)
+	{
+		return;
+	}
+	const FKey Key = MTUIInput::GetPlayerMappedKey(GetOwningLocalPlayer(), TEXT("IA_Ready"), EKeys::R);
+	ReadyKeyText->SetText(FText::FromString(
+		FString::Printf(TEXT("%s키를 눌러 게임준비"), *Key.GetDisplayName(/*bLongDisplayName=*/false).ToString())));
+}
+
+void UMTLobbyHUDWidget::HandleInputSettingsChanged(UEnhancedInputUserSettings* /*Settings*/)
+{
+	RefreshReadyKeyHint();
 }
 
 TArray<AMTPlayerState*> UMTLobbyHUDWidget::GetPlayers() const

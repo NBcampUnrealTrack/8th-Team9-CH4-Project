@@ -227,6 +227,13 @@ public:
 	// 현재 선택 고양이의 대표 패시브 클래스 (HUD 패시브 슬롯용). PossessedBy의 부여 로직과 동일 기준.
 	TSubclassOf<UGameplayAbility> GetActivePassiveClass() const;
 
+	// 고양이별 어빌리티 클래스 조회 — CDO에서도 유효 (사망 중 HUD가 폰 없이 아이콘 해석용)
+	TSubclassOf<UGameplayAbility> GetPassiveClassForCat(EMTCatType Cat) const;
+	TSubclassOf<UGameplayAbility> GetSkillClassForCat(EMTCatType Cat, EMTAbilitySlot Slot) const;
+
+	// 로비 선택이 없을 때 폴백 고양이 (HUD 공유용)
+	EMTCatType GetDefaultCatType() const { return DefaultCatType; }
+
 	// 현재 활성 고양이 종류 (선택값 우선, 없으면 DefaultCatType 폴백) — PossessedBy/패시브와 동일 기준
 	UFUNCTION(BlueprintPure, Category = "MT|Cat")
 	EMTCatType GetActiveCatType() const;

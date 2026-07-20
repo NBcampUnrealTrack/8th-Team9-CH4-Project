@@ -307,17 +307,11 @@ EMTCatType AMTPlayerCharacter::GetActiveCatType() const
 
 TSubclassOf<UGameplayAbility> AMTPlayerCharacter::GetActivePassiveClass() const
 {
-	// PossessedBy의 고양이 결정과 동일: 선택값 우선, 없으면 폴백
-	EMTCatType Cat = EMTCatType::None;
-	if (const AMTPlayerState* PS = GetPlayerState<AMTPlayerState>())
-	{
-		Cat = PS->GetSelectedCat();
-	}
-	if (Cat == EMTCatType::None)
-	{
-		Cat = DefaultCatType;
-	}
+	return GetPassiveClassForCat(GetActiveCatType());
+}
 
+TSubclassOf<UGameplayAbility> AMTPlayerCharacter::GetPassiveClassForCat(EMTCatType Cat) const
+{
 	if (const FMTCatAbilitySet* Set = CatAbilities.Find(Cat))
 	{
 		// 대표 패시브 = 첫 유효 항목 (고양이당 1개 전제, 여러 개면 첫 번째)
@@ -328,6 +322,15 @@ TSubclassOf<UGameplayAbility> AMTPlayerCharacter::GetActivePassiveClass() const
 				return Passive;
 			}
 		}
+	}
+	return nullptr;
+}
+
+TSubclassOf<UGameplayAbility> AMTPlayerCharacter::GetSkillClassForCat(EMTCatType Cat, EMTAbilitySlot Slot) const
+{
+	if (const FMTCatAbilitySet* Set = CatAbilities.Find(Cat))
+	{
+		return (Slot == EMTAbilitySlot::SkillA) ? Set->SkillA : Set->SkillB;
 	}
 	return nullptr;
 }

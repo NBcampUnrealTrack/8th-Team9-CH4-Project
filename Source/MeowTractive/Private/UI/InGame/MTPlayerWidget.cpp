@@ -12,8 +12,12 @@
 #include "Components/ProgressBar.h"
 #include "Components/VerticalBox.h"
 #include "Blueprint/WidgetTree.h"
+#include "Components/PanelWidget.h"
 #include "Components/Image.h"
 #include "GameFramework/PlayerState.h"
+#include "EnhancedInputSubsystems.h"
+#include "UserSettings/EnhancedInputUserSettings.h"
+#include "UI/MTUIInputUtils.h"
 
 void UMTPlayerWidget::NativeConstruct()
 {
@@ -26,6 +30,19 @@ void UMTPlayerWidget::NativeConstruct()
 	{
 		SkillInfoCanvas->SetVisibility(ESlateVisibility::Collapsed);
 	}
+
+	// 도움말 키 힌트 — 키 재바인딩 이벤트 구독으로 동적 갱신
+	if (const ULocalPlayer* LP = GetOwningLocalPlayer())
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+		{
+			if (UEnhancedInputUserSettings* Settings = Subsystem->GetUserSettings())
+			{
+				Settings->OnSettingsChanged.AddUniqueDynamic(this, &UMTPlayerWidget::HandleInputSettingsChanged);
+			}
+		}
+	}
+	RefreshSkillInfoKeyHint();
 }
 
 void UMTPlayerWidget::NativeDestruct()
@@ -36,6 +53,17 @@ void UMTPlayerWidget::NativeDestruct()
 		GS->OnMatchTimeUpdated.RemoveDynamic(this, &UMTPlayerWidget::HandleMatchTimeUpdated);
 	}
 	UnbindCharacter();
+
+	if (const ULocalPlayer* LP = GetOwningLocalPlayer())
+	{
+		if (UEnhancedInputLocalPlayerSubsystem* Subsystem = LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>())
+		{
+			if (UEnhancedInputUserSettings* Settings = Subsystem->GetUserSettings())
+			{
+				Settings->OnSettingsChanged.RemoveDynamic(this, &UMTPlayerWidget::HandleInputSettingsChanged);
+			}
+		}
+	}
 
 	if (UWorld* World = GetWorld())
 	{
@@ -90,6 +118,7 @@ void UMTPlayerWidget::TryBindCharacter()
 
 	BoundCharacter = Character;
 	BoundASC = ASC;
+	LastCharacterClass = Character->GetClass();
 
 	HpChangedHandle = ASC->GetGameplayAttributeValueChangeDelegate(UMTPlayerAttributeSet::GetHpAttribute())
 		.AddUObject(this, &UMTPlayerWidget::HandleHpChanged);
@@ -119,22 +148,8 @@ void UMTPlayerWidget::TryBindCharacter()
 		SkillBSlot->SetKeyMappingName(TEXT("IA_SkillB"));
 	}
 
-	// 스킬 정보 패널 아이콘 슬롯 — 현재 고양이 기준으로 아이콘 바인딩 (키 표시는 불필요)
-	if (PassiveSlot_SkillInfo)
-	{
-		PassiveSlot_SkillInfo->BindAbilityByClass(ASC, Character->GetActivePassiveClass());
-		PassiveSlot_SkillInfo->SetIconOnly(true);
-	}
-	if (SkillASlot_SkillInfo)
-	{
-		SkillASlot_SkillInfo->BindAbilityBySlot(ASC, (int32)EMTAbilitySlot::SkillA);
-		SkillASlot_SkillInfo->SetIconOnly(true);
-	}
-	if (SkillBSlot_SkillInfo)
-	{
-		SkillBSlot_SkillInfo->BindAbilityBySlot(ASC, (int32)EMTAbilitySlot::SkillB);
-		SkillBSlot_SkillInfo->SetIconOnly(true);
-	}
+	// 스킬 정보 패널 — 텍스트·아이콘을 현재 고양이 기준으로 갱신 (리스폰 재바인딩 포함)
+	RefreshSkillInfo();
 
 	RefreshHp();
 	RefreshAccentColor();
@@ -318,17 +333,57 @@ void UMTPlayerWidget::RefreshAttractedCount()
 
 void UMTPlayerWidget::RefreshSkillInfo()
 {
+	// 사망 중엔 폰이 없으므로 PlayerState 선택값 + 마지막 폰 클래스 CDO로 해석 (GameMode는 서버 전용이라 참조 불가)
+	AMTPlayerCharacter* Char = BoundCharacter.Get();
+	const AMTPlayerCharacter* Source = Char;
+	if (!Source && LastCharacterClass)
+	{
+		Source = LastCharacterClass->GetDefaultObject<AMTPlayerCharacter>();
+	}
+
+	EMTCatType Cat = EMTCatType::None;
+	if (Char)
+	{
+		Cat = Char->GetActiveCatType();   // 선택값 우선, 없으면 DefaultCatType 폴백
+	}
+	else
+	{
+		const APlayerController* PC = GetOwningPlayer();
+		if (const AMTPlayerState* PS = PC ? PC->GetPlayerState<AMTPlayerState>() : nullptr)
+		{
+			Cat = PS->GetSelectedCat();
+		}
+		if (Cat == EMTCatType::None && Source)
+		{
+			Cat = Source->GetDefaultCatType();
+		}
+	}
+
+	// 아이콘: 클래스 CDO에서 해석하므로 ASC(사망 시 무효)가 없어도 표시됨
+	if (Source)
+	{
+		UAbilitySystemComponent* ASC = BoundASC.Get();
+		if (PassiveSlot_SkillInfo)
+		{
+			PassiveSlot_SkillInfo->BindAbilityByClass(ASC, Source->GetPassiveClassForCat(Cat));
+			PassiveSlot_SkillInfo->SetIconOnly(true);
+		}
+		if (SkillASlot_SkillInfo)
+		{
+			SkillASlot_SkillInfo->BindAbilityByClass(ASC, Source->GetSkillClassForCat(Cat, EMTAbilitySlot::SkillA));
+			SkillASlot_SkillInfo->SetIconOnly(true);
+		}
+		if (SkillBSlot_SkillInfo)
+		{
+			SkillBSlot_SkillInfo->BindAbilityByClass(ASC, Source->GetSkillClassForCat(Cat, EMTAbilitySlot::SkillB));
+			SkillBSlot_SkillInfo->SetIconOnly(true);
+		}
+	}
+
 	if (!SkillDescData)
 	{
 		return;   // DataAsset 미지정 (Class Defaults에서 할당 필요)
 	}
-
-	EMTCatType Cat = EMTCatType::None;
-	if (AMTPlayerCharacter* Char = BoundCharacter.Get())
-	{
-		Cat = Char->GetActiveCatType();   // 선택값 우선, 없으면 DefaultCatType 폴백
-	}
-
 	const FMTCatSkillDesc* Desc = SkillDescData->Descriptions.Find(Cat);
 	if (!Desc)
 	{
@@ -337,6 +392,53 @@ void UMTPlayerWidget::RefreshSkillInfo()
 	if (SkillInfo1) { SkillInfo1->SetText(Desc->Passive); }
 	if (SkillInfo2) { SkillInfo2->SetText(Desc->Skill1); }
 	if (SkillInfo3) { SkillInfo3->SetText(Desc->Skill2); }
+}
+
+void UMTPlayerWidget::RefreshSkillInfoKeyHint()
+{
+	if (!SkillInfoKeyText && !SkillInfoCloseText)
+	{
+		return;
+	}
+
+	// IA_SkillInfo의 First 슬롯 현재 키 조회 (재바인딩 정보 없으면 기본 F1)
+	const FKey Key = MTUIInput::GetPlayerMappedKey(GetOwningLocalPlayer(), TEXT("IA_SkillInfo"), EKeys::F1);
+
+	const FString KeyName = Key.GetDisplayName(/*bLongDisplayName=*/false).ToString();
+	if (SkillInfoKeyText)
+	{
+		SkillInfoKeyText->SetText(FText::FromString(FString::Printf(TEXT("%s - 도움말"), *KeyName)));
+	}
+	if (SkillInfoCloseText)
+	{
+		SkillInfoCloseText->SetText(FText::FromString(FString::Printf(TEXT("%s키를 눌러 도움말 닫기"), *KeyName)));
+	}
+}
+
+void UMTPlayerWidget::HandleInputSettingsChanged(UEnhancedInputUserSettings* /*Settings*/)
+{
+	RefreshSkillInfoKeyHint();
+}
+
+void UMTPlayerWidget::SetSkillInfoOnlyMode()
+{
+	// HUD 요소(체력/순위/슬롯/힌트) 전부 숨기고 패널만 사용
+	if (UPanelWidget* Root = Cast<UPanelWidget>(GetRootWidget()))
+	{
+		for (int32 i = 0; i < Root->GetChildrenCount(); ++i)
+		{
+			UWidget* Child = Root->GetChildAt(i);
+			if (Child && Child != SkillInfoCanvas)
+			{
+				Child->SetVisibility(ESlateVisibility::Collapsed);
+			}
+		}
+	}
+
+	if (SkillInfoCanvas && !SkillInfoCanvas->IsVisible())
+	{
+		ToggleSkillInfo();   // 패널 즉시 열기 (텍스트/아이콘 갱신 포함)
+	}
 }
 
 void UMTPlayerWidget::ToggleSkillInfo()

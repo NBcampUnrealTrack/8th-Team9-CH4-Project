@@ -59,6 +59,14 @@ public:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
 	TObjectPtr<UInputAction> PauseAction;
 
+	// 스킬 정보(도움말) 토글 입력 (IA_SkillInfo — 기본 F1, 키 설정에서 재바인딩 가능)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TObjectPtr<UInputAction> SkillInfoAction;
+
+	// 매치 HUD가 없는 맵(로비)에서 도움말을 띄울 위젯 (WBP_MTPlayerWidget — 스킬 정보 전용 모드로 표시)
+	UPROPERTY(EditDefaultsOnly, Category = "MT|UI")
+	TSubclassOf<class UMTPlayerWidget> SkillInfoFallbackWidgetClass;
+
 	UFUNCTION(Client, Reliable)
 	void ClientShowHitMarker();
 
@@ -72,4 +80,8 @@ private:
 	// 열려 있는 일시정지 메뉴 인스턴스 (없으면 nullptr = 닫힘)
 	UPROPERTY(Transient)
 	TObjectPtr<class UMTPauseMenuWidget> PauseMenu;
+
+	// 로비 도움말 위젯 인스턴스 (없으면 nullptr = 닫힘)
+	UPROPERTY(Transient)
+	TObjectPtr<class UMTPlayerWidget> SkillInfoFallbackWidget;
 };
