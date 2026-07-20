@@ -22,6 +22,7 @@ protected:
 	FTimerHandle BeamTimerHandle;
 	FTimerHandle BeamVisualTimerHandle;
 	FTimerHandle BeamFXCleanupTimerHandle;
+	FTimerHandle BeamFXFadeInTimerHandle;
 	bool bIsBeamVisualUpdateActive = false;
 	bool bIsAttractiveBeamFXEnding = false;
 
@@ -74,6 +75,9 @@ protected:
 	FName AttractiveBeamSocketName = TEXT("attractivebeam");
 
 	UPROPERTY(EditDefaultsOnly, Category = "AttractiveBeam|FX", meta = (ClampMin = "0.0"))
+	float BeamFXFadeInTime = 0.2f;
+
+	UPROPERTY(EditDefaultsOnly, Category = "AttractiveBeam|FX", meta = (ClampMin = "0.0"))
 	float BeamFXFadeOutTime = 0.35f;
 
 	UPROPERTY(Transient)
@@ -106,6 +110,8 @@ private:
 	void UpdateAttractiveBeamFX(const FVector& Start, const FVector& End);
 	void UpdateAttractiveBeamHitFX(bool bHitActor);
 	void StopAttractiveBeamFX();
+	// 매료빔 시작 페이드 완료 후 Niagara에 정상 상태를 알린다.
+	void FinishAttractiveBeamFadeIn();
 	void FinishAttractiveBeamFX();
 	FVector GetAttractiveBeamFXStartLocation() const;
 	FLinearColor GetAvatarPlayerColor() const;

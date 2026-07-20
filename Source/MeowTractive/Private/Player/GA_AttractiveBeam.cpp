@@ -196,57 +196,74 @@ void UGA_AttractiveBeam::StartAttractiveBeamFX()
 		if (UWorld* World = GetWorld())
 		{
 			World->GetTimerManager().ClearTimer(BeamFXCleanupTimerHandle);
+			World->GetTimerManager().ClearTimer(BeamFXFadeInTimerHandle);
 		}
 
 		bIsAttractiveBeamFXEnding = false;
-		ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.BeamEnding")), false);
-		ActiveAttractiveBeamFX->SetVariableFloat(FName(TEXT("User.BeamFadeOutTime")), BeamFXFadeOutTime);
 		ActiveAttractiveBeamFX->Activate(true);
-		ActiveAttractiveBeamFX->SetVariableLinearColor(FName(TEXT("User.PlayerColor")), GetAvatarPlayerColor());
-		return;
 	}
-
-	AActor* Avatar = GetAvatarActorFromActorInfo();
-	if (!Avatar)
+	else
 	{
-		return;
-	}
-
-	USceneComponent* AttachComponent = Avatar->GetRootComponent();
-	if (const ACharacter* Character = Cast<ACharacter>(Avatar))
-	{
-		if (Character->GetMesh())
+		AActor* Avatar = GetAvatarActorFromActorInfo();
+		if (!Avatar)
 		{
-			AttachComponent = Character->GetMesh();
+			return;
 		}
+
+		USceneComponent* AttachComponent = Avatar->GetRootComponent();
+		if (const ACharacter* Character = Cast<ACharacter>(Avatar))
+		{
+			if (Character->GetMesh())
+			{
+				AttachComponent = Character->GetMesh();
+			}
+		}
+
+		if (!AttachComponent)
+		{
+			return;
+		}
+
+		UNiagaraSystem* AttractiveBeamFXAsset = AttractiveBeamFX.Get();
+		if (!AttractiveBeamFXAsset)
+		{
+			return;
+		}
+
+		ActiveAttractiveBeamFX = UNiagaraFunctionLibrary::SpawnSystemAttached(
+			AttractiveBeamFXAsset,
+			AttachComponent,
+			AttractiveBeamSocketName,
+			FVector::ZeroVector,
+			FRotator::ZeroRotator,
+			EAttachLocation::SnapToTarget,
+			false);
 	}
 
-	if (!AttachComponent)
+	if (!ActiveAttractiveBeamFX)
 	{
 		return;
 	}
 
-	UNiagaraSystem* AttractiveBeamFXAsset = AttractiveBeamFX.Get();
-	if (!AttractiveBeamFXAsset)
+	bIsAttractiveBeamFXEnding = false;
+	ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.BeamStarting")), true);
+	ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.BeamEnding")), false);
+	ActiveAttractiveBeamFX->SetVariableFloat(FName(TEXT("User.BeamFadeInTime")), BeamFXFadeInTime);
+	ActiveAttractiveBeamFX->SetVariableFloat(FName(TEXT("User.BeamFadeOutTime")), BeamFXFadeOutTime);
+	ActiveAttractiveBeamFX->SetVariableLinearColor(FName(TEXT("User.PlayerColor")), GetAvatarPlayerColor());
+
+	if (BeamFXFadeInTime <= 0.f)
 	{
-		return;
+		FinishAttractiveBeamFadeIn();
 	}
-
-	ActiveAttractiveBeamFX = UNiagaraFunctionLibrary::SpawnSystemAttached(
-		AttractiveBeamFXAsset,
-		AttachComponent,
-		AttractiveBeamSocketName,
-		FVector::ZeroVector,
-		FRotator::ZeroRotator,
-		EAttachLocation::SnapToTarget,
-		false);
-
-	if (ActiveAttractiveBeamFX)
+	else if (UWorld* World = GetWorld())
 	{
-		bIsAttractiveBeamFXEnding = false;
-		ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.BeamEnding")), false);
-		ActiveAttractiveBeamFX->SetVariableFloat(FName(TEXT("User.BeamFadeOutTime")), BeamFXFadeOutTime);
-		ActiveAttractiveBeamFX->SetVariableLinearColor(FName(TEXT("User.PlayerColor")), GetAvatarPlayerColor());
+		World->GetTimerManager().SetTimer(
+			BeamFXFadeInTimerHandle,
+			this,
+			&UGA_AttractiveBeam::FinishAttractiveBeamFadeIn,
+			BeamFXFadeInTime,
+			false);
 	}
 }
 
@@ -283,6 +300,11 @@ void UGA_AttractiveBeam::StopAttractiveBeamFX()
 	}
 
 	bIsAttractiveBeamFXEnding = true;
+	if (UWorld* World = GetWorld())
+	{
+		World->GetTimerManager().ClearTimer(BeamFXFadeInTimerHandle);
+	}
+	ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.BeamStarting")), false);
 	ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.BeamEnding")), true);
 	ActiveAttractiveBeamFX->SetVariableFloat(FName(TEXT("User.BeamFadeOutTime")), BeamFXFadeOutTime);
 
@@ -305,6 +327,15 @@ void UGA_AttractiveBeam::StopAttractiveBeamFX()
 	}
 
 	FinishAttractiveBeamFX();
+}
+
+// 매료빔 시작 페이드 완료 후 Niagara에 정상 상태를 알린다.
+void UGA_AttractiveBeam::FinishAttractiveBeamFadeIn()
+{
+	if (ActiveAttractiveBeamFX)
+	{
+		ActiveAttractiveBeamFX->SetVariableBool(FName(TEXT("User.BeamStarting")), false);
+	}
 }
 
 //VFX 스케일/페이드 아웃 종료, 이펙트 제거.
