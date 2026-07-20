@@ -24,6 +24,7 @@ AMTLobbyGameMode::AMTLobbyGameMode()
 	// TODO: 공원 맵 완성 시 실제 맵으로 교체 (현재는 프로토타입 맵 사용)
 	FallbackMatchMap = TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/Map/TestMap.TestMap")));
 	MatchMaps.Add(EMTRoomMap::Park, FallbackMatchMap);
+	MatchMaps.Add(EMTRoomMap::City, TSoftObjectPtr<UWorld>(FSoftObjectPath(TEXT("/Game/LS_Scifi_ModernCity/Maps/Scifi_ModernCity.Scifi_ModernCity"))));
 
 	// 슬롯별 팀색 (빨·파·초·노) — AMTMatchGameMode 폴백 팔레트와 동일하게 유지
 	TeamColors = {

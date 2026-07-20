@@ -37,6 +37,7 @@ UENUM(BlueprintType)
 enum class EMTRoomMap : uint8
 {
 	Park     UMETA(DisplayName = "공원"),
+	City     UMETA(DisplayName = "도시"),
 	Random   UMETA(DisplayName = "랜덤"),
 };
 
