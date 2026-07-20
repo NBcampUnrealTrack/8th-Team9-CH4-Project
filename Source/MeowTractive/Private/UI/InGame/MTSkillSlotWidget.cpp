@@ -10,6 +10,30 @@
 #include "GameFramework/GameStateBase.h"
 #include "Materials/MaterialInterface.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "EnhancedInputSubsystems.h"
+#include "UserSettings/EnhancedInputUserSettings.h"
+#include "InputCoreTypes.h"
+
+void UMTSkillSlotWidget::NativeConstruct()
+{
+	Super::NativeConstruct();
+
+	// 키 재설정 시 SkillKeyText 갱신 구독
+	if (UEnhancedInputUserSettings* Settings = GetInputUserSettings())
+	{
+		Settings->OnSettingsChanged.AddUniqueDynamic(this, &UMTSkillSlotWidget::HandleInputSettingsChanged);
+	}
+	RefreshKeyText();
+}
+
+void UMTSkillSlotWidget::NativeDestruct()
+{
+	if (UEnhancedInputUserSettings* Settings = GetInputUserSettings())
+	{
+		Settings->OnSettingsChanged.RemoveDynamic(this, &UMTSkillSlotWidget::HandleInputSettingsChanged);
+	}
+	Super::NativeDestruct();
+}
 
 void UMTSkillSlotWidget::NativePreConstruct()
 {
@@ -78,6 +102,13 @@ void UMTSkillSlotWidget::NativeTick(const FGeometry& MyGeometry, float InDeltaTi
 	if (!SpecHandle.IsValid())
 	{
 		ResolveAbilitySpec();
+	}
+
+	// 정보 패널용: 아이콘만 (항상 활성 상태 고정, 쿨다운/카운트/키 갱신 생략)
+	if (bIconOnly)
+	{
+		SetCooldownVisuals(0.f, 0.f, false);
+		return;
 	}
 
 	if (bDashSlot)
@@ -244,5 +275,100 @@ void UMTSkillSlotWidget::ApplyIcon(UTexture2D* IconTexture)
 	if (IconTexture)
 	{
 		SkillIcon->SetBrushFromTexture(IconTexture);
+	}
+}
+
+UEnhancedInputUserSettings* UMTSkillSlotWidget::GetInputUserSettings() const
+{
+	const ULocalPlayer* LP = GetOwningLocalPlayer();
+	UEnhancedInputLocalPlayerSubsystem* Subsystem =
+		LP ? LP->GetSubsystem<UEnhancedInputLocalPlayerSubsystem>() : nullptr;
+	return Subsystem ? Subsystem->GetUserSettings() : nullptr;
+}
+
+void UMTSkillSlotWidget::SetKeyMappingName(FName InMappingName)
+{
+	KeyMappingName = InMappingName;
+	RefreshKeyText();
+}
+
+void UMTSkillSlotWidget::SetNoKeyLabel(const FText& InLabel)
+{
+	NoKeyLabel = InLabel;
+	RefreshKeyText();
+}
+
+void UMTSkillSlotWidget::SetIconOnly(bool bInIconOnly)
+{
+	bIconOnly = bInIconOnly;
+}
+
+void UMTSkillSlotWidget::HandleInputSettingsChanged(UEnhancedInputUserSettings* /*Settings*/)
+{
+	RefreshKeyText();
+}
+
+// 키 표시명 축약: Left Shift→Shift, Left Mouse Button→LMB 등
+static FText AbbreviateKeyName(const FKey& Key)
+{
+	if (Key == EKeys::LeftShift || Key == EKeys::RightShift)     { return FText::FromString(TEXT("Shift")); }
+	if (Key == EKeys::LeftControl || Key == EKeys::RightControl) { return FText::FromString(TEXT("Ctrl")); }
+	if (Key == EKeys::LeftAlt || Key == EKeys::RightAlt)         { return FText::FromString(TEXT("Alt")); }
+	if (Key == EKeys::LeftMouseButton)   { return FText::FromString(TEXT("LMB")); }
+	if (Key == EKeys::RightMouseButton)  { return FText::FromString(TEXT("RMB")); }
+	if (Key == EKeys::MiddleMouseButton) { return FText::FromString(TEXT("MMB")); }
+	if (Key == EKeys::SpaceBar)          { return FText::FromString(TEXT("Space")); }
+	return Key.GetDisplayName(/*bLongDisplayName=*/false);
+}
+
+void UMTSkillSlotWidget::RefreshKeyText()
+{
+	if (!SkillKeyText)
+	{
+		return;
+	}
+	if (KeyMappingName.IsNone())
+	{
+		// 키 없는 슬롯(패시브 등) — 고정 라벨이 있으면 표시, 없으면 숨김
+		if (!NoKeyLabel.IsEmpty())
+		{
+			SkillKeyText->SetText(NoKeyLabel);
+			SkillKeyText->SetVisibility(ESlateVisibility::HitTestInvisible);
+		}
+		else
+		{
+			SkillKeyText->SetVisibility(ESlateVisibility::Collapsed);
+		}
+		return;
+	}
+
+	// 매핑 이름으로 First 슬롯의 현재 키를 조회
+	FKey CurrentKey;
+	if (UEnhancedInputUserSettings* Settings = GetInputUserSettings())
+	{
+		if (const UEnhancedPlayerMappableKeyProfile* Profile = Settings->GetActiveKeyProfile())
+		{
+			if (const FKeyMappingRow* Row = Profile->GetPlayerMappingRows().Find(KeyMappingName))
+			{
+				for (const FPlayerKeyMapping& Mapping : Row->Mappings)
+				{
+					if (Mapping.GetSlot() == EPlayerMappableKeySlot::First)
+					{
+						CurrentKey = Mapping.GetCurrentKey();
+						break;
+					}
+				}
+			}
+		}
+	}
+
+	if (CurrentKey.IsValid())
+	{
+		SkillKeyText->SetText(AbbreviateKeyName(CurrentKey));
+		SkillKeyText->SetVisibility(ESlateVisibility::HitTestInvisible);
+	}
+	else
+	{
+		SkillKeyText->SetVisibility(ESlateVisibility::Collapsed);
 	}
 }

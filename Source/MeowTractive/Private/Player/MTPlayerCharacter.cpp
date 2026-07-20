@@ -291,6 +291,20 @@ void AMTPlayerCharacter::FreezeForMatchEnd()
 	}
 }
 
+EMTCatType AMTPlayerCharacter::GetActiveCatType() const
+{
+	EMTCatType Cat = EMTCatType::None;
+	if (const AMTPlayerState* PS = GetPlayerState<AMTPlayerState>())
+	{
+		Cat = PS->GetSelectedCat();
+	}
+	if (Cat == EMTCatType::None)
+	{
+		Cat = DefaultCatType;   // 로비 선택 없을 때 폴백
+	}
+	return Cat;
+}
+
 TSubclassOf<UGameplayAbility> AMTPlayerCharacter::GetActivePassiveClass() const
 {
 	// PossessedBy의 고양이 결정과 동일: 선택값 우선, 없으면 폴백

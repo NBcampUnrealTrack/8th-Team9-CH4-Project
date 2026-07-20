@@ -1,5 +1,6 @@
 ﻿#include "UI/InGame/MTPlayerWidget.h"
 #include "UI/InGame/MTSkillSlotWidget.h"
+#include "UI/InGame/MTSkillDescData.h"
 #include "Game/MTGameState.h"
 #include "Game/MTGameplayTags.h"
 #include "Player/MTPlayerCharacter.h"
@@ -19,6 +20,12 @@ void UMTPlayerWidget::NativeConstruct()
 	Super::NativeConstruct();
 	TryBindGameState();
 	TryBindCharacter();
+
+	// 스킬 정보 패널은 기본 숨김 (F1로 토글)
+	if (SkillInfoCanvas)
+	{
+		SkillInfoCanvas->SetVisibility(ESlateVisibility::Collapsed);
+	}
 }
 
 void UMTPlayerWidget::NativeDestruct()
@@ -94,18 +101,39 @@ void UMTPlayerWidget::TryBindCharacter()
 	{
 		// 선택 고양이의 패시브 아이콘 표시 (입력·쿨다운 없음)
 		PassiveSlot->BindAbilityByClass(ASC, Character->GetActivePassiveClass());
+		PassiveSlot->SetNoKeyLabel(FText::FromString(TEXT("패시브")));
 	}
 	if (DashSlot)
 	{
 		DashSlot->BindDash(Character);
+		DashSlot->SetKeyMappingName(TEXT("IA_Dash"));
 	}
 	if (SkillASlot)
 	{
 		SkillASlot->BindAbilityBySlot(ASC, (int32)EMTAbilitySlot::SkillA);
+		SkillASlot->SetKeyMappingName(TEXT("IA_SkillA"));
 	}
 	if (SkillBSlot)
 	{
 		SkillBSlot->BindAbilityBySlot(ASC, (int32)EMTAbilitySlot::SkillB);
+		SkillBSlot->SetKeyMappingName(TEXT("IA_SkillB"));
+	}
+
+	// 스킬 정보 패널 아이콘 슬롯 — 현재 고양이 기준으로 아이콘 바인딩 (키 표시는 불필요)
+	if (PassiveSlot_SkillInfo)
+	{
+		PassiveSlot_SkillInfo->BindAbilityByClass(ASC, Character->GetActivePassiveClass());
+		PassiveSlot_SkillInfo->SetIconOnly(true);
+	}
+	if (SkillASlot_SkillInfo)
+	{
+		SkillASlot_SkillInfo->BindAbilityBySlot(ASC, (int32)EMTAbilitySlot::SkillA);
+		SkillASlot_SkillInfo->SetIconOnly(true);
+	}
+	if (SkillBSlot_SkillInfo)
+	{
+		SkillBSlot_SkillInfo->BindAbilityBySlot(ASC, (int32)EMTAbilitySlot::SkillB);
+		SkillBSlot_SkillInfo->SetIconOnly(true);
 	}
 
 	RefreshHp();
@@ -286,6 +314,47 @@ void UMTPlayerWidget::RefreshAttractedCount()
 		return;
 	}
 	AttractedCountText->SetText(FText::AsNumber(GS->GetAttractedCount(MyPS)));
+}
+
+void UMTPlayerWidget::RefreshSkillInfo()
+{
+	if (!SkillDescData)
+	{
+		return;   // DataAsset 미지정 (Class Defaults에서 할당 필요)
+	}
+
+	EMTCatType Cat = EMTCatType::None;
+	if (AMTPlayerCharacter* Char = BoundCharacter.Get())
+	{
+		Cat = Char->GetActiveCatType();   // 선택값 우선, 없으면 DefaultCatType 폴백
+	}
+
+	const FMTCatSkillDesc* Desc = SkillDescData->Descriptions.Find(Cat);
+	if (!Desc)
+	{
+		return;
+	}
+	if (SkillInfo1) { SkillInfo1->SetText(Desc->Passive); }
+	if (SkillInfo2) { SkillInfo2->SetText(Desc->Skill1); }
+	if (SkillInfo3) { SkillInfo3->SetText(Desc->Skill2); }
+}
+
+void UMTPlayerWidget::ToggleSkillInfo()
+{
+	if (!SkillInfoCanvas)
+	{
+		return;
+	}
+
+	if (SkillInfoCanvas->IsVisible())
+	{
+		SkillInfoCanvas->SetVisibility(ESlateVisibility::Collapsed);
+	}
+	else
+	{
+		RefreshSkillInfo();   // 열 때 현재 고양이 기준으로 텍스트 갱신 (아이콘은 슬롯이 자체 반영)
+		SkillInfoCanvas->SetVisibility(ESlateVisibility::SelfHitTestInvisible);
+	}
 }
 
 void UMTPlayerWidget::RefreshHp()

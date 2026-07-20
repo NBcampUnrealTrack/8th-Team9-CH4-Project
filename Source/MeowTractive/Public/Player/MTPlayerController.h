@@ -65,6 +65,9 @@ public:
 protected:
 	virtual void SetupInputComponent() override;
 
+	// F1 → 스킬 정보 패널 토글 (HUD 위젯에 위임). 로컬 전용.
+	void ToggleSkillInfo();
+
 private:
 	// 열려 있는 일시정지 메뉴 인스턴스 (없으면 nullptr = 닫힘)
 	UPROPERTY(Transient)
