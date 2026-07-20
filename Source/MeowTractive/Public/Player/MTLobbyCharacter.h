@@ -74,7 +74,24 @@ protected:
 	// 프롬프트 위젯에 행동 이름 주입 (위젯 생성 지연 대비 — 가시성 타이머에서 재시도)
 	void PushPromptLabel();
 
+	// 근접 아웃라인 트리거 (Pawn 오버랩)
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "MT|Lobby")
+	TObjectPtr<class USphereComponent> OutlineTrigger;
+
+	// 근접 아웃라인 색 (MM_PPInteractOutline 스텐실 1~3)
+	UPROPERTY(EditAnywhere, Category = "MT|Lobby", meta = (ClampMin = "0", ClampMax = "255"))
+	int32 OutlineStencil = 2;
+
 private:
+	// OutlineTrigger 진입/이탈 → 로컬 플레이어에게 아웃라인 표시
+	UFUNCTION()
+	void OnOutlineTriggerBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnOutlineTriggerEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
+
 	// 현재 표시 중인 사이클 인덱스 (서버 확정 → 전 클라 복제)
 	UPROPERTY(ReplicatedUsing = OnRep_CatIndex)
 	int32 CatIndex = INDEX_NONE;

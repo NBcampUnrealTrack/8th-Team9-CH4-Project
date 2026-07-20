@@ -45,6 +45,13 @@ void AMTPlayerHUD::BeginPlay()
 	const AGameStateBase* GS = GetWorld()->GetGameState();
 	if (!GS || !GS->HasMatchStarted())
 	{
+		// 대기·카운트다운 동안 HUD 위젯 숨김 — "시작!" 이후 ShowPlayerWidget으로 복원
+		if (PlayerWidget)
+		{
+			SavedPlayerWidgetVisibility = PlayerWidget->GetVisibility();
+			PlayerWidget->SetVisibility(ESlateVisibility::Collapsed);
+		}
+
 		ShowLoadingOverlay();
 
 		// 대기 문구 점 애니메이션 (끝 점은 애니메이션이 대신 그림)
@@ -146,12 +153,13 @@ void AMTPlayerHUD::UpdateCountdownText(int32 Value)
 	}
 	else
 	{
-		// 0 = 시작! (StartMatch와 동시) — 잠시 보여주고 제거
+		// 0 = 시작! (StartMatch와 동시) — 잠시 보여주고 제거, HUD 위젯 복원
 		ShowCountdownText(NSLOCTEXT("MT", "MatchStart", "시작!"));
 		if (MatchStartSound)
 		{
 			UGameplayStatics::PlaySound2D(this, MatchStartSound);
 		}
+		ShowPlayerWidget();
 		GetWorldTimerManager().SetTimer(CountdownHideTimer, this, &AMTPlayerHUD::RemoveCountdownText, 0.8f, false);
 	}
 }
@@ -169,7 +177,18 @@ void AMTPlayerHUD::HandleMatchStateChanged()
 		{
 			RemoveLoadingOverlay();
 		}
+		ShowPlayerWidget();
 	}
+}
+
+void AMTPlayerHUD::ShowPlayerWidget()
+{
+	if (bPlayerWidgetRevealed || !PlayerWidget)
+	{
+		return;
+	}
+	bPlayerWidgetRevealed = true;
+	PlayerWidget->SetVisibility(SavedPlayerWidgetVisibility);
 }
 
 void AMTPlayerHUD::ShowCountdownText(const FText& Text)

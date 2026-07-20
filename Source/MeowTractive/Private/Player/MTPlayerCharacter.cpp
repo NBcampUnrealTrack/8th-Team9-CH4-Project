@@ -232,6 +232,12 @@ void AMTPlayerCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputC
 			EnhancedInputComponent->BindAction(ReadyAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::ToggleReady);
 		}
 
+		// 로비 상호작용 (F) — 미할당 BP 대비 널가드
+		if (InteractAction)
+		{
+			EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::Interact);
+		}
+
 		// 슬롯 입력: 눌림/뗌 모두 GAS에 전달 (홀드형 스킬도 슬롯만으로 지원)
 		EnhancedInputComponent->BindAction(SkillAAction, ETriggerEvent::Started, this, &AMTPlayerCharacter::OnSkillAPressed);
 		EnhancedInputComponent->BindAction(SkillAAction, ETriggerEvent::Completed, this, &AMTPlayerCharacter::OnSkillAReleased);
@@ -454,6 +460,17 @@ void AMTPlayerCharacter::ToggleReady()
 	{
 		PC->Server_ToggleReady();   // 0.5s 쿨다운·검증은 컨트롤러가 처리
 	}
+}
+
+void AMTPlayerCharacter::Interact()
+{
+	if (!AbilitySystemComponent || IsStunned())
+	{
+		return;
+	}
+
+	AbilitySystemComponent->TryActivateAbilitiesByTag(
+		FGameplayTagContainer(MTGameplayTags::Ability::TAG_Skill_Interact), true);
 }
 
 void AMTPlayerCharacter::OnSkillAPressed()

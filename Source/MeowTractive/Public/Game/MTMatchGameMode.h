@@ -68,8 +68,9 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
     int32 MatchDuration = 180; // 라운드 시간
 
-    UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
-    TSubclassOf<class AMTPedestrianBase> NormalPedestrianClass; // 행인
+	// 행인 종류 풀 — 스폰 시 순환하며 골고루 소환
+	UPROPERTY(EditDefaultsOnly, Category = "Match Rules")
+	TArray<TSubclassOf<class AMTPedestrianBase>> NormalPedestrianClasses;
 
 	UPROPERTY(EditDefaultsOnly, Category = "Match Rules|Pedestrian")
 	FMTPedestrianGenerationConfig PedestrianGenerationConfig;

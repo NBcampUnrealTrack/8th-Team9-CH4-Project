@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "UI/MTLoadingOverlayHUD.h"
+#include "Components/SlateWrapperTypes.h"
 #include "MTPlayerHUD.generated.h"
 
 class UMTPlayerWidget;
@@ -64,6 +65,9 @@ private:
 	// 페이드인 완료 후 카운트 표시 시작 (페이드 중엔 값만 저장)
 	void HandleRevealFinished();
 
+	// 카운트다운 동안 숨긴 HUD 위젯을 "시작!" 이후 표시
+	void ShowPlayerWidget();
+
 	// 현재 카운트 값 표시 (>0 숫자, 0 = 시작!)
 	void UpdateCountdownText(int32 Value);
 
@@ -76,4 +80,6 @@ private:
 	bool bCountdownShown = false;
 	bool bRevealFinished = false;         // 페이드인 완료 여부
 	int32 PendingCountdownValue = -1;     // 페이드 중 도착한 최신 카운트 값
+	bool bPlayerWidgetRevealed = false;   // HUD 위젯 표시 완료 여부
+	ESlateVisibility SavedPlayerWidgetVisibility = ESlateVisibility::SelfHitTestInvisible;   // 숨기기 전 원래 가시성
 };

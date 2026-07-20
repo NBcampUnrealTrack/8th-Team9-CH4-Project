@@ -5,6 +5,7 @@
 #include "Game/MTLobbyGameMode.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Components/SphereComponent.h"
 #include "Components/WidgetComponent.h"
 #include "UI/Lobby/MTSelectPromptWidget.h"
 #include "GameFramework/Controller.h"
@@ -24,6 +25,15 @@ AMTLobbyCharacter::AMTLobbyCharacter()
 	PromptWidget->SetWidgetSpace(EWidgetSpace::Screen);
 	PromptWidget->SetDrawAtDesiredSize(true);
 	PromptWidget->SetRelativeLocation(FVector(0.f, 0.f, 120.f));
+
+	// 근접 아웃라인 트리거 — Pawn 오버랩만
+	OutlineTrigger = CreateDefaultSubobject<USphereComponent>(TEXT("OutlineTrigger"));
+	OutlineTrigger->SetupAttachment(RootComponent);
+	OutlineTrigger->SetSphereRadius(220.f);
+	OutlineTrigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+	OutlineTrigger->SetCollisionObjectType(ECC_WorldDynamic);
+	OutlineTrigger->SetCollisionResponseToAllChannels(ECR_Ignore);
+	OutlineTrigger->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 
 	// 기본 사이클 (플레이어 폰 BP와 동일한 머티리얼 — 점박이→고등어→뚱냥이)
 	static ConstructorHelpers::FObjectFinder<UMaterialInterface> SpottedMat(TEXT("/Game/Cat_Simple/Cat/Toon/M_CatSimple_C7_Toon"));
@@ -49,6 +59,9 @@ void AMTLobbyCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
 void AMTLobbyCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	OutlineTrigger->OnComponentBeginOverlap.AddDynamic(this, &AMTLobbyCharacter::OnOutlineTriggerBeginOverlap);
+	OutlineTrigger->OnComponentEndOverlap.AddDynamic(this, &AMTLobbyCharacter::OnOutlineTriggerEndOverlap);
 
 	// 정적 조형물: 이동·중력 시뮬 정지 — 클라에서 충돌 꺼진 사이 중력으로 바닥 아래로 가라앉는 것 방지
 	if (UCharacterMovementComponent* Move = GetCharacterMovement())
@@ -96,6 +109,27 @@ void AMTLobbyCharacter::PushPromptLabel()
 		? Cast<UMTSelectPromptWidget>(PromptWidget->GetUserWidgetObject()) : nullptr)
 	{
 		Prompt->SetActionLabel(PromptLabel);
+	}
+}
+
+void AMTLobbyCharacter::OnOutlineTriggerBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	// 로컬 플레이어 폰에게만 표시 (시각 연출 — 원격 폰 무시)
+	const APawn* Pawn = Cast<APawn>(OtherActor);
+	if (Pawn && Pawn->IsPlayerControlled() && Pawn->IsLocallyControlled())
+	{
+		MTLobbyOutline::SetActorOutline(this, true, OutlineStencil);
+	}
+}
+
+void AMTLobbyCharacter::OnOutlineTriggerEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	const APawn* Pawn = Cast<APawn>(OtherActor);
+	if (Pawn && Pawn->IsPlayerControlled() && Pawn->IsLocallyControlled())
+	{
+		MTLobbyOutline::SetActorOutline(this, false, 0);
 	}
 }
 

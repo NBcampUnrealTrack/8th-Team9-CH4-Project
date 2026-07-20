@@ -19,3 +19,9 @@ public:
 	// 펀치 히트 시 호출 (서버). InstigatorPawn = 때린 폰.
 	virtual void OnPunchSelect(AActor* InstigatorPawn) = 0;
 };
+
+// 근접 아웃라인 헬퍼: 액터 메시에 CustomDepth 스텐실 토글 (MM_PPInteractOutline 색 1~3)
+namespace MTLobbyOutline
+{
+	MEOWTRACTIVE_API void SetActorOutline(AActor* Target, bool bEnable, int32 StencilValue);
+}

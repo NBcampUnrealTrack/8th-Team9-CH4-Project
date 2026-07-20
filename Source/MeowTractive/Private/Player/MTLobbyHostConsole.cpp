@@ -7,6 +7,7 @@
 #include "Components/WidgetComponent.h"
 #include "UI/Lobby/MTSelectPromptWidget.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
 #include "Engine/World.h"
 #include "TimerManager.h"
 
@@ -33,11 +34,35 @@ void AMTLobbyHostConsole::BeginPlay()
 {
 	Super::BeginPlay();
 
+	InteractionBox->OnComponentBeginOverlap.AddDynamic(this, &AMTLobbyHostConsole::OnInteractionBoxBeginOverlap);
+	InteractionBox->OnComponentEndOverlap.AddDynamic(this, &AMTLobbyHostConsole::OnInteractionBoxEndOverlap);
+
 	UpdateHostVisibility();
 	if (UWorld* World = GetWorld())
 	{
 		World->GetTimerManager().SetTimer(
 			VisibilityTimer, this, &AMTLobbyHostConsole::UpdateHostVisibility, 0.4f, true);
+	}
+}
+
+void AMTLobbyHostConsole::OnInteractionBoxBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult)
+{
+	// 로컬 플레이어 폰에게만 표시 (시각 연출 — 원격 폰 무시)
+	const APawn* Pawn = Cast<APawn>(OtherActor);
+	if (Pawn && Pawn->IsPlayerControlled() && Pawn->IsLocallyControlled())
+	{
+		MTLobbyOutline::SetActorOutline(this, true, OutlineStencil);
+	}
+}
+
+void AMTLobbyHostConsole::OnInteractionBoxEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+	UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
+{
+	const APawn* Pawn = Cast<APawn>(OtherActor);
+	if (Pawn && Pawn->IsPlayerControlled() && Pawn->IsLocallyControlled())
+	{
+		MTLobbyOutline::SetActorOutline(this, false, 0);
 	}
 }
 

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
@@ -48,9 +48,22 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = "MT|Lobby")
 	TSubclassOf<UUserWidget> ConsoleWidgetClass;
 
+	// 근접 아웃라인 색 (MM_PPInteractOutline)
+	UPROPERTY(EditAnywhere, Category = "MT|Lobby", meta = (ClampMin = "0", ClampMax = "255"))
+	int32 OutlineStencil = 2;
+
 private:
 	// 로컬 플레이어가 호스트일 때만 표시 (복제 지연 대비 주기 재평가)
 	void UpdateHostVisibility();
+
+	// InteractionBox 진입/이탈 → 로컬 플레이어에게 아웃라인 표시
+	UFUNCTION()
+	void OnInteractionBoxBeginOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep, const FHitResult& SweepResult);
+
+	UFUNCTION()
+	void OnInteractionBoxEndOverlap(UPrimitiveComponent* OverlappedComp, AActor* OtherActor,
+		UPrimitiveComponent* OtherComp, int32 OtherBodyIndex);
 
 	FTimerHandle VisibilityTimer;
 };

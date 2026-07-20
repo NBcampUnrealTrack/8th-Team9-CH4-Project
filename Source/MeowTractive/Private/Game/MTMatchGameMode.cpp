@@ -162,7 +162,7 @@ void AMTMatchGameMode::UpdateMatchTimer()
 
 void AMTMatchGameMode::SpawnInitialPedestrians()
 {
-	if (!NormalPedestrianClass) return;
+	if (NormalPedestrianClasses.Num() == 0) return;
 
     UNavigationSystemV1* NavSys = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
     if (!NavSys) return;
@@ -192,13 +192,11 @@ void AMTMatchGameMode::SpawnInitialPedestrians()
         SpawnLocation.Z += 50.f;
 
         FRotator SpawnRotation = FRotator(0.f, FMath::FRandRange(0.f, 360.f), 0.f);
-		const FTransform SpawnTransform(SpawnRotation, SpawnLocation);
-		//UMTPedestrianSpawnManager::SpawnPedestrian(
-		//	this,
-		//	NormalPedestrianClass,
-		//	SpawnTransform,
-		//	PedestrianGenerationConfig);
-		GetWorld()->SpawnActor<AActor>(NormalPedestrianClass, SpawnLocation, SpawnRotation);
+
+		// 종류 풀 순환 → 골고루 소환
+		const TSubclassOf<AMTPedestrianBase> PedClass = NormalPedestrianClasses[i % NormalPedestrianClasses.Num()];
+		if (!PedClass) continue;
+		GetWorld()->SpawnActor<AActor>(PedClass, SpawnLocation, SpawnRotation);
     }
 }
 

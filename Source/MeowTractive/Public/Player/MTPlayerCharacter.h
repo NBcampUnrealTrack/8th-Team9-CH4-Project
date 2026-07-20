@@ -110,6 +110,8 @@ protected:
 	// 로비에서만 R키 → 준비 토글 (매치에선 무시). 서버 RPC는 컨트롤러가 처리.
 	void ToggleReady();
 
+	void Interact();
+
 	// 종류별 스킬 슬롯: 입력은 슬롯 InputID만 GAS에 전달, 실제 어빌리티는 CatAbilities가 결정
 	void OnSkillAPressed();
 	void OnSkillAReleased();
@@ -175,6 +177,10 @@ protected:
 	// 로비 준비 토글 (R). 로비 전용 — 매치에선 핸들러가 무시
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* ReadyAction;
+
+	// 로비 상호작용 (F) → GA_Interact
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* InteractAction;
 
 #pragma endregion
 
