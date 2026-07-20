@@ -17,6 +17,9 @@ DerivedDataCache/
 Intermediate/
 Saved/
 Build/
+
+# 패키징 산출물 (2GB 초과 pak/ucas는 LFS 업로드 불가 — 빌드는 드라이브 등으로 공유)
+/Windows/
 Platforms/*/Binaries/
 Platforms/*/Intermediate/
 
