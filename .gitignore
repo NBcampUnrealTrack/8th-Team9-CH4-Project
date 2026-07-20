@@ -91,10 +91,3 @@ GEMINI.md
 # ----- 기타 -----
 *.log
 *.bak
-
-# ----- 패키징 빌드 산출물 (Windows/) 통째로 추적 (LFS) -----
-# 위 Binaries/·Intermediate/ 등 무시 규칙의 예외. 단 디버그 심볼/로그는 제외.
-!Windows/**/
-!Windows/**
-Windows/**/*.pdb
-Windows/**/*.log
