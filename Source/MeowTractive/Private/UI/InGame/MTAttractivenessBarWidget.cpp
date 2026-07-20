@@ -6,6 +6,9 @@
 #include "Components/CanvasPanelSlot.h"
 #include "Components/Image.h"
 #include "Components/ProgressBar.h"
+#include "Materials/MaterialInterface.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Engine/Texture2D.h"
 
 // Widget 생성 시 캐시된 현재 플레이어와 경쟁자 매료도를 즉시 반영한다.
 void UMTAttractivenessBarWidget::NativeConstruct()
@@ -81,10 +84,10 @@ void UMTAttractivenessBarWidget::UpdateCurrentMarker(float Percent)
 	CurrentAttractivenessHandle->SetVisibility(ClampedPercent > 0.f
         ? ESlateVisibility::HitTestInvisible
         : ESlateVisibility::Collapsed);
-	// if (bUseTeamColors)
-	// {
-	// 	CurrentAttractivenessHandle->SetColorAndOpacity(CachedCurrentColor);
-	// }
+	if (bUseTeamColors)
+	{
+		ApplyHandleColor(CurrentAttractivenessHandle, CurrentHandleMID, CachedCurrentColor);
+	}
 
 	//앵커 위치를 옮겨서 마커 이동(비율에 따른 이동 구현)
     if (UCanvasPanelSlot* MarkerSlot = Cast<UCanvasPanelSlot>(CurrentAttractivenessHandle->Slot))
@@ -107,12 +110,40 @@ void UMTAttractivenessBarWidget::UpdateEnemyMarker(float Percent, FLinearColor C
 		: ESlateVisibility::Collapsed);
 	if (bUseTeamColors)
 	{
-		EnemyAttractivenessHandle->SetColorAndOpacity(Color);
+		ApplyHandleColor(EnemyAttractivenessHandle, EnemyHandleMID, Color);
 	}
 
 	//앵커 위치를 옮겨서 마커 이동(비율에 따른 이동 구현)
 	if (UCanvasPanelSlot* MarkerSlot = Cast<UCanvasPanelSlot>(EnemyAttractivenessHandle->Slot))
 	{
 		MarkerSlot->SetAnchors(FAnchors(ClampedPercent, 0.0f));
+	}
+}
+
+//핸들 team color를 emission 머티리얼로 적용 (없으면 이미지 틴트 폴백)
+void UMTAttractivenessBarWidget::ApplyHandleColor(UImage* Handle, TObjectPtr<UMaterialInstanceDynamic>& MID, const FLinearColor& Color)
+{
+	if (!Handle)
+	{
+		return;
+	}
+
+	if (HandleMaterial)
+	{
+		if (!MID)
+		{
+			MID = UMaterialInstanceDynamic::Create(HandleMaterial, this);
+			// WBP에 설정된 원본 텍스처를 그대로 파라미터로 넘겨 이미지 유지
+			if (UTexture2D* Tex = Cast<UTexture2D>(Handle->GetBrush().GetResourceObject()))
+			{
+				MID->SetTextureParameterValue(TEXT("HandleTex"), Tex);
+			}
+			Handle->SetBrushFromMaterial(MID);
+		}
+		MID->SetVectorParameterValue(TEXT("TeamColor"), Color);
+	}
+	else
+	{
+		Handle->SetColorAndOpacity(Color);
 	}
 }

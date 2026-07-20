@@ -8,6 +8,8 @@
 
 class UImage;
 class UProgressBar;
+class UMaterialInterface;
+class UMaterialInstanceDynamic;
 
 UCLASS()
 class MEOWTRACTIVE_API UMTAttractivenessBarWidget : public UUserWidget
@@ -51,6 +53,10 @@ protected:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Attractiveness Bar|Appearance")
     bool bUseTeamColors = true;
 
+    // 핸들 emission 머티리얼 (Class Defaults에서 할당). 미지정 시 이미지 틴트로 폴백
+    UPROPERTY(EditAnywhere, Category = "Attractiveness Bar|Appearance")
+    TObjectPtr<UMaterialInterface> HandleMaterial;
+
 private:
     float CachedCurrent = 0.f;
     float CachedEnemy = 0.f;
@@ -60,4 +66,13 @@ private:
 
     void UpdateCurrentMarker(float Percent);
 	void UpdateEnemyMarker(float Percent, FLinearColor Color);
+
+	// 핸들에 team color를 emission 머티리얼로 적용 (머티리얼 없으면 이미지 틴트 폴백)
+	void ApplyHandleColor(UImage* Handle, TObjectPtr<UMaterialInstanceDynamic>& MID, const FLinearColor& Color);
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> CurrentHandleMID;
+
+	UPROPERTY(Transient)
+	TObjectPtr<UMaterialInstanceDynamic> EnemyHandleMID;
 };

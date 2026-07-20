@@ -8,6 +8,7 @@
 #include "Game/MTGameInstance.h"
 #include "Game/MTLog.h"
 #include "EnhancedInputComponent.h"
+#include "InputCoreTypes.h"
 #include "UI/InGame/MTPlayerHUD.h"
 #include "UI/InGame/MTPlayerWidget.h"
 
@@ -25,6 +26,27 @@ void AMTPlayerController::SetupInputComponent()
 		else
 		{
 			UE_CLOG(MTLogEnabled(), LogMT, Warning, TEXT("[MTPC] PauseAction 미지정 → 일시정지 입력 없음 (BP_MTPlayerController에서 IA_Pause 지정)"));
+		}
+	}
+
+	// F1 → 스킬 정보 패널 토글 (Enhanced Input과 별개로 컨트롤러 InputComponent에 직접 바인딩)
+	if (InputComponent)
+	{
+		InputComponent->BindKey(EKeys::F1, IE_Pressed, this, &AMTPlayerController::ToggleSkillInfo);
+	}
+}
+
+void AMTPlayerController::ToggleSkillInfo()
+{
+	if (!IsLocalController())
+	{
+		return;
+	}
+	if (AMTPlayerHUD* MTHUD = GetHUD<AMTPlayerHUD>())
+	{
+		if (UMTPlayerWidget* Widget = MTHUD->GetPlayerWidget())
+		{
+			Widget->ToggleSkillInfo();
 		}
 	}
 }

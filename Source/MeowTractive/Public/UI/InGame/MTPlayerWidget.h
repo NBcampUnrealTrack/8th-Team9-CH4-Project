@@ -11,6 +11,7 @@ class UProgressBar;
 class UVerticalBox;
 class UImage;
 class UMTSkillSlotWidget;
+class UMTSkillDescData;
 class AMTGameState;
 class AMTPlayerCharacter;
 class UAbilitySystemComponent;
@@ -26,6 +27,10 @@ public:
 	// 매료빔이 행인에 닿을 때마다 호출 — 지속 피격 중엔 유지, 끊기면 자동 숨김
 	UFUNCTION(BlueprintCallable)
 	void ShowHitMarker();
+
+	// F1 토글: 스킬 정보 패널 열기/닫기 (열 때 현재 고양이 기준으로 설명/아이콘 갱신)
+	UFUNCTION(BlueprintCallable, Category = "MT|HUD")
+	void ToggleSkillInfo();
 
 protected:
 	virtual void NativeConstruct() override;
@@ -76,6 +81,34 @@ protected:
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UMTSkillSlotWidget> SkillBSlot;
 
+	// F1로 여닫는 스킬 정보 패널 (기본 숨김)
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UWidget> SkillInfoCanvas;
+
+	// 패시브 / 스킬1 / 스킬2 설명 텍스트
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> SkillInfo1;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> SkillInfo2;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UTextBlock> SkillInfo3;
+
+	// 스킬 정보 패널 아이콘 슬롯 (현재 고양이 기준으로 아이콘 표시)
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UMTSkillSlotWidget> PassiveSlot_SkillInfo;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UMTSkillSlotWidget> SkillASlot_SkillInfo;
+
+	UPROPERTY(meta = (BindWidgetOptional))
+	TObjectPtr<UMTSkillSlotWidget> SkillBSlot_SkillInfo;
+
+	// 고양이별 스킬 설명 데이터 (Class Defaults에서 할당 — 에디터에서 텍스트 편집)
+	UPROPERTY(EditAnywhere, Category = "MT|SkillInfo")
+	TObjectPtr<UMTSkillDescData> SkillDescData;
+
 	// 중앙: 히트마커 (매료빔 피격 시 표시, 기본 Collapsed)
 	UPROPERTY(meta = (BindWidgetOptional))
 	TObjectPtr<UImage> HitMarker;
@@ -100,6 +133,9 @@ private:
 	void RefreshAttractedCount();
 	void RefreshHp();
 	void RefreshAccentColor();
+
+	// 현재 고양이의 패시브/스킬 설명을 SkillInfo 텍스트에 반영
+	void RefreshSkillInfo();
 
 
 	TWeakObjectPtr<AMTGameState> BoundGameState;
