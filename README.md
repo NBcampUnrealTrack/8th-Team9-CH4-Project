@@ -1,7 +1,7 @@
 # MeowTractive
 
-TPS 캐주얼 액션 / 경쟁형 멀티플레이 / 파티 게임 / 탑뷰 익스트랙션
-(Casual Action · Competitive Multiplayer · Party · Top-down Extraction)
+TPS 캐주얼 액션 / 경쟁형 멀티플레이 / 파티 게임
+(Casual Action · Competitive Multiplayer · Party)
 
 - **엔진**: Unreal Engine **5.8**
 - **런타임 모듈**: `MeowTractive` (C++)
@@ -19,7 +19,7 @@ TPS 캐주얼 액션 / 경쟁형 멀티플레이 / 파티 게임 / 탑뷰 익스
 | 항목 | 권장 |
 |------|------|
 | 엔진 | Unreal Engine 5.8 |
-| IDE | Visual Studio 2022 / JetBrains Rider |
+| IDE | Visual Studio 2022 |
 | 버전 관리 | Git + **Git LFS (파일 잠금)** |
 | 소스 인코딩 | **UTF-8 with BOM** (`.editorconfig` 적용 — 한글 주석 깨짐 방지) |
 
